@@ -35,7 +35,7 @@ final class SetLocale
         if (!in_array($locale, $available, true)) {
             $locale = 'ru';
         }
-        dump($locale);
+
         app()->setLocale($locale);
 
         return $next($request);
