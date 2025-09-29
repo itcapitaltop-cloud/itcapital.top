@@ -17,8 +17,14 @@ final class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $request->cookie('locale')
-            ?? substr($request->server('HTTP_ACCEPT_LANGUAGE'), 0, 2);
+        $locale = $request->cookie('locale');
+
+        if (!$locale) {
+            $acceptLanguage = $request->server('HTTP_ACCEPT_LANGUAGE', '');
+            $browserLang = substr($acceptLanguage, 0, 2);
+
+            $locale = ($browserLang === 'zh') ? 'ru' : $browserLang;
+        }
 
         if (auth()->check() && !is_null(auth()->user()->locale)) {
             $locale = auth()->user()->locale;
@@ -27,7 +33,7 @@ final class SetLocale
         $available = ['ru', 'en', 'zh'];
 
         if (!in_array($locale, $available, true)) {
-            $locale = 'en';
+            $locale = 'ru';
         }
 
         app()->setLocale($locale);
