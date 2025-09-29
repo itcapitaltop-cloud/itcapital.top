@@ -6,7 +6,8 @@
 /storage/*.key
 /vendor
 .env.backup
-.env.productiongit branch -M main
+.env.production
+
 .env
 .phpactor.json
 .phpunit.result.cache
