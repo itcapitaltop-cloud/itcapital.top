@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities { [x-cloak]{display:none!important} }
+
+@layer utilities {
+    .icon-black {
+        filter: brightness(0) saturate(100%);
+    }
+
+    .icon-green {
+        filter: invert(71%) sepia(20%) saturate(1078%) hue-rotate(65deg) brightness(92%) contrast(87%);
+    }
+
+    .icon-gray-400 {
+        filter: invert(36%) sepia(1%) saturate(0%) hue-rotate(92deg) brightness(95%) contrast(86%);
+    }
+
+    .icon-white {
+        filter: invert(100%) sepia(27%) saturate(83%) hue-rotate(247deg) brightness(117%) contrast(100%);
+    }
+
+    .icon-red {
+        filter: invert(48%) sepia(72%) saturate(6139%) hue-rotate(339deg) brightness(106%) contrast(112%);
+    }
+
+    .icon-yellow {
+        filter: invert(94%) sepia(9%) saturate(1852%) hue-rotate(356deg) brightness(94%) contrast(89%);
+    }
+
+    .bg-gray-alpha {
+        background: rgba(31, 31, 31, 0.5);
+    }
+
+    .top-unset {
+        top: unset;
+    }
+    .left-unset {
+        left: unset;
+    }
+
+    /*.no-spinner {*/
+    /*    -moz-appearance: textfield;        !* Firefox *!*/
+    /*}*/
+    /*.no-spinner::-webkit-inner-spin-button,*/
+    /*.no-spinner::-webkit-outer-spin-button {*/
+    /*    -webkit-appearance: none;          !* Chrome, Safari, Edge *!*/
+    /*    margin: 0;*/
+    /*}*/
+}
+
+@layer base {
+    @font-face {
+        font-family: 'OCR B';
+        font-style: normal;
+        font-weight: normal;
+        src: url("/resources/assets/fonts/ocr-b-regular.ttf");
+    }
+
+    @font-face {
+        font-family: 'Golos Text';
+        font-style: normal;
+        font-weight: normal;
+        src: url("/resources/assets/fonts/GolosText.ttf")
+    }
+
+    @font-face {
+        font-family: 'Golos Text';
+        font-style: normal;
+        font-weight: bold;
+        src: url("/resources/assets/fonts/GolosText.ttf")
+    }
+
+    @font-face {
+        font-family: 'Golos Text';
+        font-style: normal;
+        font-weight: 800;
+        src: url("/resources/assets/fonts/GolosText.ttf")
+    }
+
+    /*html {*/
+    /*    font-family: 'Golos Text';*/
+    /*}*/
+
+    html {
+        font-family: 'Inter', sans-serif;
+        background-color: #17162d;
+    }
+}
+
+@layer utilities {
+    .animate-candle {
+        animation: candle infinite;
+    }
+
+    .animate-shine-sweep {
+        will-change: transform;
+        transform: translateZ(0);
+    }
+
+    .animate-candle-reverse {
+        animation: candle-reverse infinite;
+    }
+
+    .ease {
+        transition-timing-function: ease;
+    }
+}
+
+@layer components {
+    .no-spinner {
+        -moz-appearance: textfield;
+    }
+
+    .no-spinner::-webkit-outer-spin-button,
+    .no-spinner::-webkit-inner-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+}
+
+@keyframes candle {
+    0% {
+        transform: translateY(-10%);
+    }
+
+    50% {
+        transform: translateY(10%);
+    }
+
+    100% {
+        transform: translateY(-10%);
+    }
+}
+
+
+@keyframes candle-reverse {
+    0% {
+        transform: translateY(10%);
+    }
+
+    50% {
+        transform: translateY(-10%);
+    }
+
+    100% {
+        transform: translateY(10%);
+    }
+}

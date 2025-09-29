@@ -1,0 +1,9 @@
+*
+!public/
+!backup/
+!backup/.gitkeep
+!google/
+!google/**
+!public/docs/
+!public/docs/**
+!.gitignore
