@@ -29,8 +29,8 @@
                 {{-- Источник --}}
                 <x-ui.select label="{{ __('livewire_finance_deposit_source_label') }}" name="depositForm.depositSource"
                     x-model="depositSource" :options="[
-                        'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
-                        'fiat' => '{{ __('livewire_finance_deposit_source_fiat') }}',
+                        'crypto' => __('livewire_finance_deposit_source_crypto'),
+                        'fiat' => __('livewire_finance_deposit_source_fiat'),
                     ]"
                     placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" class="" />
 
@@ -199,8 +199,8 @@
             <div class="flex flex-col gap-[40px]">
                 <x-ui.select label="{{ __('livewire_finance_withdraw_format_label') }}"
                     name="withdrawForm.withdrawSource" x-model="withdrawSource" :options="[
-                        'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
-                        'fiat' => '{{ __('livewire_finance_deposit_source_fiat') }}',
+                        'crypto' => __('livewire_finance_deposit_source_crypto'),
+                        'fiat' => __('livewire_finance_deposit_source_fiat'),
                     ]"
                     placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" />
                 <div>
