@@ -2,26 +2,23 @@
     use Illuminate\Support\Carbon;
     $depositAddress = config('wallet.deposit_address');
     use Illuminate\Support\Facades\Log;
-    $withdrawDisabled = ! Carbon::now()->isSunday();
+    $withdrawDisabled = !Carbon::now()->isSunday();
 @endphp
 
-<x-ui.card-tabs
-    :tabs="[
-        'deposit'  => '{{ __('livewire_finance_tab_deposit') }}',
-        'withdraw' => '{{ __('livewire_finance_tab_withdraw') }}',
-        'log'      => '{{ __('livewire_finance_tab_log') }}',
-    ]"
-    class="mx-auto">
+<x-ui.card-tabs :tabs="[
+    'deposit' => __('livewire_finance_tab_deposit'),
+    'withdraw' => __('livewire_finance_tab_withdraw'),
+    'log' => __('livewire_finance_tab_log'),
+]" class="mx-auto">
 
     {{-- ▸ вкладка «Пополнение счета» --}}
     <x-slot name="deposit">
-        <form x-data="{ depositSource: '', helpOpen:false }" wire:submit="createDeposit" @submit.prevent
-              class="grid md:grid-cols-2 gap-10" data-network="{{ config('wallet.network') }}">
+        <form x-data="{ depositSource: '', helpOpen: false }" wire:submit="createDeposit" @submit.prevent class="grid md:grid-cols-2 gap-10"
+            data-network="{{ config('wallet.network') }}">
 
             <div class="flex justify-end md:hidden">
-                <button type="button"
-                        class="text-[#B4FF59] text-[14px] underline decoration-dashed underline-offset-2"
-                        x-on:click="helpOpen = true">
+                <button type="button" class="text-[#B4FF59] text-[14px] underline decoration-dashed underline-offset-2"
+                    x-on:click="helpOpen = true">
                     {{ __('livewire_finance_deposit_help_mobile') }}
                 </button>
             </div>
@@ -30,37 +27,31 @@
             <div class="space-y-6 flex flex-col gap-[16px]">
 
                 {{-- Источник --}}
-                <x-ui.select
-                    label="{{ __('livewire_finance_deposit_source_label') }}"
-                    name="depositForm.depositSource"
-                    x-model="depositSource"
-                    :options="[
-                    'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
-                    'fiat'  => '{{ __('livewire_finance_deposit_source_fiat') }}',
-                ]"
-                    placeholder="{{ __('livewire_finance_deposit_source_crypto') }}"
-                    class=""
-                />
+                <x-ui.select label="{{ __('livewire_finance_deposit_source_label') }}" name="depositForm.depositSource"
+                    x-model="depositSource" :options="[
+                        'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
+                        'fiat' => '{{ __('livewire_finance_deposit_source_fiat') }}',
+                    ]"
+                    placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" class="" />
 
                 {{-- Сумма --}}
                 <x-ui.input name="depositForm.depositAmount" type="text" step="0.01"
-                            placeholder="{{ __('livewire_finance_deposit_amount_placeholder') }}"
-                            input-class="py-[5px] px-[12px]" validate="number">
+                    placeholder="{{ __('livewire_finance_deposit_amount_placeholder') }}"
+                    input-class="py-[5px] px-[12px]" validate="number">
                     {{ __('livewire_finance_deposit_amount_label') }}
                 </x-ui.input>
 
                 {{-- Адрес кошелька + копия  (только для «Криптовалюта») --}}
                 <template x-if="depositSource !== 'fiat'">
                     <div class="flex w-full gap-3">
-                        <x-ui.input
-                            name="depositForm.depositAddress" validate="wallet"
-                            value="{{ $depositAddress }}" readonly class="flex-1"
-                            input-class="py-[5px] px-[12px]">
+                        <x-ui.input name="depositForm.depositAddress" validate="wallet" value="{{ $depositAddress }}"
+                            readonly class="flex-1" input-class="py-[5px] px-[12px]">
                             {{ __('livewire_finance_deposit_wallet_address_label') }}
-                            <span class="text-white/50">{{ __('livewire_finance_deposit_network_label') }} {{ config('wallet.network') }}</span>
+                            <span class="text-white/50">{{ __('livewire_finance_deposit_network_label') }}
+                                {{ config('wallet.network') }}</span>
                         </x-ui.input>
                         <button type="button"
-                                x-on:click="navigator.clipboard.writeText(@js($depositAddress)).then(() => $dispatch('new-system-notification', {
+                            x-on:click="navigator.clipboard.writeText(@js($depositAddress)).then(() => $dispatch('new-system-notification', {
                                         type: 'success',
                                         message: '{{ __('livewire_finance_notification_copy_success') }}'
                                     }))
@@ -68,7 +59,7 @@
                                         type: 'error',
                                         message: '{{ __('livewire_finance_notification_copy_failed') }}'
                                     }))"
-                                class="shrink-0 rounded-[8px] flex items-center justify-center px-[6px] py-[5px] mt-[22px]
+                            class="shrink-0 rounded-[8px] flex items-center justify-center px-[6px] py-[5px] mt-[22px]
                                    bg-[#433F8E] hover:bg-[#3c3c70] border border-white/20">
                             <img src="{{ vite()->icon('/actions/copy-new.svg') }}" alt="">
                         </button>
@@ -77,10 +68,11 @@
 
                 {{-- Хеш / Наименование банка --}}
                 <x-ui.input name="depositForm.transactionHash"
-                            x-bind:placeholder="depositSource === 'fiat'
-                            ? '{{ __('livewire_finance_deposit_transaction_hash_placeholder_fiat') }}'
-                            : '{{ __('livewire_finance_deposit_transaction_hash_placeholder_crypto') }}'"
-                            input-class="py-[5px] px-[12px]">
+                    x-bind:placeholder="depositSource === 'fiat'
+                        ?
+                        '{{ __('livewire_finance_deposit_transaction_hash_placeholder_fiat') }}' :
+                        '{{ __('livewire_finance_deposit_transaction_hash_placeholder_crypto') }}'"
+                    input-class="py-[5px] px-[12px]">
                     <template x-if="depositSource === 'fiat'">
                         <span>{{ __('livewire_finance_deposit_bank_name_label_fiat') }}</span>
                     </template>
@@ -93,7 +85,7 @@
                 <template x-if="depositSource === 'fiat'">
                     <div>
                         <a href="https://t.me/ITCAPITALTOP" target="_blank"
-                           class="text-[#B4FF59] w-auto underline underline-offset-2 hover:text-[#C0FFA1]">
+                            class="text-[#B4FF59] w-auto underline underline-offset-2 hover:text-[#C0FFA1]">
                             {{ __('livewire_finance_deposit_get_details_button') }}
                         </a>
                     </div>
@@ -107,15 +99,14 @@
                 </div>
             </div>
 
-            <div
-                x-show="helpOpen"
-                x-transition.opacity
+            <div x-show="helpOpen" x-transition.opacity
                 class="fixed inset-0 z-40 flex items-center justify-center md:hidden">
                 {{-- затемнение --}}
                 <div class="absolute inset-0 bg-black/60" x-on:click="helpOpen = false"></div>
 
                 {{-- сам блок подсказки --}}
-                <div class="relative z-50 max-w-[90%] w-[340px]
+                <div
+                    class="relative z-50 max-w-[90%] w-[340px]
                     rounded-[20px] p-6 bg-[#211F41] border border-white/10
                     text-white/80 text-[15px] leading-6 space-y-4">
                     {{-- заголовок + close --}}
@@ -195,65 +186,54 @@
     </x-slot>
 
     <x-slot name="withdraw">
-        <form  x-data="{ withdrawSource: '', helpOpen:false }"
-        wire:submit="createWithdraw"
-               @submit.prevent
-               data-network="{{ config('wallet.network') }}"
-               class="grid md:grid-cols-2 gap-10">
+        <form x-data="{ withdrawSource: '', helpOpen: false }" wire:submit="createWithdraw" @submit.prevent
+            data-network="{{ config('wallet.network') }}" class="grid md:grid-cols-2 gap-10">
 
             <div class="flex justify-end md:hidden">
-                <button type="button"
-                        class="text-[#B4FF59] text-[14px] underline decoration-dashed underline-offset-2"
-                        x-on:click="helpOpen = true">
+                <button type="button" class="text-[#B4FF59] text-[14px] underline decoration-dashed underline-offset-2"
+                    x-on:click="helpOpen = true">
                     {{ __('livewire_finance_withdraw_help_mobile') }}
                 </button>
             </div>
 
             <div class="flex flex-col gap-[40px]">
-                <x-ui.select
-                    label="{{ __('livewire_finance_withdraw_format_label') }}"
-                    name="withdrawForm.withdrawSource"
-                    x-model="withdrawSource"
-                    :options="[
-                    'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
-                    'fiat'  => '{{ __('livewire_finance_deposit_source_fiat') }}',
-                ]"
+                <x-ui.select label="{{ __('livewire_finance_withdraw_format_label') }}"
+                    name="withdrawForm.withdrawSource" x-model="withdrawSource" :options="[
+                        'crypto' => '{{ __('livewire_finance_deposit_source_crypto') }}',
+                        'fiat' => '{{ __('livewire_finance_deposit_source_fiat') }}',
+                    ]"
                     placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" />
                 <div>
                     <x-ui.input name="withdrawForm.withdrawAmount" type="text" step="0.01"
-                                placeholder="{{ __('livewire_finance_withdraw_amount_placeholder') }}"
-                                input-class="py-[5px] px-[12px]" validate="number">
+                        placeholder="{{ __('livewire_finance_withdraw_amount_placeholder') }}"
+                        input-class="py-[5px] px-[12px]" validate="number">
                         {{ __('livewire_finance_withdraw_amount_label') }}
                     </x-ui.input>
                     <p x-show="parseFloat($wire.withdrawForm.withdrawAmount) >= 10" class="text-white px-4 pt-1.5">
-                        {{ __('livewire_finance_withdraw_to_receive') }} <span x-text="(parseFloat($wire.withdrawForm.withdrawAmount) * 0.98 - 2).toFixed(2)"></span>
+                        {{ __('livewire_finance_withdraw_to_receive') }} <span
+                            x-text="(parseFloat($wire.withdrawForm.withdrawAmount) * 0.98 - 2).toFixed(2)"></span>
                     </p>
                 </div>
                 <template x-if="withdrawSource === 'fiat'">
                     <div class="flex flex-col gap-[40px]">
                         {{-- Номер СБП (телефон получателя) --}}
                         <x-ui.input name="withdrawForm.sbpPhone"
-                                    placeholder="{{ __('livewire_finance_withdraw_sbp_phone_placeholder') }}"
-                                    input-class="py-[5px] px-[12px]"
-                                    type="text"
-                                    validate="phone"
-                        >
+                            placeholder="{{ __('livewire_finance_withdraw_sbp_phone_placeholder') }}"
+                            input-class="py-[5px] px-[12px]" type="text" validate="phone">
                             {{ __('livewire_finance_withdraw_sbp_phone_label') }}
                         </x-ui.input>
 
                         {{-- Наименование банка --}}
                         <x-ui.input name="withdrawForm.bankName"
-                                    placeholder="{{ __('livewire_finance_withdraw_bank_name_placeholder') }}"
-                                    input-class="py-[5px] px-[12px]"
-                        >
+                            placeholder="{{ __('livewire_finance_withdraw_bank_name_placeholder') }}"
+                            input-class="py-[5px] px-[12px]">
                             {{ __('livewire_finance_withdraw_bank_name_label') }}
                         </x-ui.input>
 
                         {{-- ФИО получателя --}}
                         <x-ui.input name="withdrawForm.recipientName"
-                                    placeholder="{{ __('livewire_finance_withdraw_recipient_name_placeholder') }}"
-                                    input-class="py-[5px] px-[12px]"
-                        >
+                            placeholder="{{ __('livewire_finance_withdraw_recipient_name_placeholder') }}"
+                            input-class="py-[5px] px-[12px]">
                             {{ __('livewire_finance_withdraw_recipient_name_label') }}
                         </x-ui.input>
                     </div>
@@ -261,34 +241,31 @@
 
                 <template x-if="withdrawSource !== 'fiat'">
                     <div class="flex w-full gap-3">
-                        <x-ui.input name="withdrawForm.address"
-                                    validate="wallet"
-                                    placeholder="{{ __('livewire_finance_withdraw_wallet_address_label_placeholder') }}"
-                                    class="flex-1" input-class="py-[5px] px-[12px]">
+                        <x-ui.input name="withdrawForm.address" validate="wallet"
+                            placeholder="{{ __('livewire_finance_withdraw_wallet_address_label_placeholder') }}"
+                            class="flex-1" input-class="py-[5px] px-[12px]">
                             {{ __('livewire_finance_withdraw_wallet_address_label') }}
-                            <span class="text-white/50">{{ __('livewire_finance_deposit_network_label') }} {{ config('wallet.network') }}</span>
+                            <span class="text-white/50">{{ __('livewire_finance_deposit_network_label') }}
+                                {{ config('wallet.network') }}</span>
                         </x-ui.input>
                     </div>
                 </template>
 
                 <div>
-                    <x-ui.submit-button
-                        action="createWithdraw"
-                        :disabled="$withdrawDisabled"
-                    >
+                    <x-ui.submit-button action="createWithdraw" :disabled="$withdrawDisabled">
                         {{ __('livewire_finance_withdraw_submit_button') }}
                     </x-ui.submit-button>
                 </div>
             </div>
 
-            <div x-show="helpOpen"
-                 x-transition.opacity
-                 class="fixed inset-0 z-40 flex items-center justify-center md:hidden">
+            <div x-show="helpOpen" x-transition.opacity
+                class="fixed inset-0 z-40 flex items-center justify-center md:hidden">
                 <!-- затемнение -->
                 <div class="absolute inset-0 bg-black/60" x-on:click="helpOpen = false"></div>
 
                 <!-- коробка с инструкциями -->
-                <div class="relative z-50 max-w-[90%] w-[340px]
+                <div
+                    class="relative z-50 max-w-[90%] w-[340px]
                 rounded-[20px] p-6 bg-[#211F41] border border-white/10
                 text-white/80 text-[15px] leading-6 space-y-4">
                     <div class="flex justify-between items-start">
@@ -316,7 +293,7 @@
                     <!-- подсказка для фиата -->
                     <template x-if="withdrawSource === 'fiat'">
                         <div>
-                             {{ __('livewire_finance_withdraw_help_fiat_title') }}
+                            {{ __('livewire_finance_withdraw_help_fiat_title') }}
                             <ul class="list-decimal list-inside mt-2">
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_1') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
@@ -369,47 +346,44 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left text-white whitespace-nowrap">
                 <thead class="text-white">
-                <tr class="border-none font-dela text-[16px] leading-[40px]">
-                    <th class="py-2 pr-4">{{ __('livewire_finance_log_date_header') }}</th>
-                    <th class="py-2 pr-4">{{ __('livewire_finance_log_amount_header') }}</th>
-                    <th class="py-2 pr-4">{{ __('livewire_finance_log_type_header') }}</th>
-                    <th class="py-2">{{ __('livewire_finance_log_status_header') }}</th>
-                </tr>
+                    <tr class="border-none font-dela text-[16px] leading-[40px]">
+                        <th class="py-2 pr-4">{{ __('livewire_finance_log_date_header') }}</th>
+                        <th class="py-2 pr-4">{{ __('livewire_finance_log_amount_header') }}</th>
+                        <th class="py-2 pr-4">{{ __('livewire_finance_log_type_header') }}</th>
+                        <th class="py-2">{{ __('livewire_finance_log_status_header') }}</th>
+                    </tr>
                 </thead>
                 <tbody class="font-semibold text-[16px]">
-                @forelse($operations as $op)
-                    <tr class="border-none">
-                        <td class="py-2 pr-4">
-                            {{ $op['created_at']->format('d.m.Y, H:i') }}
-                        </td>
-                        <td class="py-2 pr-4">
-                            ${{ number_format($op['amount']) }}
-                        </td>
-                        <td class="py-2 pr-4">
-                            <img src="{{ vite()->icon(
-                                $op['arrow'] === 'down'
-                                    ? '/advantages/arrow-down.svg'
-                                    : '/advantages/arrow-up.svg'
-                            ) }}"
-                                 class="inline-block mr-1 align-middle"
-                                 alt="{{ $op['arrow'] === 'down' ? '↓' : '↑' }}" />
-                            {{ $op['type'] }}
-                        </td>
-                        <td class="py-2 pl-4">
-                            {{ $op['status'] }}
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="4" class="p-0">            {{-- убираем внутренние отступы --}}
-                            <div class="min-h-[400px] flex items-center justify-center">
-                                <p class="text-white/60">{{ __('livewire_finance_log_empty') }}</p>
-                            </div>
-                        </td></tr>
-                @endforelse
+                    @forelse($operations as $op)
+                        <tr class="border-none">
+                            <td class="py-2 pr-4">
+                                {{ $op['created_at']->format('d.m.Y, H:i') }}
+                            </td>
+                            <td class="py-2 pr-4">
+                                ${{ number_format($op['amount']) }}
+                            </td>
+                            <td class="py-2 pr-4">
+                                <img src="{{ vite()->icon($op['arrow'] === 'down' ? '/advantages/arrow-down.svg' : '/advantages/arrow-up.svg') }}"
+                                    class="inline-block mr-1 align-middle"
+                                    alt="{{ $op['arrow'] === 'down' ? '↓' : '↑' }}" />
+                                {{ $op['type'] }}
+                            </td>
+                            <td class="py-2 pl-4">
+                                {{ $op['status'] }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="p-0"> {{-- убираем внутренние отступы --}}
+                                <div class="min-h-[400px] flex items-center justify-center">
+                                    <p class="text-white/60">{{ __('livewire_finance_log_empty') }}</p>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
     </x-slot>
 
 </x-ui.card-tabs>
-
