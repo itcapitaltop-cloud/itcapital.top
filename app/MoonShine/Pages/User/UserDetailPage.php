@@ -14,63 +14,47 @@ use App\Models\ItcPackage;
 use App\Models\LogAdminAction;
 use App\Models\Partner;
 use App\Models\PartnerLevelPercent;
+use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
-use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
-use App\MoonShine\Resources\ItcPackageResource;
-use App\MoonShine\Resources\TransactionResource;
 use App\MoonShine\Resources\UserResource;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\Alert;
-use MoonShine\Components\Breadcrumbs;
-use MoonShine\Components\Dropdown;
 use MoonShine\Components\FlexibleRender;
 use MoonShine\Components\FormBuilder;
-use MoonShine\Components\Link;
 use MoonShine\Components\Modal;
-use MoonShine\Decorations\Column;
+use MoonShine\Components\MoonShineComponent;
+use MoonShine\Components\TableBuilder;
+use MoonShine\Decorations\Block;
 use MoonShine\Decorations\Divider;
-use MoonShine\Decorations\Grid;
+use MoonShine\Decorations\Heading;
 use MoonShine\Decorations\Tab;
 use MoonShine\Decorations\Tabs;
-use MoonShine\Fields\Checkbox;
 use MoonShine\Fields\Date;
+use MoonShine\Fields\Email;
 use MoonShine\Fields\Enum;
+use MoonShine\Fields\Field;
 use MoonShine\Fields\Fields;
 use MoonShine\Fields\Hidden;
+use MoonShine\Fields\Number;
 use MoonShine\Fields\Password;
 use MoonShine\Fields\Preview;
 use MoonShine\Fields\Relationships\BelongsTo;
-use MoonShine\Fields\Switcher;
-use MoonShine\Fields\Td;
-use MoonShine\Fields\Template;
-use MoonShine\Fields\Relationships\HasOne;
 use MoonShine\Fields\Select;
-use MoonShine\Pages\Crud\DetailPage;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Components\TableBuilder;
-use MoonShine\Components\Layout\Div;
-use MoonShine\Decorations\Block;
-use MoonShine\Decorations\Fragment;
-use MoonShine\Decorations\Heading;
-use MoonShine\Fields\Email;
-use MoonShine\Fields\Field;
-use MoonShine\Fields\ID;
-use MoonShine\Fields\Number;
+use MoonShine\Fields\Switcher;
+use MoonShine\Fields\Template;
 use MoonShine\Fields\Text;
 use MoonShine\Fields\Url;
 use MoonShine\Http\Requests\MoonShineFormRequest;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
+use MoonShine\Pages\Crud\DetailPage;
 use MoonShine\Pages\PageComponents;
 use MoonShine\TypeCasts\ModelCast;
-use App\Models\UserAuthLog;
 use Throwable;
 
 class UserDetailPage extends DetailPage
@@ -95,9 +79,10 @@ class UserDetailPage extends DetailPage
         $resource = $this->getResource();
         $item = $resource->getItem();
 
-        $activeTab     = request('tab', 'main');
-        $openPackage   = request('openPackage');
-//        Log::channel('source')->debug($activeTab);
+        $activeTab = request('tab', 'main');
+        $openPackage = request('openPackage');
+
+        //        Log::channel('source')->debug($activeTab);
         if (! $item->relationLoaded('summary')) {
             $item->load('summary');
         }
@@ -107,14 +92,14 @@ class UserDetailPage extends DetailPage
                 ->icon('heroicons.lock-open')
                 ->method(
                     'unban',
-                    params: fn() => ['resourceItem' => $item->id]
+                    params: fn () => ['resourceItem' => $item->id]
                 )
                 ->primary()
             : ActionButton::make('Забанить')
                 ->icon('heroicons.lock-closed')
                 ->method(
                     'ban',
-                    params: fn() => ['resourceItem' => $item->id]
+                    params: fn () => ['resourceItem' => $item->id]
                 )
                 ->error();
 
@@ -126,7 +111,7 @@ class UserDetailPage extends DetailPage
 
                 Block::make('Добавить бонус', [
                     Template::make('Тип баланса')
-                        ->changeRender(fn() => view('admin.partials.balance-type-radios', [
+                        ->changeRender(fn () => view('admin.partials.balance-type-radios', [
                             'item' => $item,
                             'enum' => BalanceTypeEnum::cases(),
                         ])->render()),
@@ -138,11 +123,10 @@ class UserDetailPage extends DetailPage
                 ]),
             ])
             ->name('bonus-form')
-            ->async(asyncEvents:
-                [
-                    'table-updated-users',
-                    'form-reset-balance-form'
-                ])
+            ->async(asyncEvents: [
+                'table-updated-users',
+                'form-reset-balance-form',
+            ])
             ->submit('Отредактировать');
 
         $trigger = ActionButton::make('Редактировать')
@@ -155,17 +139,17 @@ class UserDetailPage extends DetailPage
         ]);
 
         $balanceModal = Modal::make(
-            title:      'Редактировать баланс',
-            content:    fn() => null,
-            outer:      $trigger,
-            asyncUrl:   null,
+            title: 'Редактировать баланс',
+            content: fn () => null,
+            outer: $trigger,
+            asyncUrl: null,
             components: $formComponents
         )->name('edit-balance-modal');
 
         $formChangePassword = FormBuilder::make()
             ->asyncMethod('changePassword')
             ->fields([
-                Preview::make('Текущий пароль', formatted: fn() => $item->getAuthPassword()),
+                Preview::make('Текущий пароль', formatted: fn () => $item->getAuthPassword()),
                 Password::make('Новый пароль', 'new_password'),
                 Hidden::make('user_id')->fill($item->id),
             ])
@@ -181,18 +165,17 @@ class UserDetailPage extends DetailPage
             ->primary();
 
         $passwordModal = Modal::make(
-            title:       'Редактировать пароль',
-            content:     fn() => null,
-            outer:       $trigger,
-            asyncUrl:    null,
-            components:  $formComponents
+            title: 'Редактировать пароль',
+            content: fn () => null,
+            outer: $trigger,
+            asyncUrl: null,
+            components: $formComponents
         )->name('edit-password-modal');
 
         $createPackageForm = FormBuilder::make()
             ->asyncMethod('createPackage')
             ->customAttributes([
-                'x-data' =>
-                    "( () => {
+                'x-data' => "( () => {
                  const data = formBuilder(``, { whenFields: [], reactiveUrl: `` }, []);
 
                  Object.assign(data, {
@@ -214,12 +197,12 @@ class UserDetailPage extends DetailPage
                 Select::make('Тип пакета', 'packageType')
                     ->options(
                         collect(PackageTypeEnum::cases())
-                            ->reject(fn($e) => $e === PackageTypeEnum::ARCHIVE)
-                            ->mapWithKeys(fn($e) => [$e->value => $e->getName()])
+                            ->reject(fn ($e) => $e === PackageTypeEnum::ARCHIVE)
+                            ->mapWithKeys(fn ($e) => [$e->value => $e->getName()])
                             ->all()
                     )
                     ->customAttributes([
-                        'x-model'     => 'packageType',
+                        'x-model' => 'packageType',
                         'x-on:change' => 'onChangeFieldPackageForm($event)',
                     ])
                     ->required(),
@@ -229,7 +212,7 @@ class UserDetailPage extends DetailPage
                     ->options([1 => '1', 3 => '3', 6 => '6', 12 => '12'])
                     ->customAttributes(['wire:model.defer' => 'duration'])
                     ->customWrapperAttributes([
-                        'x-show'  => "packageType === '" . PackageTypeEnum::PRESENT->value . "'",
+                        'x-show' => "packageType === '" . PackageTypeEnum::PRESENT->value . "'",
                         'x-cloak' => '',
                     ]),
 
@@ -238,7 +221,7 @@ class UserDetailPage extends DetailPage
                     ->customAttributes(
                         [
                             'wire:model.defer' => 'percent',
-                            'step'             => 'any',
+                            'step' => 'any',
                         ])
                     ->required(),
 
@@ -256,44 +239,44 @@ class UserDetailPage extends DetailPage
             ->success();
 
         $createPackageModal = Modal::make(
-            title:      'Создание пакета',
-            content:    fn() => null,
-            outer:      $createPackageTrigger,
-            asyncUrl:    null,
+            title: 'Создание пакета',
+            content: fn () => null,
+            outer: $createPackageTrigger,
+            asyncUrl: null,
             components: $packageComponents
         )->name('create-package-modal');
 
         $packages = ItcPackage::query()
             ->with([
                 'transaction:id,uuid,amount,user_id',
-                'reinvestProfits' => fn($q) => $q
+                'reinvestProfits' => fn ($q) => $q
                     ->whereDoesntHave('withdraw')
-                    ->select('id','uuid','package_uuid','amount','created_at','matured_at'),
+                    ->select('id', 'uuid', 'package_uuid', 'amount', 'created_at', 'matured_at'),
             ])
-            ->whereHas('transaction', fn($q) => $q->where('user_id', $item->id))
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
             ->withSum([
-                'reinvestProfits as reinvest_profits_sum_amount' => fn($q) => $q->whereDoesntHave('withdraw')
+                'reinvestProfits as reinvest_profits_sum_amount' => fn ($q) => $q->whereDoesntHave('withdraw'),
             ], 'amount')
             ->withSum([
                 'profits as profits_sum_amount' => fn ($q) => $q   // profits — базовая связь
-                ->select(DB::raw('COALESCE(SUM(amount),0)'))
+                    ->select(DB::raw('COALESCE(SUM(amount),0)')),
             ], 'amount')
             ->get()
-            ->map(fn(ItcPackage $pkg) => [
-                'uuid'                        => $pkg->transaction->uuid,
-                'amount'                      => $pkg->transaction->amount,
-                'type'                        => $pkg->type,
-                'month_profit_percent'        => $pkg->month_profit_percent,
+            ->map(fn (ItcPackage $pkg) => [
+                'uuid' => $pkg->transaction->uuid,
+                'amount' => $pkg->transaction->amount,
+                'type' => $pkg->type,
+                'month_profit_percent' => $pkg->month_profit_percent,
                 'reinvest_profits_sum_amount' => $pkg->reinvest_profits_sum_amount,
-                'profits_sum_amount'          => $pkg->profits_sum_amount,
-                'itc_created_at'              => $pkg->created_at,
-                'reinvest_profits'           => $pkg->reinvestProfits
-                    ->map(fn($r) => [
-                        'uuid'         => $r->uuid,
+                'profits_sum_amount' => $pkg->profits_sum_amount,
+                'itc_created_at' => $pkg->created_at,
+                'reinvest_profits' => $pkg->reinvestProfits
+                    ->map(fn ($r) => [
+                        'uuid' => $r->uuid,
                         'package_uuid' => $r->package_uuid,
-                        'amount'       => $r->amount,
-                        'matured_at'   => $r->matured_at,
-                        'created_at'   => $r->created_at,
+                        'amount' => $r->amount,
+                        'matured_at' => $r->matured_at,
+                        'created_at' => $r->created_at,
                     ])
                     ->toArray(),
             ])
@@ -304,16 +287,16 @@ class UserDetailPage extends DetailPage
             ->flatten(1)
             ->all();
         $partners = Partner::with('user')
-                    ->where('partner_id', $item->id)
-                    ->get()
-                    ->map(function (Partner $partner) {
-                        return [
-                            'id' => $partner?->user_id,
-                            'username' => $partner?->user?->username,
-                            'email' => $partner?->user?->email,
-                            'partner_id' => $partner?->partner_id
-                        ];
-                    });
+            ->where('partner_id', $item->id)
+            ->get()
+            ->map(function (Partner $partner) {
+                return [
+                    'id' => $partner?->user_id,
+                    'username' => $partner?->user?->username,
+                    'email' => $partner?->user?->email,
+                    'partner_id' => $partner?->partner_id,
+                ];
+            });
 
         $transactions = Transaction::query()
             ->where('user_id', $item->id)
@@ -325,45 +308,92 @@ class UserDetailPage extends DetailPage
                     'action' => in_array($tx->trx_type, TrxTypeEnum::getDebits())
                         ? 'Увеличение баланса'
                         : 'Уменьшение баланса',
-                    'type'   => $tx->trx_type->getName(),
-                    'date'   => $tx->created_at->format('d.m.Y'),
+                    'type' => $tx->trx_type->getName(),
+                    'operation_amount' => round((float) $tx->amount, 2),
+                    'date' => $tx->created_at->format('d.m.Y'),
                 ];
             })
+            ->toArray();
+
+        // Партнёрские начисления
+        $partnerRewards = PartnerReward::query()
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
+            ->with(['transaction', 'from'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (PartnerReward $reward) {
+                $typeName = match ($reward->reward_type) {
+                    PartnerRewardTypeEnum::START => 'Стартовая премия',
+                    PartnerRewardTypeEnum::REGULAR => 'Регулярная премия',
+                };
+
+                return [
+                    'action' => 'Увеличение баланса',
+                    'type' => $typeName . ' (линия ' . $reward->line . ')',
+                    'from_user' => $reward->from
+                        ? $reward->from->username . ' (' . $reward->from->email . ')'
+                        : 'Не указан',
+                    'operation_amount' => round((float) $reward->amount, 2),
+                    'date' => $reward->created_at->format('d.m.Y'),
+                ];
+            })
+            ->toArray();
+
+        // Объединяем и сортируем по дате
+        $userLogs = collect([...$transactions, ...$partnerRewards])
+            ->sortByDesc(function ($item) {
+                return \Carbon\Carbon::createFromFormat('d.m.Y', $item['date']);
+            })
+            ->values()
             ->toArray();
 
         $adminLogs = LogAdminAction::query()
             ->where('target_user_id', $item->id)
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn(LogAdminAction $log) => [
-                'action'     => LogActionTypeEnum::from($log->action_type)->label(),
-                'model'      => class_basename($log->model_type),
+            ->map(fn (LogAdminAction $log) => [
+                'action' => LogActionTypeEnum::from($log->action_type)->label(),
+                'model' => class_basename($log->model_type),
                 'old_values' => collect($log->old_values)
-                    ->map(fn($value, $key) => "{$key}: {$value}")
+                    ->map(fn ($value) => $value)
                     ->implode("\n"),
                 'new_values' => collect($log->new_values)
-                    ->map(fn($value, $key) => "{$key}: {$value}")
+                    ->map(fn ($value) => $value)
                     ->implode("\n"),
-                'date'       => $log->created_at->format('d.m.Y H:i'),
+                'operation_amount' => collect($log->old_values)
+                    ->map(function ($oldValue, $key) use ($log) {
+                        $newValue = $log->new_values[$key] ?? null;
+
+                        if (is_numeric($oldValue) && is_numeric($newValue)) {
+                            $diff = $newValue - $oldValue;
+
+                            return $diff >= 0 ? "+{$diff}" : $diff;
+                        }
+
+                        return '';
+                    })
+                    ->filter()
+                    ->implode("\n"),
+                'date' => $log->created_at->format('d.m.Y H:i'),
             ])
             ->toArray();
 
         $referrerLink = $item->referrer ?
             Url::make(
-            'Кто пригласил в систему',
-            'referrer',
-            fn($value, int $rowIndex) => $item->referrer
-                ? to_page(
-                    page:     new UserDetailPage,
-                    resource: new UserResource(),
-                    params:   ['resourceItem' => $item->referrer->id]
+                'Кто пригласил в систему',
+                'referrer',
+                fn ($value, int $rowIndex) => $item->referrer
+                    ? to_page(
+                        page: new UserDetailPage(),
+                        resource: new UserResource(),
+                        params: ['resourceItem' => $item->referrer->id]
+                    )
+                    : null
+            )
+                ->title(
+                    fn ($href, Url $field) => $item->referrer?->username
                 )
-                : null
-            )
-            ->title(
-                fn($href, Url $field) => $item->referrer?->username
-            )
-            : Text::make('Кто пригласил в систему',formatted: fn($value, $row) => 'Нет реферера');
+            : Text::make('Кто пригласил в систему', formatted: fn ($value, $row) => 'Нет реферера');
 
         $authLog = UserAuthLog::query()
             ->where('user_id', $item->id)
@@ -378,17 +408,17 @@ class UserDetailPage extends DetailPage
         $fields[] = $lastAuth
             ? Text::make(
                 'Последний вход',
-                formatted: fn() => $lastAuth->created_at->format('d.m.Y H:i:s')
+                formatted: fn () => $lastAuth->created_at->format('d.m.Y H:i:s')
                     . ', IP: ' . $lastAuth->ip
                     . ', ' . $lastAuth->device
                     . ', ' . $lastAuth->browser
             )
-            : Text::make('Последний вход', formatted: fn() => 'Нет данных о входах');
+            : Text::make('Последний вход', formatted: fn () => 'Нет данных о входах');
 
         foreach ($authLog as $i => $log) {
             $fields[] = Text::make(
                 'Вход ' . ($i + 1),
-                formatted: fn() => $log->created_at->format('d.m.Y H:i:s')
+                formatted: fn () => $log->created_at->format('d.m.Y H:i:s')
                     . ', IP: ' . $log->ip
                     . ', ' . $log->device
                     . ', ' . $log->browser
@@ -400,14 +430,14 @@ class UserDetailPage extends DetailPage
             ->except('id', 'referrer');
 
         $detailFields->prepend(
-            Text::make('ID','id')->readonly()
+            Text::make('ID', 'id')->readonly()
         );
 
         $detailFields->splice(
             1,
             0,
             [
-                Text::make('Кто пригласил в систему','referrer_username')
+                Text::make('Кто пригласил в систему', 'referrer_username')
                     ->readonly(),
             ]
         );
@@ -420,12 +450,12 @@ class UserDetailPage extends DetailPage
                 Email::make('Email')->fill($item->email),
                 Text::make('Имя пользователя', 'username')->fill($item->username),
                 Switcher::make('Доступ к премиям с 20 линий', 'extended_lines')
-                    ->fill((bool)($item->extended_lines ?? false))
+                    ->fill((bool) ($item->extended_lines ?? false))
                     ->customAttributes([
                         'x-model' => 'extended_lines',
                     ]),
                 Text::make('Ранг', 'rank')->fill($item->rank)->readonly(),
-                Text::make('Кто пригласил в систему','referrer_username')->fill($item->referrer?->username),
+                Text::make('Кто пригласил в систему', 'referrer_username')->fill($item->referrer?->username),
             ])
             ->submit('Сохранить');
 
@@ -437,7 +467,7 @@ class UserDetailPage extends DetailPage
             Number::make('Партнёрский баланс', 'partner_balance')
                 ->fill($item->summary?->partner_balance ?? 0)
                 ->step(0.01),
-            Hidden::make('user_id')->fill($item->id)
+            Hidden::make('user_id')->fill($item->id),
         ]);
 
         $makeItcPackageForm = static function (mixed $item) {
@@ -450,14 +480,14 @@ class UserDetailPage extends DetailPage
                 $blockItems[] = ActionButton::make('Закрыть пакет')
                     ->inModal(
                         title: 'Подтверждение',
-                        content: function() use ($item) {
+                        content: function () use ($item) {
                             return Block::make([
                                 Heading::make('Вы действительно хотите закрыть пакет?')->h(3),
                                 Heading::make('Все средства будут выведены на основной баланс, а пакет станет архивным.')->h(6),
-                                ActionButton::make('Подтвердить закрытие', fn() => route('itc-package-close', ['uuid' => $item['uuid']]))
+                                ActionButton::make('Подтвердить закрытие', fn () => route('itc-package-close', ['uuid' => $item['uuid']]))
                                     ->icon('heroicons.archive-box')
                                     ->async(method: 'POST')
-                                    ->secondary()
+                                    ->secondary(),
                             ]);
                         }
                     )
@@ -476,7 +506,7 @@ class UserDetailPage extends DetailPage
                     Text::make('Процент прибыли', 'profit_percent')
                         ->fill($package->month_profit_percent),
                     Text::make('Депозит', 'amount')
-                        ->fill(round((float)$item['amount'], 2)),
+                        ->fill(round((float) $item['amount'], 2)),
                     Enum::make('Тип пакета', 'type')
                         ->attach(PackageTypeEnum::class)
                         ->fill($package->type),
@@ -499,11 +529,11 @@ class UserDetailPage extends DetailPage
                     BelongsTo::make(
                         'Переназначить реферера',
                         'referrer',
-                        formatted: fn(User $user) => "{$user->username}, {$user->email}",
+                        formatted: fn (User $user) => "{$user->username}, {$user->email}",
                         resource: new UserResource()
                     )
                         ->searchable(),
-                    Hidden::make('user_id')->fill($partner['id'])
+                    Hidden::make('user_id')->fill($partner['id']),
                 ])
                 ->async()
                 ->submit('Подтвердить');
@@ -515,7 +545,7 @@ class UserDetailPage extends DetailPage
             ->name('balance-form')
             ->submit('Сохранить');
 
-        $in  = Transaction::query()
+        $in = Transaction::query()
             ->where('user_id', $item->id)
             ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
             ->whereNotNull('accepted_at')
@@ -532,15 +562,15 @@ class UserDetailPage extends DetailPage
             TableBuilder::make()
                 ->items([
                     [
-                        'in'      => $in,
-                        'out'     => $out,
+                        'in' => $in,
+                        'out' => $out,
                         'balance' => $balance,
                     ],
                 ])
                 ->fields([
-                    Text::make('IN', 'in', formatted: fn($v) => round((float)$v['in'], 2) . ' ITC'),
-                    Text::make('OUT', 'out', formatted: fn($v) => round((float)$v['out'], 2) . ' ITC'),
-                    Text::make('Сальдо', 'balance', fn($v) => round((float)$v['balance'], 2) . ' ITC'),
+                    Text::make('IN', 'in', formatted: fn ($v) => round((float) $v['in'], 2) . ' ITC'),
+                    Text::make('OUT', 'out', formatted: fn ($v) => round((float) $v['out'], 2) . ' ITC'),
+                    Text::make('Сальдо', 'balance', fn ($v) => round((float) $v['balance'], 2) . ' ITC'),
                 ]),
         ]);
 
@@ -548,9 +578,10 @@ class UserDetailPage extends DetailPage
             ? UserLevelPercentOverride::where('user_id', $item->id)->get()
             : null;
         $line = 0;
+
         return [
             FlexibleRender::make(
-                fn() => '
+                fn () => '
                     <div class="flex flex-wrap gap-2 items-center">
                         ' . $actionButton . '
                         ' . $createPackageModal . '
@@ -565,8 +596,8 @@ class UserDetailPage extends DetailPage
                         Block::make('Информация о пользователе', [
                             $this->detailComponent($item, new Fields([
                                 $referrerLink,
-                                ...$fields,])),
-                            $detailForm
+                                ...$fields, ])),
+                            $detailForm,
                         ])
                             ->customAttributes([
                                 'x-data' => '{
@@ -574,9 +605,9 @@ class UserDetailPage extends DetailPage
                                 }',
                             ]),
                         Divider::make(),
-                        Block::make('Баланс',[
+                        Block::make('Баланс', [
                             $balanceModal,
-                            $balanceForm
+                            $balanceForm,
                         ]),
                         Divider::make(),
                         $inOutBlock,
@@ -585,7 +616,7 @@ class UserDetailPage extends DetailPage
                 )
                     ->name('main')
 
-                    ->active(fn() => $activeTab === 'main'),
+                    ->active(fn () => $activeTab === 'main'),
                 Tab::make(
                     'Пакеты',
                     [
@@ -594,37 +625,37 @@ class UserDetailPage extends DetailPage
                             ->withNotFound()
                             ->fields([
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
-                                Text::make('Сумма', 'amount', formatted: fn ($item) => round((float)$item['amount'], 2)),
-                                Number::make('Сумма реинвеста', 'reinvest_profits_sum_amount', formatted: fn ($item) => round((float)$item['reinvest_profits_sum_amount'], 2)),
-                                Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'].'%'),
-                                Number::make('Прибыль после реинвеста', 'profits_sum_amount', formatted: fn ($item) =>
-                                    round((float) $item['profits_sum_amount'], 2)
+                                Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
+                                Number::make('Сумма реинвеста', 'reinvest_profits_sum_amount', formatted: fn ($item) => round((float) $item['reinvest_profits_sum_amount'], 2)),
+                                Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
+                                Number::make('Прибыль после реинвеста', 'profits_sum_amount', formatted: fn ($item) => round((float) $item['profits_sum_amount'], 2)
                                 ),
                                 Enum::make('Тип пакета', 'type')->attach(PackageTypeEnum::class),
                             ])
                             ->buttons([
                                 ActionButton::make('')
                                     ->inModal(
-                                        title: static fn($item) => 'Редактирование пакета',
+                                        title: static fn ($item) => 'Редактирование пакета',
                                         content: $makeItcPackageForm,
-                                        name: "itc-package-modal"
+                                        name: 'itc-package-modal'
                                     )
                                     ->icon('heroicons.pencil')
                                     ->primary()
                                     ->onClick(
-                                        fn() => "event.stopPropagation()",
+                                        fn () => 'event.stopPropagation()',
                                         'stop'
                                     ),
                                 ActionButton::make('')
                                     ->inModal(
-                                        title: static fn($item) => 'Реинвесты по пакету',
-                                        content: static function($item) {
+                                        title: static fn ($item) => 'Реинвесты по пакету',
+                                        content: static function ($item) {
                                             $reinvests = $item['reinvest_profits'];
                                             $blockItems = [];
 
-                                            if (!empty($reinvests)) {
+                                            if (! empty($reinvests)) {
                                                 $blockItems[] = ActionButton::make('Снять все реинвесты', function () use ($reinvests) {
                                                     $uuids = array_column($reinvests, 'uuid');
+
                                                     return route('reinvest-profit-withdraw-bulk', ['uuids' => implode(',', $uuids)]);
                                                 })
                                                     ->icon('heroicons.arrow-down-tray')
@@ -637,19 +668,19 @@ class UserDetailPage extends DetailPage
                                                 ->fields([
                                                     Date::make('Дата реинвеста', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                                     Date::make('Дата разморозки', 'matured_at')->format('d.m.Y H:i:s')->showOnExport(),
-                                                    Text::make('Размер реинвеста', 'amount', formatted: fn ($re) => round((float)$re['amount'], 2))->showOnExport(),
+                                                    Text::make('Размер реинвеста', 'amount', formatted: fn ($re) => round((float) $re['amount'], 2))->showOnExport(),
                                                 ])
                                                 ->buttons([
                                                     ActionButton::make('Снять на баланс', fn ($re) => route('reinvest-profit-withdraw', ['uuid' => $re['uuid']]))
                                                         ->async(method: 'POST')
                                                         ->showInDropdown(),
-//                                                    ActionButton::make('Отменить реинвесты', fn(array $re) => route('reinvest-profit-delete', ['uuid' => $re['uuid']]))
-//                                                        ->async(method: 'DELETE')
-//                                                        ->showInDropdown(),
-                                                    ActionButton::make('Удалить реинвесты', fn(array $re) => route('reinvest-profit-remove-all', ['uuid' => $re['uuid']]))
+                                                    //                                                    ActionButton::make('Отменить реинвесты', fn(array $re) => route('reinvest-profit-delete', ['uuid' => $re['uuid']]))
+                                                    //                                                        ->async(method: 'DELETE')
+                                                    //                                                        ->showInDropdown(),
+                                                    ActionButton::make('Удалить реинвесты', fn (array $re) => route('reinvest-profit-remove-all', ['uuid' => $re['uuid']]))
                                                         ->async(method: 'POST')
                                                         ->showInDropdown(),
-                                                    ActionButton::make('Добавить срок работы',fn(array $re) => route('reinvest-profit-extend', ['uuid' => $re['uuid']]))
+                                                    ActionButton::make('Добавить срок работы', fn (array $re) => route('reinvest-profit-extend', ['uuid' => $re['uuid']]))
                                                         ->async('POST')
                                                         ->showInDropdown(),
                                                 ])
@@ -657,32 +688,31 @@ class UserDetailPage extends DetailPage
 
                                             return Block::make($blockItems);
                                         },
-                                        name: "package"
+                                        name: 'package'
                                     )
                                     ->icon('heroicons.currency-dollar')
                                     ->secondary()
                                     ->onClick(
-                                        fn() => "event.stopPropagation()",
+                                        fn () => 'event.stopPropagation()',
                                         'stop'
-                                    )
+                                    ),
 
                             ])
                             ->items($packages)
+                            ->trAttributes(
+                                function (mixed $data, int $row, ComponentAttributeBag $attr): ComponentAttributeBag {
+                                    $attr->setAttributes([
+                                        'data-row-key' => $data['uuid'],
+                                        '@click.stop.prevent' => '$event.currentTarget.querySelector(\'.btn.btn-primary\')?.click()',
+                                        'style' => 'cursor: pointer;',
+                                    ]);
 
-                        ->trAttributes(
-                             function (mixed $data, int $row, ComponentAttributeBag $attr) use ($item): ComponentAttributeBag  {
-                                 $attr->setAttributes([
-                                     'data-row-key'           => $data['uuid'],
-                                     '@click.stop.prevent' => '$event.currentTarget.querySelector(\'.btn.btn-primary\')?.click()',
-                                     'style'  => 'cursor: pointer;',
-                                 ]);
-
-                                return $attr;
-                            }
-                        ),
+                                    return $attr;
+                                }
+                            ),
                     ]
-                    )->name('packages')
-                    ->active(fn() => $activeTab === 'packages'),
+                )->name('packages')
+                    ->active(fn () => $activeTab === 'packages'),
                 Tab::make(
                     'Рефералы',
                     [
@@ -690,13 +720,12 @@ class UserDetailPage extends DetailPage
                             ->action('/itcapitalmoonshineadminpanel/partners')
                             ->fields([
                                 Text::make('Добавить реферала', 'user'),
-                                Hidden::make('user_id')->fill($item->id)
+                                Hidden::make('user_id')->fill($item->id),
                             ])
-                            ->async(asyncEvents:
-                                [
-                                    'table-updated-users',
-                                    'form-reset-add-referral'
-                                ])
+                            ->async(asyncEvents: [
+                                'table-updated-users',
+                                'form-reset-add-referral',
+                            ])
                             ->name('add-referral')
                             ->submit('Добавить партнера'),
                         TableBuilder::make()
@@ -705,15 +734,14 @@ class UserDetailPage extends DetailPage
                                 Text::make('ID'),
                                 Url::make('Имя пользователя',
                                     'username',
-                                    fn($partner) =>
-                                    to_page(
-                                        page:     new UserDetailPage,
+                                    fn ($partner) => to_page(
+                                        page: new UserDetailPage(),
                                         resource: new UserResource(),
-                                        params:   ['resourceItem' => $partner['id']]
+                                        params: ['resourceItem' => $partner['id']]
                                     )
                                 )
                                     ->title(
-                                        fn($href, Url $field) => $field->getData()['username']),
+                                        fn ($href, Url $field) => $field->getData()['username']),
                                 Text::make('Адрес электронной почты', 'email'),
 
                             ])
@@ -721,36 +749,36 @@ class UserDetailPage extends DetailPage
                             ->buttons([
                                 ActionButton::make('')
                                     ->inModal(
-                                        title: static fn($partner) => 'Переназначить реферера',
+                                        title: static fn ($partner) => 'Переназначить реферера',
                                         content: $changeReferralForm,
-                                        name: "itc-package-modal"
+                                        name: 'itc-package-modal'
                                     )
                                     ->icon('heroicons.pencil')
                                     ->primary()
                                     ->onClick(
-                                        fn() => "event.stopPropagation()",
+                                        fn () => 'event.stopPropagation()',
                                         'stop'
-                                    )
+                                    ),
                             ])
                             ->trAttributes(
                                 function (mixed $data, int $row, ComponentAttributeBag $attr) {
 
                                     $url = to_page(
-                                        page:     new UserDetailPage,
-                                        resource: new UserResource,
-                                        params:   ['resourceItem' => $data['id']],
+                                        page: new UserDetailPage(),
+                                        resource: new UserResource(),
+                                        params: ['resourceItem' => $data['id']],
                                     );
                                     $attr->setAttributes([
                                         'onclick' => "window.location='{$url}'",
-                                        'style'   => 'cursor: pointer;',
+                                        'style' => 'cursor: pointer;',
                                     ]);
 
                                     return $attr;
                                 }
-                            )
+                            ),
                     ]
-                    )->name('referrals')
-                    ->active(fn() => $activeTab === 'referrals'),
+                )->name('referrals')
+                    ->active(fn () => $activeTab === 'referrals'),
                 Tab::make('Настройка рангов', [
                     // Форма с чекбоксом и полем "Ранг"
                     Block::make([
@@ -771,9 +799,9 @@ class UserDetailPage extends DetailPage
                                 Number::make('Ранг', 'rank')
                                     ->min(1)->max(8)
                                     ->fill($item->rank)
-                                ->customAttributes([
-                                    'x-bind:disabled' => '!overridden_rank',
-                                ]),
+                                    ->customAttributes([
+                                        'x-bind:disabled' => '!overridden_rank',
+                                    ]),
                                 Hidden::make('user_id')
                                     ->fill($item->id),
                                 TableBuilder::make()
@@ -809,7 +837,7 @@ class UserDetailPage extends DetailPage
                                             ->customAttributes([
                                                 'x-bind:disabled' => '!override_enabled',
                                             ]),
-                                        ])
+                                    ])
                                     ->items(
                                         PartnerLevelPercent::asGridRows(override: $override)
                                     )
@@ -826,6 +854,7 @@ class UserDetailPage extends DetailPage
                                                     'style' => 'position:sticky;left:0;background:#fff;min-width:100px;max-width:100px;width:100px;',
                                                 ]);
                                             }
+
                                             if ($cell === 1) {
                                                 $existing = $attr->get('class', '');
                                                 $attr->setAttributes([
@@ -833,6 +862,7 @@ class UserDetailPage extends DetailPage
                                                     'style' => 'position:sticky;left:80px;min-width:100px;max-width:100px;width:100px;',
                                                 ]);
                                             }
+
                                             if ($cell >= 2) {
                                                 $existing = $attr->get('class', '');
                                                 $attr->setAttributes([
@@ -840,18 +870,19 @@ class UserDetailPage extends DetailPage
                                                     'style' => 'min-width:120px;max-width:120px;width:120px;',
                                                 ]);
                                             }
-//                                            if ($cell >= 0) {
-//                                                $existing = $attr->get('class', '');
-//                                                $attr->setAttributes([
-//                                                    'class' => trim($existing),
-//                                                    'style' => 'height: 40px;line-height: 40px;',
-//                                                ]);
-//                                            }
+
+                                            //                                            if ($cell >= 0) {
+                                            //                                                $existing = $attr->get('class', '');
+                                            //                                                $attr->setAttributes([
+                                            //                                                    'class' => trim($existing),
+                                            //                                                    'style' => 'height: 40px;line-height: 40px;',
+                                            //                                                ]);
+                                            //                                            }
                                             return $attr;
                                         }
                                     )
                                     ->sticky()
-                                    ->name('percentsOverride')
+                                    ->name('percentsOverride'),
                             ])
                             ->submit('Сохранить'),
                     ])
@@ -860,7 +891,7 @@ class UserDetailPage extends DetailPage
                                 override_enabled: ' . ($item->levelOverride ? 'true' : 'false') . ',
                                 overridden_rank: ' . (($item->overridden_rank) ? 'true' : 'false') . '
                             }',
-                        ])
+                        ]),
                 ])
                     ->name('level_settings'),
                 Tab::make(
@@ -873,12 +904,13 @@ class UserDetailPage extends DetailPage
                                     TableBuilder::make()
                                         ->withNotFound()
                                         ->fields([
-                                            Text::make('Действие',     'action'),
-                                            Text::make('Старые значения','old_values'),
-                                            Text::make('Новые значения','new_values'),
-                                            Text::make('Дата',         'date'),
+                                            Text::make('Действие', 'action'),
+                                            Text::make('Старые значения', 'old_values'),
+                                            Text::make('Новые значения', 'new_values'),
+                                            Text::make('Сумма операции', 'operation_amount'),
+                                            Text::make('Дата', 'date'),
                                         ])
-                                        ->items($adminLogs)
+                                        ->items($adminLogs),
                                 ]
                             ),
                             Tab::make('Пользователь', [
@@ -886,10 +918,12 @@ class UserDetailPage extends DetailPage
                                     ->withNotFound()
                                     ->fields([
                                         Text::make('Действие', 'action'),
-                                        Text::make('Тип',      'type'),
-                                        Text::make('Дата',     'date'),
+                                        Text::make('Тип', 'type'),
+                                        Text::make('Сумма операции', 'operation_amount'),
+                                        Text::make('Пользователь', 'from_user'),
+                                        Text::make('Дата', 'date'),
                                     ])
-                                    ->items($transactions)
+                                    ->items($userLogs)
                                     ->trAttributes(function (array $data, int $row, ComponentAttributeBag $attributes): ComponentAttributeBag {
                                         // в $data['action'] лежит «Увеличение баланса» или «Уменьшение баланса»
                                         $color = $data['action'] === 'Увеличение баланса' ? 'green' : 'red';
@@ -897,13 +931,13 @@ class UserDetailPage extends DetailPage
                                         return $attributes->merge([
                                             'style' => "color: {$color};",
                                         ]);
-                                    })
-                            ])
-                        ])
+                                    }),
+                            ]),
+                        ]),
                     ]
                 )
                     ->name('logs')
-                    ->active(fn() => $activeTab === 'logs')
+                    ->active(fn () => $activeTab === 'logs'),
             ]),
         ];
     }
@@ -913,37 +947,39 @@ class UserDetailPage extends DetailPage
         return MoonShineJsonResponse::make();
     }
 
-
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         return [
-            ...parent::mainLayer()
+            ...parent::mainLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
 
@@ -954,8 +990,8 @@ class UserDetailPage extends DetailPage
         return [
             // 1) Ссылка на список
             to_page(
-                page:     new UserIndexPage,
-                resource: new UserResource
+                page: new UserIndexPage(),
+                resource: new UserResource()
             ) => __('Пользователи'),
 
             // 2) Текущий пункт — имя пользователя, без ссылки
@@ -967,9 +1003,8 @@ class UserDetailPage extends DetailPage
     {
         // получаем модель из ресурса
         $user = $this->getResource()->getItem();
+
         // возвращаем username вместо статичного «Пользователи»
         return $user->username;
     }
-
-
 }

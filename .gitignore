@@ -4,7 +4,7 @@
 /public/hot
 /public/storage
 /storage/*.key
-/storage/google
+/storage/google/*.json
 /vendor
 .env.backup
 .env.production

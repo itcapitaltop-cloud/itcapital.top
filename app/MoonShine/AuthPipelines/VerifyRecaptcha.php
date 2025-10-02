@@ -16,12 +16,12 @@ final class VerifyRecaptcha
 
         $messages = [                         // <‑‑‑ добавили
             'g-recaptcha-response.required' => 'Подтвердите, что вы не робот',
-            'g-recaptcha-response.captcha'  => 'Капча пройдена неверно',
+            'g-recaptcha-response.captcha' => 'Капча пройдена неверно',
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
-        
-        if ($validator->fails()) {
+
+        if (! $validator->fails()) {
             return back()
                 ->withErrors($validator)
                 ->withInput($request->except('password'));
