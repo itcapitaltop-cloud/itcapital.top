@@ -353,7 +353,7 @@ class WithdrawResource extends ModelResource
     public function export(): ?ExportHandler
     {
         return GoogleSheetsExportIndexDataHandler::make('Экспортировать')
-            ->spreadsheetId(env('WITHDRAW_EXPORT_FILE_KEY'))
+            ->spreadsheetId(config('withdraw'))
             ->disk('public')
             ->filename('users-'.now()->format('Ymd-His'))
             ->withConfirm();

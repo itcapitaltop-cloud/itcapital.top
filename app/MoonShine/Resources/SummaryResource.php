@@ -101,7 +101,7 @@ class SummaryResource extends ModelResource
     public function export(): ?ExportHandler
     {
         return SummarySheetsExportHandler::make('Экспортировать')
-            ->spreadsheetId(env('SUMMARY_EXPORT_FILE_KEY'))
+            ->spreadsheetId(config('services.export_file.summary'))
             ->disk('public')
             ->filename('summary-'.now()->format('Ymd-His'))
             ->withConfirm();

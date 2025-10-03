@@ -1,0 +1,76 @@
+name: wpka-api
+
+services:
+  app:
+    container_name: "${COMPOSE_PROJECT_NAME}-app"
+    image: "${DOCKER_REGISTRY_HOST}/wpka-api.eisc.ttk.ru/prod/app:${DEPLOY_VERSION:-latest}"
+    env_file:
+      - .env
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "nc -z localhost 9000 || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    container_name: "${COMPOSE_PROJECT_NAME}-nginx"
+    image: "${DOCKER_REGISTRY_HOST}/wpka-api.eisc.ttk.ru/prod/nginx:${DEPLOY_VERSION:-latest}"
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      - app
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  cron:
+    container_name: "${COMPOSE_PROJECT_NAME}-cron"
+    image: "${DOCKER_REGISTRY_HOST}/wpka-api.eisc.ttk.ru/prod/cron:${DEPLOY_VERSION:-latest}"
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep crond || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  supervisor:
+    container_name: "${COMPOSE_PROJECT_NAME}-supervisor"
+    image: "${DOCKER_REGISTRY_HOST}/wpka-api.eisc.ttk.ru/prod/supervisor:${DEPLOY_VERSION:-latest}"
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep supervisord || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  redis-data:
+  db-data:

@@ -13,9 +13,10 @@ use MoonShine\Http\Middleware\Authenticate;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 
-Route::domain('academy.itcapital.top')->group(function () {
+Route::domain("academy.{config('app.something')}")->group(function () {
     Route::view('/', 'academy.landing')->name('academy.landing');
     Route::view('/admin', 'academy.admin')->name('academy.admin');
+
     Route::fallback(function () {
         abort(404);
     });

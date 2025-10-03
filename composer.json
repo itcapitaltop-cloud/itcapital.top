@@ -17,7 +17,7 @@
         "jdorn/sql-formatter": "^1.2",
         "jenssegers/agent": "^2.6",
         "laravel/framework": "^12.32.5",
-        "laravel/reverb": "@beta",
+        "laravel/reverb": "^1.6.0",
         "laravel/tinker": "^2.9",
         "league/csv": "^9.16",
         "livewire/livewire": "^3.5",

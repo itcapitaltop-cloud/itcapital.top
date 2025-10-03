@@ -36,8 +36,13 @@ return [
     ],
 
     'google' => [
-        'credentials' => storage_path('app/google/credentials.json'),
+        'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
+        'client_email' => env('GOOGLE_SERVICE_ACCOUNT_EMAIL'),
+        'private_key' => env('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'),
         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
+        'token_uri' => env('GOOGLE_SERVICE_ACCOUNT_TOKEN_URI'),
+        'type' => env('GOOGLE_SERVICE_ACCOUNT_TYPE'),
+        'client_id' => env('GOOGLE_SERVICE_CLIENT_ID'),
     ],
 
     'twelvedata' => [
@@ -53,4 +58,11 @@ return [
         'secret' => env('NOCAPTCHA_SECRET'),
     ],
 
+    'export_file' => [
+        'deposit' => env('DEPOSIT_EXPORT_FILE_KEY'),
+        'itc_package' => env('ITC_PACKAGE_EXPORT_FILE_KEY'),
+        'summary' => env('SUMMARY_EXPORT_FILE_KEY'),
+        'users' => env('USERS_EXPORT_FILE_KEY'),
+        'withdraw' => env('WITHDRAW_EXPORT_FILE_KEY'),
+    ]
 ];

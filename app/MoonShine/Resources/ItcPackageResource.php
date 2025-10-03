@@ -91,7 +91,7 @@ class ItcPackageResource extends ModelResource
     public function export(): ?ExportHandler
     {
         return GoogleSheetsExportIndexDataHandler::make('Экспортировать',)
-            ->spreadsheetId(env('ITC_PACKAGE_EXPORT_FILE_KEY'))
+            ->spreadsheetId(config('services.export_file.itc_package'))
             ->disk('public')
             ->filename('itc-packages-'.now()->format('Ymd-His'))
             ->withConfirm();

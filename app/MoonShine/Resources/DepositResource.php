@@ -307,7 +307,7 @@ class DepositResource extends ModelResource
     public function export(): ?ExportHandler
     {
         return GoogleSheetsExportIndexDataHandler::make('Экспортировать')
-            ->spreadsheetId(env('DEPOSIT_EXPORT_FILE_KEY'))
+            ->spreadsheetId(config('services.export_file.deposit'))
             ->disk('public')
             ->filename('deposits-'.now()->format('Ymd-His'))
             ->withConfirm();
