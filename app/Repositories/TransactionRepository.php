@@ -166,7 +166,7 @@ class TransactionRepository implements TransactionRepositoryContract
                 'users.username as from_username',
             ])
             ->join('transactions', 'transactions.uuid', '=', 'partner_rewards.uuid')
-            ->leftJoin('partner_closure as descendant', function ($join) use ($userId) {
+            ->leftJoin('partner_closures as descendant', function ($join) use ($userId) {
                 $join->on('descendant.descendant_id', '=', 'partner_rewards.from_user_id')
                     ->where('descendant.ancestor_id', '=', $userId);
             })
