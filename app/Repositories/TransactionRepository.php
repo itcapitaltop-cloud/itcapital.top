@@ -11,8 +11,6 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Models\ItcPackage;
 use App\Models\PackageProfitReinvest;
-use App\Models\Partner;
-use App\Models\PartnerClosure;
 use App\Models\PartnerReward;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -34,38 +32,44 @@ class TransactionRepository implements TransactionRepositoryContract
             'balance_type' => $dto->balanceType,
             'user_id' => $dto->userId,
             'accepted_at' => $dto->acceptedAt,
-            'rejected_at' => $dto->rejectedAt
+            'rejected_at' => $dto->rejectedAt,
         ]);
     }
 
     public function getBalanceAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
     {
-        $credits = Transaction::query()->where('user_id', $userId)
-            ->where('balance_type', $balanceType)
-            ->whereIn('trx_type', TrxTypeEnum::getCredits())
-            ->whereNull('rejected_at')
-            ->selectRaw('(-1 * amount) as amount');
+        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
+        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
 
-        return DB::table(DB::table('transactions')
+        $debitsList = "'" . implode("','", $debits) . "'";
+        $creditsList = "'" . implode("','", $credits) . "'";
+
+        $sum = Transaction::query()
             ->where('user_id', $userId)
             ->where('balance_type', $balanceType)
-            ->whereNotNull('accepted_at')
-            ->whereIn('trx_type', TrxTypeEnum::getDebits())
-            ->select('amount')
-            ->unionAll($credits), 'transactions')
-            ->sum('amount');
+            ->whereNull('rejected_at')
+            ->selectRaw("
+            SUM(
+                CASE
+                    WHEN trx_type IN ($debitsList) THEN amount
+                    WHEN trx_type IN ($creditsList) THEN -amount
+                    ELSE 0
+                END
+            ) as balance
+        ")
+            ->value('balance');
+
+        return (string) ($sum ?? 0);
     }
 
     public function getInvestedAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
     {
-        $sum = Transaction::query()
+        return (string) Transaction::query()
             ->where('user_id', $userId)
-            ->where('balance_type', $balanceType->value)
-            ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
+            ->where('balance_type', $balanceType)
+            ->where('trx_type', TrxTypeEnum::DEPOSIT)
             ->whereNotNull('accepted_at')
             ->sum('amount');
-
-        return (string) $sum;
     }
 
     public function store(CreateTransactionDto $dto, Closure $callback): mixed
@@ -77,21 +81,21 @@ class TransactionRepository implements TransactionRepositoryContract
 
             return [
                 'transaction' => $transaction,
-                'model' => $model
+                'model' => $model,
             ];
         });
     }
 
-    public function partnerPeriodStats(Carbon $from, Carbon $to = null): array
+    public function partnerPeriodStats(Carbon $from, ?Carbon $to = null): array
     {
         $to ??= now();
 
         $before = $this->balanceUpTo($from->copy()->subSecond());
-        $after  = $this->balanceUpTo($to);
+        $after = $this->balanceUpTo($to);
 
         return [
             'start' => $before,            // баланс на начало
-            'end'   => $after,             // баланс на конец
+            'end' => $after,             // баланс на конец
             'delta' => $after - $before,   // изменение (может быть < 0)
         ];
     }
@@ -99,16 +103,29 @@ class TransactionRepository implements TransactionRepositoryContract
     /** баланс партнёрского счёта на конец $moment */
     private function balanceUpTo(Carbon $moment): float
     {
-        $base = Transaction::query()
+        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
+        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
+
+        $debitsList = "'" . implode("','", $debits) . "'";
+        $creditsList = "'" . implode("','", $credits) . "'";
+
+        $sum = Transaction::query()
             ->where('user_id', Auth::id())
             ->where('balance_type', BalanceTypeEnum::PARTNER)
             ->whereNull('rejected_at')
-            ->where('accepted_at', '<=', $moment);
+            ->where('accepted_at', '<=', $moment)
+            ->selectRaw("
+            SUM(
+                CASE
+                    WHEN trx_type IN ($debitsList) THEN amount
+                    WHEN trx_type IN ($creditsList) THEN -amount
+                    ELSE 0
+                END
+            ) as balance
+        ")
+            ->value('balance');
 
-        $in  = (clone $base)->whereIn('trx_type', TrxTypeEnum::getDebits()) ->sum('amount');
-        $out = (clone $base)->whereIn('trx_type', TrxTypeEnum::getCredits())->sum('amount');
-
-        return $in - $out;
+        return (float) ($sum ?? 0);
     }
 
     /**
@@ -122,10 +139,10 @@ class TransactionRepository implements TransactionRepositoryContract
             DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 
             $amount = $this->getBalanceAmountByUserIdAndType($dto->userId, $dto->balanceType);
-//            Log::channel('source')->debug($amount);
+            //            Log::channel('source')->debug($amount);
 
             if ($amount - $dto->amount < 0) {
-                throw new InvalidAmountException;
+                throw new InvalidAmountException();
             }
 
             $transaction = $this->commonStore($dto);
@@ -142,45 +159,36 @@ class TransactionRepository implements TransactionRepositoryContract
     {
         $userId = Auth::id();
 
-        $rewards = PartnerReward::query()
-            ->whereHas('transaction', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
+        return PartnerReward::query()
+            ->select([
+                'partner_rewards.*',
+                'descendant.depth as real_depth',
+                'users.username as from_username',
+            ])
+            ->join('transactions', 'transactions.id', '=', 'partner_rewards.transaction_id')
+            ->leftJoin('partner_closure as descendant', function ($join) use ($userId) {
+                $join->on('descendant.descendant_id', '=', 'partner_rewards.from_user_id')
+                    ->where('descendant.ancestor_id', '=', $userId);
             })
-            ->whereIn('reward_type', [
+            ->leftJoin('users', 'users.id', '=', 'partner_rewards.from_user_id')
+            ->where('transactions.user_id', $userId)
+            ->whereIn('partner_rewards.reward_type', [
                 PartnerRewardTypeEnum::START->value,
                 PartnerRewardTypeEnum::REGULAR->value,
             ])
-            ->with([
-                'from:id,username',
-            ])
-            ->orderByDesc('created_at')
+            ->orderByDesc('partner_rewards.created_at')
             ->limit($limit)
-            ->get();
-
-
-        // Вытаскиваем реальную глубину (линию) через PartnerClosure
-        $closure = PartnerClosure::query()
-            ->where('ancestor_id', $userId)
-            ->whereIn('descendant_id', $rewards->pluck('from_user_id')->all())
             ->get()
-            ->keyBy('descendant_id');
-
-//        Log::channel('source')->debug($closure);
-
-        return $rewards->map(function (PartnerReward $r) use ($closure) {
-            $line = $closure[$r->from_user_id]->depth ?? $r->line;
-
-            return [
-                'date'  => $r->created_at?->format('d.m.Y, H:i') ?? '',
-                'user'  => $r->from?->username ?? '—',
-                'level' => $line,
-                'event' => match ($r->reward_type->value) {
-                    PartnerRewardTypeEnum::START->value   => 'Получена стартовая премия ' . scale((float)$r->amount) . ' ITC',
-                    PartnerRewardTypeEnum::REGULAR->value => 'Получена регулярная премия ' . scale((float)$r->amount) . ' ITC',
+            ->map(fn ($r) => [
+                'date' => $r->created_at->format('d.m.Y, H:i'),
+                'user' => $r->from_username ?? '—',
+                'level' => $r->real_depth ?? $r->line,
+                'event' => match ($r->reward_type) {
+                    PartnerRewardTypeEnum::START->value => 'Получена стартовая премия ' . scale((float) $r->amount) . ' ITC',
+                    PartnerRewardTypeEnum::REGULAR->value => 'Получена регулярная премия ' . scale((float) $r->amount) . ' ITC',
                     default => '—',
-                }
-            ];
-        });
+                },
+            ]);
     }
 
     public function packageLog(int $limit = 200): Collection
@@ -200,23 +208,24 @@ class TransactionRepository implements TransactionRepositoryContract
                 TrxTypeEnum::PRESENT_PACKAGE,
                 TrxTypeEnum::ZERO_PRESENT_PACKAGE,
             ])
+            ->select(['accepted_at', 'created_at', 'trx_type', 'amount'])
             ->orderByDesc('accepted_at')
             ->limit($limit)
             ->get()
-            ->map(fn (Transaction $t) => [
-                'date'  => $t->accepted_at ?? $t->created_at,
-                'event' => $t->trx_type->getName()
-                    . (scale((float)$t->amount) ? ' ' . scale((float)$t->amount) : ''),
+            ->map(fn ($t) => [
+                'date' => $t->accepted_at ?? $t->created_at,
+                'event' => $t->trx_type->getName() . ' ' . scale((float) $t->amount),
             ]);
 
         $reinvestRows = PackageProfitReinvest::query()
             ->whereIn('package_uuid', $ownPackageUuids)
+            ->select(['created_at', 'amount'])
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()
-            ->map(fn (PackageProfitReinvest $r) => [
-                'date'  => $r->created_at,
-                'event' => 'Реинвест дивидендов ' . scale((float)$r->amount),
+            ->map(fn ($r) => [
+                'date' => $r->created_at,
+                'event' => 'Реинвест дивидендов ' . scale((float) $r->amount),
             ]);
 
         return $trxRows
@@ -226,7 +235,7 @@ class TransactionRepository implements TransactionRepositoryContract
             ->values()
             ->map(fn ($row) => [
                 // форматируем дату только перед выдачей
-                'date'  => $row['date']->format('d.m.Y, H:i'),
+                'date' => $row['date']->format('d.m.Y, H:i'),
                 'event' => $row['event'],
             ]);
     }

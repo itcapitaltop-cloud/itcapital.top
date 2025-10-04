@@ -34,7 +34,7 @@
         <div class="w-full flex flex-col">
             <div class="items-end justify-center mb-[15px] px-4 py-8 gap-4 pb-[env(safe-area-inset-bottom)]">
                 @auth
-                    <x-account.dashboard.widget.balance-pill />
+                    <livewire:account.dashboard.balance-pill />
                 @endauth
                 <x-ui.user-menu class="mt-[25px] mb-[15px] mr-[10px]"/>
             </div>

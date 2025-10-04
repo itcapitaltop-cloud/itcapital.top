@@ -4,7 +4,6 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,8 +18,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 /**
- *
- *
  * @property int $id
  * @property string $first_name
  * @property string $last_name
@@ -33,6 +30,7 @@ use Illuminate\Notifications\Notifiable;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
+ *
  * @method static \Database\Factories\UserFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|User newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|User newQuery()
@@ -47,20 +45,25 @@ use Illuminate\Notifications\Notifiable;
  * @method static \Illuminate\Database\Eloquent\Builder|User whereRememberToken($value)
  * @method static \Illuminate\Database\Eloquent\Builder|User whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|User whereUsername($value)
+ *
  * @property \Illuminate\Support\Carbon|null $banned_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|User whereBannedAt($value)
+ *
  * @property int $rank
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|User whereRank($value)
+ *
  * @mixin \Eloquent
  */
-class User extends Authenticatable implements MustVerifyEmail
+final class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string>
+     * @var list<string>
      */
     protected $fillable = [
         'first_name',
@@ -82,7 +85,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var array<int, string>
+     * @var list<string>
      */
     protected $hidden = [
         'password',
@@ -99,7 +102,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'banned_at' => 'datetime'
+            'banned_at' => 'datetime',
         ];
     }
 
@@ -112,11 +115,16 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected static function booted(): void
     {
-        static::addGlobalScope('notBanned', function (Builder $builder) {
+        self::addGlobalScope('notBanned', function (Builder $builder) {
             $builder->whereNull('banned_at');
         });
     }
 
+    /**
+     * User to transactions
+     *
+     * @return HasMany
+     */
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
@@ -157,7 +165,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function investmentsSum(): Attribute
     {
         return Attribute::make(
-            get: fn(): float => (float) ($this->attributes['investments_sum'] ?? 0),
+            get: fn (): float => (float) ($this->attributes['investments_sum'] ?? 0),
         );
     }
 
@@ -187,8 +195,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->transactions()
             ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
             ->whereNotNull('accepted_at')
-            ->whereHas('itcPackage', fn ($q) =>
-            $q->whereNull('closed_at')
+            ->whereHas('itcPackage', fn ($q) => $q->whereNull('closed_at')
                 ->where('type', '!=', PackageTypeEnum::ARCHIVE)
             )
             ->sum('amount');
@@ -202,21 +209,21 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function reinvestsSum(): Attribute
     {
         return Attribute::make(
-            get: fn(): float => (float) ($this->attributes['reinvests_sum'] ?? 0),
+            get: fn (): float => (float) ($this->attributes['reinvests_sum'] ?? 0),
         );
     }
 
     protected function partnerBalance(): Attribute
     {
         return Attribute::make(
-            get: fn(): float => (float) ($this->attributes['partner_balance'] ?? 0),
+            get: fn (): float => (float) ($this->attributes['partner_balance'] ?? 0),
         );
     }
 
     protected function firstPackageAt(): Attribute
     {
         return Attribute::make(
-            get: fn(): ?string => $this->attributes['first_package_at'] ?? null,
+            get: fn (): ?string => $this->attributes['first_package_at'] ?? null,
         );
     }
 

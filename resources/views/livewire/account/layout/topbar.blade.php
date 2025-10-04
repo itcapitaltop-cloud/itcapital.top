@@ -2,7 +2,7 @@
     {{-- Баланс + кнопка кошелька --}}
     <div class="flex items-center gap-10">
         <x-ui.logo class="mr-auto"/>
-        <x-account.dashboard.widget.balance-pill class="hidden md:flex"/>
+        <livewire:account.dashboard.balance-pill class="hidden md:flex"/>
         <button
             type="button"
             @click="$store.menu.open = true"

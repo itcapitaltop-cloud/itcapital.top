@@ -3,7 +3,7 @@
 
 @endphp
 <div class="grid gap-3">
-    <x-account.dashboard.widget.balance />
+    <livewire:account.dashboard.balance-widget />
     <x-bg.main>
         <x-bg.section-slim>
             <div class="flex items-center justify-between">

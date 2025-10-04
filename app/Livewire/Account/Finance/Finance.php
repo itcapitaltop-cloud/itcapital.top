@@ -11,14 +11,13 @@ use App\Models\Deposit;
 use App\Models\Withdraw;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Livewire\Component;
-use Throwable;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class Finance extends Component
 {
     public CreateDepositForm $depositForm;
+
     public CreateWithdrawForm $withdrawForm;
 
     public function createDeposit()
@@ -36,12 +35,13 @@ class Finance extends Component
 
     public function createWithdraw()
     {
-        if (!Carbon::now()->isSunday()) {
+        if (! Carbon::now()->isSunday()) {
             $this->dispatch(
                 'new-system-notification',
                 type: 'warning',
                 message: __('livewire_finance_withdrawal_only_on_sunday')
             );
+
             return;
         }
 
@@ -77,21 +77,23 @@ class Finance extends Component
     {
         $deposits = Deposit::query()
             ->join('transactions', 'deposits.uuid', '=', 'transactions.uuid')
+            ->leftJoin('payment_sources', 'deposits.payment_source_id', '=', 'payment_sources.id')
             ->where('transactions.user_id', Auth::id())
             ->select([
+                'deposits.uuid',
                 'transactions.created_at',
                 'transactions.amount',
                 'transactions.accepted_at',
                 'transactions.rejected_at',
                 'deposits.payment_source_id',
                 'deposits.currency',
-                'deposits.transaction_hash',   // ← оставляем как есть
+                'deposits.transaction_hash',
+                'payment_sources.source as payment_source',
             ])
-            ->with('paymentSource:id,source')   // crypto | fiat
             ->get()
             ->map(function (Deposit $d): array {
 
-                $source = $d->paymentSource?->source;   // crypto | fiat
+                $source = $d->payment_source;   // crypto | fiat
 
                 if ($source === 'crypto') {
                     // пример: «USDT, tx 0xabc…789»
@@ -120,8 +122,11 @@ class Finance extends Component
 
         $withdraws = Withdraw::query()
             ->join('transactions', 'withdraws.uuid', '=', 'transactions.uuid')
+            ->leftJoin('payment_sources', 'withdraws.payment_source_id', '=', 'payment_sources.id')
+            ->leftJoin('withdraw_fiat_details', 'withdraws.uuid', '=', 'withdraw_fiat_details.uuid')
             ->where('transactions.user_id', Auth::id())
             ->select([
+                'withdraws.uuid',
                 'transactions.created_at',
                 'transactions.amount',
                 'transactions.accepted_at',
@@ -129,20 +134,20 @@ class Finance extends Component
                 'withdraws.payment_source_id',
                 'withdraws.currency',
                 'withdraws.wallet_address',
-                'withdraws.uuid'
+                'payment_sources.source as payment_source',
+                'withdraw_fiat_details.bank_name',
             ])
-            ->with('paymentSource:id,source')        // crypto | fiat
-            ->with('fiatDetail:uuid,bank_name')      // eager‑load, null для crypto
             ->get()
             ->map(function (Withdraw $w): array {
-                $source = $w->paymentSource?->source;                 // crypto / fiat
+                $source = $w->payment_source;
+
                 return [
                     'created_at' => $w->created_at,
                     'amount' => $w->amount,
                     'arrow' => 'up',
                     'type' => $source === 'crypto'
                         ? __('livewire_finance_crypto_withdrawal_label', ['currency' => $w->currency->value])
-                        : __('livewire_finance_fiat_withdrawal_label', ['bank' => $w->fiatDetail?->bank_name]),
+                        : __('livewire_finance_fiat_withdrawal_label', ['bank' => $w->bank_name]),
                     'status' => TransactionStatusEnum::fromDates(
                         $w->accepted_at, $w->rejected_at
                     )->getName(),

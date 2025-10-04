@@ -20,8 +20,9 @@ use Livewire\Component;
 class Index extends Component
 {
 
-    public function render()
+    public function render(): \Illuminate\Contracts\View\View
     {
+        $transactionRepo = app(TransactionRepositoryContract::class);
 
         return view('livewire.account.dashboard.index', [
 
@@ -115,6 +116,17 @@ class Index extends Component
             'growthMonth' => Partner::where('partner_id', Auth::id())
                 ->whereBetween('created_at', [now()->subMonth(), now()])
                 ->count(),
+
+            // Balance amounts
+            'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
+            'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
+
+            // Partner link
+            'partnerLink' => url()->query('/', ['partner' => Auth::user()->username]),
+
+            // Partner period stats
+            'weekStats' => $transactionRepo->partnerPeriodStats(now()->subWeek()),
+            'monthStats' => $transactionRepo->partnerPeriodStats(now()->subMonth()),
         ]);
     }
 }

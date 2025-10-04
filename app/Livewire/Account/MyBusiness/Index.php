@@ -43,7 +43,8 @@ class Index extends Component
     {
         return view('livewire.account.my-business.index', [
             'partners' => $this->getPartnersByLine(),
-            'rank' => Auth::user()->rank
+            'rank' => Auth::user()->rank,
+            'partnerLink' => url()->query('/', ['partner' => Auth::user()->username]),
         ]);
     }
 }

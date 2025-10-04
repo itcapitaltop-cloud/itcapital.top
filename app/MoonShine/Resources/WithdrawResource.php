@@ -4,28 +4,22 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources;
 
-use App\Enums\Transactions\TransactionStatusEnum;
 use App\Models\Transaction;
+use App\Models\Withdraw;
 use App\MoonShine\Handlers\GoogleSheetsExportIndexDataHandler;
+use App\MoonShine\Pages\Withdraw\WithdrawDetailPage;
+use App\MoonShine\Pages\Withdraw\WithdrawFormPage;
+use App\MoonShine\Pages\Withdraw\WithdrawIndexPage;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Withdraw;
-use App\MoonShine\Pages\Withdraw\WithdrawIndexPage;
-use App\MoonShine\Pages\Withdraw\WithdrawFormPage;
-use App\MoonShine\Pages\Withdraw\WithdrawDetailPage;
-
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
-use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Fields\Range;
 use MoonShine\Handlers\ExportHandler;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\Resources\ModelResource;
 use MoonShine\Pages\Page;
+use MoonShine\Resources\ModelResource;
 
 /**
  * @extends ModelResource<Withdraw>
@@ -60,7 +54,7 @@ class WithdrawResource extends ModelResource
 
             /* ───── ДАТА ЗАЯВКИ НА ВЫВОД ───── */
             Range::make('Дата заявки', 'created_at')           // два <input type="date">
-            ->fromAttributes(['type' => 'date'])
+                ->fromAttributes(['type' => 'date'])
                 ->toAttributes(['type' => 'date'])
                 ->onApply(function (Builder $q, array $v) {
                     if ($v['from'] === null && $v['to'] === null) {
@@ -71,6 +65,7 @@ class WithdrawResource extends ModelResource
                         if ($v['from'] !== null) {
                             $d->whereDate('withdraws.created_at', '>=', $v['from']);
                         }
+
                         if ($v['to'] !== null) {
                             $d->whereDate('withdraws.created_at', '<=', $v['to']);
                         }
@@ -80,7 +75,7 @@ class WithdrawResource extends ModelResource
             /* ───── СУММА ЗАЯВКИ (transactions.amount) ───── */
             Range::make('Сумма', 'amount')
                 ->fromAttributes(['type' => 'number', 'step' => '0.01'])
-                ->toAttributes  (['type' => 'number', 'step' => '0.01'])
+                ->toAttributes(['type' => 'number', 'step' => '0.01'])
                 ->onApply(function (Builder $q, array $v) {
                     if ($v['from'] === null && $v['to'] === null) {
                         return;
@@ -90,6 +85,7 @@ class WithdrawResource extends ModelResource
                         if ($v['from'] !== null) {
                             $t->where('amount', '>=', $v['from']);
                         }
+
                         if ($v['to'] !== null) {
                             $t->where('amount', '<=', $v['to']);
                         }
@@ -99,7 +95,7 @@ class WithdrawResource extends ModelResource
             /* ───── КОМИССИЯ (withdraws.commission) ───── */
             Range::make('Комиссия', 'commission')
                 ->fromAttributes(['type' => 'number', 'step' => '0.01'])
-                ->toAttributes  (['type' => 'number', 'step' => '0.01'])
+                ->toAttributes(['type' => 'number', 'step' => '0.01'])
                 ->onApply(function (Builder $q, array $v) {
                     if ($v['from'] === null && $v['to'] === null) {
                         return;
@@ -109,6 +105,7 @@ class WithdrawResource extends ModelResource
                         if ($v['from'] !== null) {
                             $d->where('withdraws.commission', '>=', $v['from']);
                         }
+
                         if ($v['to'] !== null) {
                             $d->where('withdraws.commission', '<=', $v['to']);
                         }
@@ -118,7 +115,7 @@ class WithdrawResource extends ModelResource
             /* ───── К ВЫВОДУ = amount − commission ───── */
             Range::make('К выводу', 'net')
                 ->fromAttributes(['type' => 'number', 'step' => '0.01'])
-                ->toAttributes  (['type' => 'number', 'step' => '0.01'])
+                ->toAttributes(['type' => 'number', 'step' => '0.01'])
                 ->onApply(function (Builder $q, array $v) {
                     if ($v['from'] === null && $v['to'] === null) {
                         return;
@@ -128,11 +125,9 @@ class WithdrawResource extends ModelResource
                         $sq->select(DB::raw(1))
                             ->from('transactions')
                             ->whereColumn('transactions.uuid', 'withdraws.uuid')
-                            ->when($v['from'] !== null, fn ($s) =>
-                            $s->whereRaw('(transactions.amount - withdraws.commission) >= ?', [$v['from']])
+                            ->when($v['from'] !== null, fn ($s) => $s->whereRaw('(transactions.amount - withdraws.commission) >= ?', [$v['from']])
                             )
-                            ->when($v['to'] !== null, fn ($s) =>
-                            $s->whereRaw('(transactions.amount - withdraws.commission) <= ?', [$v['to']])
+                            ->when($v['to'] !== null, fn ($s) => $s->whereRaw('(transactions.amount - withdraws.commission) <= ?', [$v['to']])
                             );
                     });
                 }),
@@ -143,8 +138,8 @@ class WithdrawResource extends ModelResource
     {
         $query = $this->getQuery();
 
-        $exact   = false;
-        $value   = "%{$terms}%";
+        $exact = false;
+        $value = "%{$terms}%";
 
         if (preg_match('/^=(.+)$/u', $terms, $m)) {
             $exact = true;
@@ -155,20 +150,23 @@ class WithdrawResource extends ModelResource
         $token = mb_strtolower($plain);
 
         /* тематические подсказки -------------------------------------------- */
-        $contains = static fn(string $w): bool => mb_stripos($w, $token) !== false;
+        $contains = static fn (string $w): bool => mb_stripos($w, $token) !== false;
 
-        $isCrypto = $contains('крипто')  || $contains('crypto') || $contains('usdt');
-        $isFiat   = $contains('фиат')    || $contains('fiat');
+        $isCrypto = $contains('крипто') || $contains('crypto') || $contains('usdt');
+        $isFiat = $contains('фиат') || $contains('fiat');
 
-        $isModer  = $contains('на модерации') || $contains('модерац') || $contains('moder');
-        $isReject = $contains('отклонено')    || $contains('reject');
-        $isAccept = $contains('исполнено')    || $contains('accepted');
+        $isModer = $contains('на модерации') || $contains('модерац') || $contains('moder');
+        $isReject = $contains('отклонено') || $contains('reject');
+        $isAccept = $contains('исполнено') || $contains('accepted');
 
         /* точная дата / число ------------------------------------------------ */
         $exactDate = null;
+
         if ($exact) {
-            try { $exactDate = \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s'); }
-            catch (\Throwable) { /* не дата */ }
+            try {
+                $exactDate = \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s');
+            } catch (\Throwable) { /* не дата */
+            }
         }
         $exactNum = $exact && is_numeric($value) ? $value : null;
 
@@ -202,12 +200,10 @@ class WithdrawResource extends ModelResource
 
             /* сумма (transaction.amount) ---------------------------------- */
             if ($exactNum !== null) {
-                $q->orWhereHas('transaction', fn ($t) =>
-                $t->where('amount', '=', $exactNum)
+                $q->orWhereHas('transaction', fn ($t) => $t->where('amount', '=', $exactNum)
                 );
             } elseif (! $exact) {
-                $q->orWhereHas('transaction', fn ($t) =>
-                $t->whereRaw('amount::text ilike ?', ["%{$token}%"])
+                $q->orWhereHas('transaction', fn ($t) => $t->whereRaw('amount::text ilike ?', ["%{$token}%"])
                 );
             }
 
@@ -229,8 +225,7 @@ class WithdrawResource extends ModelResource
             }
 
             /* username ----------------------------------------------------- */
-            $q->orWhereHas('transaction.user', fn ($u) =>
-            $u->where('username', $exact ? '=' : 'ilike', $exact ? $value : "%{$token}%")
+            $q->orWhereHas('transaction.user', fn ($u) => $u->where('username', $exact ? '=' : 'ilike', $exact ? $value : "%{$token}%")
             );
 
             /* крипто / фиат ------------------------------------------------ */
@@ -241,64 +236,30 @@ class WithdrawResource extends ModelResource
                 . '|bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{39})$'; // BTC Bech32
 
             if ($isCrypto) {
-                $q->orWhere('withdraws.wallet_address', '~',  $cryptoRegex);
+                $q->orWhere('withdraws.wallet_address', '~', $cryptoRegex);
             }
+
             if ($isFiat) {
                 $q->orWhere('withdraws.wallet_address', '!~', $cryptoRegex);
             }
 
             /* статусы ------------------------------------------------------ */
             if ($isModer) {
-                $q->orWhereHas('transaction', fn ($t) =>
-                $t->whereNull('accepted_at')->whereNull('rejected_at')
+                $q->orWhereHas('transaction', fn ($t) => $t->whereNull('accepted_at')->whereNull('rejected_at')
                 );
             }
+
             if ($isReject) {
-                $q->orWhereHas('transaction', fn ($t) =>
-                $t->whereNotNull('rejected_at')
+                $q->orWhereHas('transaction', fn ($t) => $t->whereNotNull('rejected_at')
                 );
             }
+
             if ($isAccept) {
-                $q->orWhereHas('transaction', fn ($t) =>
-                $t->whereNotNull('accepted_at')
+                $q->orWhereHas('transaction', fn ($t) => $t->whereNotNull('accepted_at')
                 );
             }
         });
     }
-
-//    public function indexButtons(): array
-//    {
-//        return [
-//            ActionButton::make('')
-//                ->method(
-//                    'accept',
-//                    params: fn ($item) => ['resourceItem' => $item->uuid]
-//                )
-//                ->icon('heroicons.check')
-//                ->success()
-//                ->canSee(fn(Withdraw $item) => in_array(
-//                    TransactionStatusEnum::fromDates(
-//                        $item->transaction?->accepted_at,
-//                        $item->transaction?->rejected_at
-//                    ),
-//                    [TransactionStatusEnum::MODERATE, TransactionStatusEnum::REJECTED]
-//                )),
-//            ActionButton::make('')
-//                ->method(
-//                    'reject',
-//                    params: fn ($item) => ['resourceItem' => $item->uuid]
-//                )
-//                ->icon('heroicons.x-mark')
-//                ->error()
-//                ->canSee(fn(Withdraw $item) => in_array(
-//                    TransactionStatusEnum::fromDates(
-//                        $item->transaction?->accepted_at,
-//                        $item->transaction?->rejected_at
-//                    ),
-//                    [TransactionStatusEnum::MODERATE, TransactionStatusEnum::REJECTED]
-//                )),
-//        ];
-//    }
 
     public function getActiveActions(): array
     {
@@ -307,8 +268,8 @@ class WithdrawResource extends ModelResource
 
     /**
      * @param Withdraw $item
-     *
      * @return array<string, string[]|string>
+     *
      * @see https://laravel.com/docs/validation#available-validation-rules
      */
     public function rules(Model $item): array
@@ -318,7 +279,7 @@ class WithdrawResource extends ModelResource
 
     public function tdAttributes(): Closure
     {
-        return function(Withdraw $item, int $row, int $cell, ComponentAttributeBag $attr) {
+        return function (Withdraw $item, int $row, int $cell, ComponentAttributeBag $attr) {
             // если это колонка с wallet_address (индекс 5)
             if ($cell === 5) {
                 // сохраняем существующие классы и добавляем pointer
@@ -334,18 +295,20 @@ class WithdrawResource extends ModelResource
                 $existing = $attr->get('class', '');
                 $attr->setAttributes([
                     // чтобы можно было стилизовать псевдо-элемент
-                    'class'         => trim($existing . ' has-copy-tooltip cursor-pointer'),
-                    'data-copy'     => $copyValue,
-                    'data-tooltip'  => 'Кликните, чтобы скопировать',
-                    'style'         => 'max-width:250px;overflow:auto;text-overflow:ellipsis;white-space:nowrap;',
+                    'class' => trim($existing . ' has-copy-tooltip cursor-pointer'),
+                    'data-copy' => $copyValue,
+                    'data-tooltip' => 'Кликните, чтобы скопировать',
+                    'style' => 'max-width:250px;overflow:auto;text-overflow:ellipsis;white-space:nowrap;',
                 ]);
             }
+
             if ($cell === 7) {
                 $existing = $attr->get('class', '');
                 $attr->setAttributes([
                     'class' => $existing . ' flex items-center gap-2',
                 ]);
             }
+
             return $attr;
         };
     }
@@ -353,10 +316,9 @@ class WithdrawResource extends ModelResource
     public function export(): ?ExportHandler
     {
         return GoogleSheetsExportIndexDataHandler::make('Экспортировать')
-            ->spreadsheetId(config('withdraw'))
+            ->spreadsheetId(config('services.export_file.withdraw'))
             ->disk('public')
-            ->filename('users-'.now()->format('Ymd-His'))
+            ->filename('users-' . now()->format('Ymd-His'))
             ->withConfirm();
     }
-
 }

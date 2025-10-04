@@ -6,21 +6,20 @@ use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\ExternalServices\GoogleDriveBackupUploaderContract;
 use App\Contracts\ExternalServices\GoogleSheetsUploaderContract;
 use App\Contracts\Logs\LogRepositoryContract;
+use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
+use App\Contracts\Packages\PackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Notifications\ResetPasswordRu;
 use App\Notifications\VerifyEmailRu;
 use App\Repositories\GoogleDriveBackupUploaderRepository;
 use App\Repositories\GoogleSheetsUploaderRepository;
+use App\Repositories\ItcPackageRepository;
 use App\Repositories\LogRepository;
 use App\Repositories\PackageReinvestRepository;
+use App\Repositories\PackageRepository;
 use App\Repositories\StartBonusAccrualRepository;
 use App\Repositories\TransactionRepository;
-use App\Composers\AuthComposer;
-use App\Contracts\Packages\ItcPackageRepositoryContract;
-use App\Contracts\Packages\PackageRepositoryContract;
-use App\Repositories\ItcPackageRepository;
-use App\Repositories\PackageRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\App;
@@ -61,12 +60,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (!App::hasDebugModeEnabled()) {
+        if (! App::hasDebugModeEnabled()) {
             $this->app['request']->server->set('HTTPS', 'on');
             URL::forceScheme('https');
         }
-
-        View::composer('*', AuthComposer::class);
 
         View::composer('*', function (\Illuminate\View\View $view) {
             $view->with('isAuthPage', request()->routeIs(
@@ -88,7 +85,7 @@ class AppServiceProvider extends ServiceProvider
 
         VerifyEmail::toMailUsing(function ($notifiable, $url) {
 
-            return (new VerifyEmailRu)->toMail($notifiable)->view(
+            return (new VerifyEmailRu())->toMail($notifiable)->view(
                 'emails.verify-ru',
                 ['url' => $url]
             );

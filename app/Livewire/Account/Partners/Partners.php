@@ -571,6 +571,7 @@ class Partners extends Component
                 ->whereNull('banned_at')
                 ->pluck('username')
                 ->all(),
+            'partnerLink' => url()->query('/', ['partner' => Auth::user()->username]),
         ]);
     }
 }

@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ARG WWWGROUP
 ARG POSTGRES_VERSION=15
 
-WORKDIR /var/www/html
+WORKDIR /var/www/html/public
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TZ=UTC
