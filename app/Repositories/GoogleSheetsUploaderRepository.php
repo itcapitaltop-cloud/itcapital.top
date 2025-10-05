@@ -26,11 +26,11 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
             'private_key' => str_replace('\\n', "\n", config('services.google.private_key')),
             'client_email' => config('services.google.client_email'),
             'client_id' => config('services.google.client_id'),
-            'auth_uri' => 'https://accounts.google.com/o/oauth2/auth',
+            'auth_uri' => config('services.google.auth_uri'),
             'token_uri' => config('services.google.token_uri'),
-            'auth_provider_x509_cert_url' => 'https://www.googleapis.com/oauth2/v1/certs',
+            'auth_provider_x509_cert_url' => config('services.google.auth_provider_x509_cert_url'),
             'client_x509_cert_url' => config('services.google.client_x509_cert_url'),
-            'client_secret' => null,
+            'universe_domain' => config('services.google.universe_domain'),
         ]);
         $client->setScopes([GoogleSheets::SPREADSHEETS]);
         $this->service = new GoogleSheets($client);

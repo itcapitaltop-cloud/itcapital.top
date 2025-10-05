@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderContract
 {
     protected Drive $service;
+
     protected ?string $folderId;
 
     /**
@@ -27,11 +28,11 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
             'private_key' => str_replace('\\n', "\n", config('services.google.private_key')),
             'client_email' => config('services.google.client_email'),
             'client_id' => config('services.google.client_id'),
-            'auth_uri' => 'https://accounts.google.com/o/oauth2/auth',
+            'auth_uri' => config('services.google.auth_uri'),
             'token_uri' => config('services.google.token_uri'),
-            'auth_provider_x509_cert_url' => 'https://www.googleapis.com/oauth2/v1/certs',
+            'auth_provider_x509_cert_url' => config('services.google.auth_provider_x509_cert_url'),
             'client_x509_cert_url' => config('services.google.client_x509_cert_url'),
-            'client_secret' => null,
+            'universe_domain' => config('services.google.universe_domain'),
         ]);
         $client->addScope(Drive::DRIVE);
         $this->service = new Drive($client);
@@ -46,6 +47,7 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
         $fileMetadata = new DriveFile([
             'name' => $remoteName,
         ]);
+
         if ($this->folderId) {
             $fileMetadata->setParents([$this->folderId]);
         }
@@ -54,7 +56,7 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
             'data' => $content,
             'mimeType' => 'application/sql',
             'uploadType' => 'multipart',
-            'fields' => 'id, name, createdTime'
+            'fields' => 'id, name, createdTime',
         ]);
     }
 
@@ -64,6 +66,7 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
     public function getBackupFiles(): array
     {
         $q = "name contains 'backup_' and name contains '.sql'";
+
         if ($this->folderId) {
             $q .= " and '{$this->folderId}' in parents";
         }
@@ -73,8 +76,9 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
             'fields' => 'files(id, name, createdTime)',
         ]);
         $files = $list->getFiles() ?: [];
-        usort($files, fn($a, $b) => strtotime($a->getCreatedTime()) <=> strtotime($b->getCreatedTime()));
-        return array_map(fn($f) => [
+        usort($files, fn ($a, $b) => strtotime($a->getCreatedTime()) <=> strtotime($b->getCreatedTime()));
+
+        return array_map(fn ($f) => [
             'id' => $f->getId(),
             'name' => $f->getName(),
             'createdTime' => $f->getCreatedTime(),
