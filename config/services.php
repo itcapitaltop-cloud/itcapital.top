@@ -41,7 +41,7 @@ return [
         'private_key' => env('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'),
         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
         'token_uri' => env('GOOGLE_SERVICE_ACCOUNT_TOKEN_URI'),
-        'type' => env('GOOGLE_SERVICE_ACCOUNT_TYPE'),
+        'type' => env('GOOGLE_SERVICE_TYPE_ACCOUNT'),
         'client_id' => env('GOOGLE_SERVICE_CLIENT_ID'),
     ],
 
@@ -54,7 +54,7 @@ return [
     ],
 
     'recaptcha' => [
-        'key'    => env('NOCAPTCHA_SITEKEY'),
+        'key' => env('NOCAPTCHA_SITEKEY'),
         'secret' => env('NOCAPTCHA_SECRET'),
     ],
 
@@ -64,5 +64,5 @@ return [
         'summary' => env('SUMMARY_EXPORT_FILE_KEY'),
         'users' => env('USERS_EXPORT_FILE_KEY'),
         'withdraw' => env('WITHDRAW_EXPORT_FILE_KEY'),
-    ]
+    ],
 ];
