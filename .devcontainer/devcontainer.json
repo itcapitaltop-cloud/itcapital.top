@@ -1,0 +1,30 @@
+{
+    "name": "Laravel Sail Dev Container",
+    "dockerComposeFile": ["../docker-compose.yml"],
+    "service": "laravel.test",
+    "workspaceFolder": "/var/www/html",
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "laravel.vscode-laravel",
+                "amiralizadeh9480.laravel-extra-intellisense",
+                "porifa.laravel-intelephense",
+                "open-southeners.laravel-pint",
+                "jaguadoromero.vscode-php-create-class",
+                "neilbrayfield.php-docblocker",
+                "bmewburn.vscode-intelephense-client",
+                "sanderronde.phpstan-vscode"
+            ],
+            "settings": {
+                "php.validate.executablePath": "/usr/bin/php",
+                "editor.formatOnSave": true,
+                "intelephense.environment.phpVersion": "8.4"
+            }
+        }
+    },
+
+    "mounts": ["source=${localWorkspaceFolder},target=/var/www/html,type=bind"],
+
+    "remoteUser": "sail"
+}
