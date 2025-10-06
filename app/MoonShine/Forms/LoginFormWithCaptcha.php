@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Forms;
 
-use MoonShine\Components\FormBuilder;
-use MoonShine\Fields\Password;
-use MoonShine\Fields\Switcher;
-use MoonShine\Fields\Text;
-use MoonShine\Components\FlexibleRender;   // «чистый» HTML/Blade компонент :contentReference[oaicite:2]{index=2}
 use Anhskohbo\NoCaptcha\Facades\NoCaptcha;
+use MoonShine\UI\Components\FlexibleRender;
+use MoonShine\UI\Components\FormBuilder;
+use MoonShine\UI\Fields\Password;
+use MoonShine\UI\Fields\Switcher;   // «чистый» HTML/Blade компонент :contentReference[oaicite:2]{index=2}
+use MoonShine\UI\Fields\Text;
 
 class LoginFormWithCaptcha
 {
@@ -22,8 +22,8 @@ class LoginFormWithCaptcha
                 Text::make(__('moonshine::ui.login.username'), 'username')
                     ->required()
                     ->customAttributes([
-                        'autofocus'     => true,
-                        'autocomplete'  => 'username',
+                        'autofocus' => true,
+                        'autocomplete' => 'username',
                     ]),
 
                 Password::make(__('moonshine::ui.login.password'), 'password')
@@ -31,8 +31,7 @@ class LoginFormWithCaptcha
 
                 // ===== reCAPTCHA =====
                 FlexibleRender::make(
-                    fn () =>
-                        '<div style="margin-bottom:20px">' .
+                    fn () => '<div style="margin-bottom:20px">' .
                         NoCaptcha::display() .
                         '</div>' .
                         NoCaptcha::renderJs('', false, 'recaptchaLoaded')

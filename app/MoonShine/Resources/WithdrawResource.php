@@ -13,13 +13,12 @@ use App\MoonShine\Pages\Withdraw\WithdrawIndexPage;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\ComponentAttributeBag;
-use MoonShine\Fields\Range;
-use MoonShine\Handlers\ExportHandler;
-use MoonShine\Pages\Page;
-use MoonShine\Resources\ModelResource;
+use MoonShine\Laravel\Handlers\ExportHandler;
+use MoonShine\Laravel\Pages\Page;
+use MoonShine\Laravel\Resources\ModelResource;
+use MoonShine\UI\Fields\Range;
 
 /**
  * @extends ModelResource<Withdraw>
@@ -35,20 +34,16 @@ class WithdrawResource extends ModelResource
     /**
      * @return list<Page>
      */
-    public function pages(): array
+    protected function pages(): array
     {
         return [
-            WithdrawIndexPage::make($this->title()),
-            WithdrawFormPage::make(
-                $this->getItemID()
-                    ? __('moonshine::ui.edit')
-                    : __('moonshine::ui.add')
-            ),
-            WithdrawDetailPage::make(__('moonshine::ui.show')),
+            WithdrawIndexPage::class,
+            WithdrawFormPage::class,
+            WithdrawDetailPage::class,
         ];
     }
 
-    public function filters(): array
+    protected function filters(): iterable
     {
         return [
 
@@ -272,7 +267,7 @@ class WithdrawResource extends ModelResource
      *
      * @see https://laravel.com/docs/validation#available-validation-rules
      */
-    public function rules(Model $item): array
+    public function rules(mixed $item): array
     {
         return [];
     }

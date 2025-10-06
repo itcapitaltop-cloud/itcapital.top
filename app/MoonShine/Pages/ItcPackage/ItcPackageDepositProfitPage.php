@@ -4,28 +4,24 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\ItcPackage;
 
-use MoonShine\Components\Alert;
-use MoonShine\Components\FormBuilder;
-use MoonShine\Pages\Page;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Decorations\Block;
-use MoonShine\Fields\Number;
+use MoonShine\Laravel\Pages\Page;
+use MoonShine\UI\Components\Alert;
+use MoonShine\UI\Components\FormBuilder;
+use MoonShine\UI\Components\Layout\Block;
+use MoonShine\UI\Components\MoonShineComponent;
+use MoonShine\UI\Fields\Number;
 
 class ItcPackageDepositProfitPage extends Page
 {
-    /**
-     * @return array<string, string>
-     */
-    public function breadcrumbs(): array
+    protected string $title = 'Начислить прибыль';
+
+    protected ?string $alias = 'itc-package-deposit-profit';
+
+    public function getBreadcrumbs(): array
     {
         return [
-            '#' => $this->title()
+            '#' => $this->getTitle(),
         ];
-    }
-
-    public function title(): string
-    {
-        return $this->title ?: 'ItcPackageDepositProfitPage';
     }
 
     /**
@@ -47,11 +43,11 @@ class ItcPackageDepositProfitPage extends Page
                             ->customAttributes(
                                 [
                                     'step' => 'any',
-                                ])
+                                ]),
                     ])
                     ->method('POST')
-                    ->submit('Подтвердить')
-            ])
+                    ->submit('Подтвердить'),
+            ]),
         ];
     }
 }

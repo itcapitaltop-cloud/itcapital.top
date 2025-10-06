@@ -12,93 +12,97 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\Summary\SummaryDetailPage;
 use App\MoonShine\Pages\Summary\SummaryFormPage;
 use App\MoonShine\Pages\Summary\SummaryIndexPage;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Jackiedo\DotenvEditor\Facades\DotenvEditor;
-use MoonShine\ActionButtons\ActionButton;
-use MoonShine\Handlers\ExportHandler;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\MoonShineRequest;
-use MoonShine\Pages\Page;
-use MoonShine\Resources\ModelResource;
+use MoonShine\ImportExport\Contracts\HasImportExportContract;
+use MoonShine\ImportExport\ExportHandler;
+use MoonShine\ImportExport\Traits\ImportExportConcern;
+use MoonShine\Laravel\Http\Responses\MoonShineJsonResponse;
+use MoonShine\Laravel\MoonShineRequest;
+use MoonShine\Laravel\Resources\ModelResource;
+use MoonShine\Support\Enums\ToastType;
+use MoonShine\Support\ListOf;
+use MoonShine\UI\Components\ActionButton;
 
 /**
- * @extends ModelResource<Summary>
+ * @extends ModelResource<Summary, SummaryIndexPage, SummaryFormPage, SummaryDetailPage>
  */
-class SummaryResource extends ModelResource
+final class SummaryResource extends ModelResource implements HasImportExportContract
 {
+    use ImportExportConcern;
+
     protected string $model = Summary::class;
 
     protected string $title = 'Сводка';
 
     /**
-     * @return list<Page>
-     *
-     * @throws \Throwable
+     * @return \MoonShine\Support\ListOf<\MoonShine\Contracts\UI\ActionButtonContract>
      */
-
-    /**
-     * @throws \Throwable
-     */
-    public function actions(): array
+    protected function topButtons(): ListOf
     {
-        return [
-            ActionButton::make('Сменить адрес кошелька')
-                ->icon('heroicons.wallet')
-                ->toggleModal('edit-wallet-modal')
-                ->showInDropdown(),
-            ActionButton::make('Проценты регулярной премии')
-                ->icon('heroicons.adjustments-horizontal')
-                ->toggleModal('edit-global-percents-modal')
-                ->showInDropdown(),
-            ActionButton::make('Требования к рангам')
-                ->icon('heroicons.trophy')
-                ->toggleModal('edit-rank-requirements-modal')
-                ->showInDropdown(),
-            ActionButton::make('Начислить прибыль', to_page(new ItcPackageDepositProfitPage()))
-                ->icon('heroicons.banknotes')
-                ->showInDropdown(),
-        ];
-        //        return [];
-    }
-
-    public function pages(): array
-    {
-        return [
-            SummaryIndexPage::make($this->title()),
-            SummaryFormPage::make(
-                $this->getItemID()
-                    ? __('moonshine::ui.edit')
-                    : __('moonshine::ui.add')
-            ),
-            SummaryDetailPage::make(__('moonshine::ui.show')),
-        ];
+        return parent::topButtons()
+            ->add(
+                ActionButton::make('Сменить адрес кошелька')
+                    ->icon('wallet')
+                    ->toggleModal('edit-wallet-modal')
+                    ->showInDropdown()
+            )
+            ->add(
+                ActionButton::make('Проценты регулярной премии')
+                    ->icon('adjustments-horizontal')
+                    ->toggleModal('edit-global-percents-modal')
+                    ->showInDropdown()
+            )
+            ->add(
+                ActionButton::make('Требования к рангам')
+                    ->icon('trophy')
+                    ->toggleModal('edit-rank-requirements-modal')
+                    ->showInDropdown()
+            )
+            ->add(
+                ActionButton::make(
+                    'Начислить прибыль',
+                    url: fn () => moonshineRouter()->getEndpoints()->toPage(
+                        page: ItcPackageDepositProfitPage::class
+                    )
+                )
+                    ->icon('banknotes')
+                    ->showInDropdown()
+            );
     }
 
     /**
-     * @param Summary $item
-     * @return array<string, string[]|string>
-     *
-     * @see https://laravel.com/docs/validation#available-validation-rules
+     * @return array{0: class-string<SummaryIndexPage>, 1: class-string<SummaryFormPage>, 2: class-string<SummaryDetailPage>}
      */
-    public function rules(Model $item): array
+    protected function pages(): array
     {
-        return [];
+        return [
+            SummaryIndexPage::class,
+            SummaryFormPage::class,
+            SummaryDetailPage::class,
+        ];
     }
 
+    /**
+     * @return list<\MoonShine\Laravel\Enums\Action>
+     */
     public function getActiveActions(): array
     {
         return [];
     }
 
-    public function export(): ?ExportHandler
+    /**
+     * @return \MoonShine\ImportExport\ExportHandler
+     */
+    public function export(): ExportHandler
     {
         return SummarySheetsExportHandler::make('Экспортировать')
             ->spreadsheetId(config('services.export_file.summary'))
             ->disk('public')
+            ->dir('exports')
             ->filename('summary-' . now()->format('Ymd-His'))
             ->withConfirm();
     }
@@ -106,7 +110,7 @@ class SummaryResource extends ModelResource
     /**
      * @throws ValidationException
      */
-    public function updateWallet($payload): MoonShineJsonResponse
+    public function updateWallet(MoonShineRequest $payload): MoonShineJsonResponse
     {
         $network = $payload->input('network');
 
@@ -156,9 +160,8 @@ class SummaryResource extends ModelResource
             'wallet.network' => $payload->input('network'),
         ]);
 
-        $url = to_page(
-            page: new SummaryIndexPage(),
-            resource: new SummaryResource(),
+        $url = moonshineRouter()->getEndpoints()->toPage(
+            page: SummaryIndexPage::class
         );
 
         return MoonShineJsonResponse::make()
@@ -189,8 +192,7 @@ class SummaryResource extends ModelResource
                 $newReqs = [];
 
                 foreach ($rows as $row) {
-                    // Персональный депозит (только одна строка на ранг)
-                    if (isset($row['personal_deposit']) && $row['personal_deposit'] !== null && $row['personal_deposit'] !== '') {
+                    if (isset($row['personal_deposit']) && $row['personal_deposit'] !== '') {
                         $newReqs[] = [
                             'partner_rank_id' => $row['partner_rank_id'],
                             'line' => null,
@@ -229,7 +231,7 @@ class SummaryResource extends ModelResource
                 ->redirect(request()->headers->get('referer') ?? '/');
         } catch (\Throwable $e) {
             return MoonShineJsonResponse::make()
-                ->toast('Ошибка: ' . $e->getMessage(), 'error');
+                ->toast('Ошибка: ' . $e->getMessage(), ToastType::ERROR);
         }
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\Deposit;
 
-use MoonShine\Pages\Crud\FormPage;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Fields\Field;
+use MoonShine\Laravel\Pages\Crud\FormPage;
+use MoonShine\UI\Components\MoonShineComponent;
+use MoonShine\UI\Fields\Field;
 use Throwable;
 
 class DepositFormPage extends FormPage
@@ -21,34 +21,37 @@ class DepositFormPage extends FormPage
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         return [
-            ...parent::mainLayer()
+            ...parent::mainLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
 }

@@ -11,44 +11,37 @@ use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
-use App\Models\ItcPackage;
-use App\Models\LogAdminAction;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\PartnerLevel;
-use App\Models\Transaction;
+use App\Models\User;
 use App\Models\UserLevelOverride;
 use App\Models\UserLevelPercentOverride;
 use App\Models\UserSummary;
 use App\MoonShine\Handlers\GoogleSheetsExportIndexDataHandler;
+use App\MoonShine\Pages\User\UserDetailPage;
+use App\MoonShine\Pages\User\UserFormPage;
+use App\MoonShine\Pages\User\UserIndexPage;
 use Carbon\Carbon;
 use Closure;
 use Exception;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use App\Models\User;
-use App\MoonShine\Pages\User\UserIndexPage;
-use App\MoonShine\Pages\User\UserFormPage;
-use App\MoonShine\Pages\User\UserDetailPage;
-
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
-use MoonShine\Fields\Checkbox;
-use MoonShine\Fields\Email;
-use MoonShine\Fields\Text;
-use MoonShine\Fields\Range;
-use MoonShine\Handlers\ExportHandler;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\MoonShineRequest;
-use MoonShine\Resources\ModelResource;
-use MoonShine\Pages\Page;
+use MoonShine\Laravel\Handlers\ExportHandler;
+use MoonShine\Laravel\Http\Responses\MoonShineJsonResponse;
+use MoonShine\Laravel\MoonShineRequest;
+use MoonShine\Laravel\Pages\Page;
+use MoonShine\Laravel\Resources\ModelResource;
+use MoonShine\UI\Fields\Checkbox;
+use MoonShine\UI\Fields\Email;
+use MoonShine\UI\Fields\Range;
+use MoonShine\UI\Fields\Text;
 use Throwable;
 
 /**
@@ -62,30 +55,28 @@ class UserResource extends ModelResource
 
     protected bool $saveFilterState = false;
 
-
     /**
      * @return list<Page>
      */
-
-
-    public function filters(): array
+    protected function filters(): iterable
     {
         return [
 
             Range::make('Баланс', 'buy_packages_sum')
-                ->onApply(function(Builder $q, array $value) {
+                ->onApply(function (Builder $q, array $value) {
                     // если ни from, ни to не заданы — ничего не делаем
                     if (is_null($value['from']) && is_null($value['to'])) {
                         return;
                     }
 
                     // сгруппировать AND (banned_at IS NULL AND диапазон)
-                    $q->where(function(Builder $q2) use ($value) {
+                    $q->where(function (Builder $q2) use ($value) {
                         $q2->whereNull('users.banned_at');
 
                         if (! is_null($value['from'])) {
                             $q2->where('user_summary.buy_packages_sum', '>=', $value['from']);
                         }
+
                         if (! is_null($value['to'])) {
                             $q2->where('user_summary.buy_packages_sum', '<=', $value['to']);
                         }
@@ -93,17 +84,18 @@ class UserResource extends ModelResource
                 }),
 
             Range::make('Реинвесты', 'reinvests_sum')
-                ->onApply(function(Builder $q, array $value) {
+                ->onApply(function (Builder $q, array $value) {
                     if (is_null($value['from']) && is_null($value['to'])) {
                         return;
                     }
 
-                    $q->where(function(Builder $q2) use ($value) {
+                    $q->where(function (Builder $q2) use ($value) {
                         $q2->whereNull('users.banned_at');
 
                         if (! is_null($value['from'])) {
                             $q2->where('user_summary.reinvests_sum', '>=', $value['from']);
                         }
+
                         if (! is_null($value['to'])) {
                             $q2->where('user_summary.reinvests_sum', '<=', $value['to']);
                         }
@@ -111,17 +103,18 @@ class UserResource extends ModelResource
                 }),
 
             Range::make('Линий в партнёрке', 'partners_count')
-                ->onApply(function(Builder $q, array $value) {
+                ->onApply(function (Builder $q, array $value) {
                     if (is_null($value['from']) && is_null($value['to'])) {
                         return;
                     }
 
-                    $q->where(function(Builder $q2) use ($value) {
+                    $q->where(function (Builder $q2) use ($value) {
                         $q2->whereNull('users.banned_at');
 
                         if (! is_null($value['from'])) {
                             $q2->where('user_summary.partners_count', '>=', $value['from']);
                         }
+
                         if (! is_null($value['to'])) {
                             $q2->where('user_summary.partners_count', '<=', $value['to']);
                         }
@@ -140,7 +133,7 @@ class UserResource extends ModelResource
                 }),
 
             Checkbox::make('Показать забаненных', 'show_banned')
-                ->onApply(function(Builder $q, $value) {
+                ->onApply(function (Builder $q, $value) {
                     if ($value) {
                         // убираем скрытие по умолчанию и добавляем всех, у кого banned_at НЕ NULL
                         $q->withoutGlobalScope('notBanned')
@@ -162,31 +155,22 @@ class UserResource extends ModelResource
         ];
     }
 
-    public function pages(): array
+    protected function pages(): array
     {
         return [
-            UserIndexPage::make($this->title()),
-            UserFormPage::make(
-                $this->getItemID()
-                    ? __('moonshine::ui.edit')
-                    : __('moonshine::ui.add')
-            ),
-            UserDetailPage::make(__('moonshine::ui.show')),
+            UserIndexPage::class,
+            UserFormPage::class,
+            UserDetailPage::class,
         ];
     }
 
     /**
      * @param User $item
-     *
      * @return array<string, string[]|string>
+     *
      * @see https://laravel.com/docs/validation#available-validation-rules
      */
-    public function rules(Model $item): array
-    {
-        return [];
-    }
-
-    public function indexButtons(): array
+    public function rules(mixed $item): array
     {
         return [];
     }
@@ -204,6 +188,7 @@ class UserResource extends ModelResource
                 'user_summary.partners_count    as partners_count',
                 'user_summary.first_package_at  as first_package_at',
             ]);
+
         return $q;
     }
 
@@ -220,17 +205,15 @@ class UserResource extends ModelResource
         $user->save();
 
         $url = to_page(
-            page:     new UserDetailPage,
-            resource: new UserResource,
-            params:   ['resourceItem' => $user->id],
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $user->id],
         );
 
         return MoonShineJsonResponse::make()
             ->toast('Пользователь забанен.')
             ->redirect($url);
     }
-
-
 
     public function unban(): MoonShineJsonResponse
     {
@@ -239,9 +222,9 @@ class UserResource extends ModelResource
         $user->save();
 
         $url = to_page(
-            page:     new UserDetailPage,
-            resource: new UserResource,
-            params:   ['resourceItem' => $user->id],
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $user->id],
         );
 
         return MoonShineJsonResponse::make()
@@ -256,9 +239,9 @@ class UserResource extends ModelResource
         $user->save();
 
         $url = to_page(
-            page:     new UserDetailPage,
-            resource: new UserResource,
-            params:   ['resourceItem' => $user->id],
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $user->id],
         );
 
         return MoonShineJsonResponse::make()
@@ -275,20 +258,20 @@ class UserResource extends ModelResource
     {
         return function (User $item, int $row, ComponentAttributeBag $attr): ComponentAttributeBag {
             $url = to_page(
-                page:     new UserDetailPage,
-                resource: new UserResource,
-                params:   ['resourceItem' => $item->id],
+                page: new UserDetailPage(),
+                resource: new UserResource(),
+                params: ['resourceItem' => $item->id],
             );
             $attr->setAttributes([
                 'onclick' => "window.location='{$url}'",
-                'style'   => 'cursor: pointer;',
+                'style' => 'cursor: pointer;',
             ]);
 
             return $attr;
         };
     }
 
-    public function search(): array
+    protected function search(): array
     {
         return ['email', 'username', 'first_name', 'last_name'];
     }
@@ -296,13 +279,13 @@ class UserResource extends ModelResource
     /**
      * @throws Throwable
      */
-
     public function update(MoonShineRequest $request): MoonShineJsonResponse
     {
         try {
             $data = $request->all();
             $item = User::withoutGlobalScope('notBanned')->find($data['id']);
-            if (!$item) {
+
+            if (! $item) {
                 throw new ModelNotFoundException("Пользователь с ID {$data['id']} не найден");
             }
 
@@ -336,7 +319,7 @@ class UserResource extends ModelResource
                         $newReferrerId = $referrer->id;
 
                         if ($oldReferrerId !== $newReferrerId) {
-                            $userId       = (int) $item->id;
+                            $userId = (int) $item->id;
                             $newPartnerId = (int) $newReferrerId;
 
                             // Поддерево пользователя (сам + все его потомки), depth относительно $userId
@@ -369,20 +352,23 @@ class UserResource extends ModelResource
                             // Вставляем новые пути:
                             // depth = depth(ancestor -> newPartner) + 1 + depth(user -> descendant)
                             $bulk = [];
+
                             foreach ($newAncestors as $na) {
                                 foreach ($subtree as $sd) {
                                     $bulk[] = [
-                                        'ancestor_id'   => (int) $na->ancestor_id,
+                                        'ancestor_id' => (int) $na->ancestor_id,
                                         'descendant_id' => (int) $sd->descendant_id,
-                                        'depth'         => (int) $na->depth + 1 + (int) $sd->depth,
+                                        'depth' => (int) $na->depth + 1 + (int) $sd->depth,
                                     ];
+
                                     if (count($bulk) >= 1000) {
                                         PartnerClosure::insert($bulk);
                                         $bulk = [];
                                     }
                                 }
                             }
-                            if (!empty($bulk)) {
+
+                            if (! empty($bulk)) {
                                 PartnerClosure::insert($bulk);
                             }
                         }
@@ -400,9 +386,10 @@ class UserResource extends ModelResource
                             $item->id
                         );
                     }
-                    Artisan::call("users:recalc-rank --no-bonus");
+                    Artisan::call('users:recalc-rank --no-bonus');
                 }
             }
+
             foreach ($changes as $field => $newValue) {
                 $logRepo->updated(
                     $item,
@@ -414,16 +401,15 @@ class UserResource extends ModelResource
             }
 
             $url = to_page(
-                page:     new UserDetailPage,
-                resource: new UserResource,
-                params:   ['resourceItem' => $item->id],
+                page: new UserDetailPage(),
+                resource: new UserResource(),
+                params: ['resourceItem' => $item->id],
             );
 
             return MoonShineJsonResponse::make()
                 ->toast('Сохранено.')
                 ->redirect($url);
-        }
-        catch (Throwable $e) {
+        } catch (Throwable $e) {
             return MoonShineJsonResponse::make()
                 ->toast('Ошибка: ' . $e->getMessage(), 'error');
         }
@@ -434,15 +420,15 @@ class UserResource extends ModelResource
      */
     public function updateBalance(MoonShineRequest $request): MoonShineJsonResponse
     {
-        $userId     = (int)   $request->input('user_id');
-        $newInvest  = (float) $request->input('investments_sum');
+        $userId = (int) $request->input('user_id');
+        $newInvest = (float) $request->input('investments_sum');
         $newPartner = (float) $request->input('partner_balance');
 
-        $summary    = UserSummary::firstWhere('user_id', $userId);
+        $summary = UserSummary::firstWhere('user_id', $userId);
         $origInvest = (float) $summary->investments_sum;
-        $origPartner= (float) $summary->partner_balance;
+        $origPartner = (float) $summary->partner_balance;
 
-        $deltaInvest  = round($newInvest  - $origInvest, 2);
+        $deltaInvest = round($newInvest - $origInvest, 2);
         $deltaPartner = round($newPartner - $origPartner, 2);
         $logRepo = app(LogRepositoryContract::class);
         // отправляем изменение инвестиций
@@ -453,7 +439,7 @@ class UserResource extends ModelResource
                 userId: $userId,
                 trxType: TrxTypeEnum::HIDDEN_DEPOSIT,
                 balanceType: BalanceTypeEnum::MAIN,
-                amount: (string)$deltaInvest,
+                amount: (string) $deltaInvest,
                 acceptedAt: Carbon::now()->toDateTimeString(),
                 prefix: 'HD-'
             ));
@@ -461,8 +447,8 @@ class UserResource extends ModelResource
             $logRepo->updated(
                 $txMain,
                 'update_investments_sum',
-                ['investments_sum'  => $origInvest],
-                ['investments_sum'  => $newInvest],
+                ['investments_sum' => $origInvest],
+                ['investments_sum' => $newInvest],
                 $userId
             );
         }
@@ -472,7 +458,7 @@ class UserResource extends ModelResource
                 userId: $userId,
                 trxType: TrxTypeEnum::HIDDEN_DEPOSIT,
                 balanceType: BalanceTypeEnum::PARTNER,
-                amount: (string)$deltaPartner,
+                amount: (string) $deltaPartner,
                 acceptedAt: Carbon::now()->toDateTimeString(),
                 prefix: 'HD-'
             ));
@@ -480,16 +466,16 @@ class UserResource extends ModelResource
             $logRepo->updated(
                 $txPartner,
                 'update_partner_balance',
-                ['partner_balance'  => $origPartner],
-                ['partner_balance'  => $newPartner],
+                ['partner_balance' => $origPartner],
+                ['partner_balance' => $newPartner],
                 $userId
             );
         }
 
         $url = to_page(
-            page:     new UserDetailPage,
-            resource: new UserResource,
-            params:   ['resourceItem' => $userId],
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $userId],
         );
 
         return MoonShineJsonResponse::make()
@@ -501,44 +487,44 @@ class UserResource extends ModelResource
         MoonShineRequest $request,
     ): MoonShineJsonResponse {
 
-        $itcRepo        = app(ItcPackageRepositoryContract::class);
+        $itcRepo = app(ItcPackageRepositoryContract::class);
         $transactionRepo = app(TransactionRepositoryContract::class);
 
-        $userId    = (int) $request->input('user_id');
+        $userId = (int) $request->input('user_id');
         $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
 
         /* DTO транзакции */
         $dto = new CreateTransactionDto(
-            userId:      $userId,
-            trxType:     $isPresent ? TrxTypeEnum::PRESENT_PACKAGE : TrxTypeEnum::BUY_PACKAGE,
+            userId: $userId,
+            trxType: $isPresent ? TrxTypeEnum::PRESENT_PACKAGE : TrxTypeEnum::BUY_PACKAGE,
             balanceType: BalanceTypeEnum::MAIN,
-            amount:      $request->input('amount'),
-            acceptedAt:  Carbon::now(),
-            prefix:      'ITC-',
+            amount: $request->input('amount'),
+            acceptedAt: Carbon::now(),
+            prefix: 'ITC-',
         );
 
         /* Данные пакета */
         $packageData = [
-            'type'                 => $request->input('packageType'),
+            'type' => $request->input('packageType'),
             'month_profit_percent' => $request->input('percent'),
-            'work_to'              => $isPresent
+            'work_to' => $isPresent
                 ? now()->addMonths((int) $request->input('duration'))
                 : now()->addWeeks(30),
-            'duration_months'      => $request->input('duration'),
+            'duration_months' => $request->input('duration'),
         ];
 
         /* Создание через репозиторий */
         $itcRepo->createPackage(
-            dto:             $dto,
-            packageData:     $packageData,
+            dto: $dto,
+            packageData: $packageData,
             transactionRepo: $transactionRepo,
-            skipBalance:     $isPresent
+            skipBalance: $isPresent
         );
 
         $url = to_page(
-            page:     new UserDetailPage,
-            resource: new UserResource,
-            params:   ['resourceItem' => $userId],
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $userId],
         );
 
         return MoonShineJsonResponse::make()
@@ -560,13 +546,13 @@ class UserResource extends ModelResource
             }
 
             // Статусы галочек
-            $overrideEnabled = (bool)($data['override_enabled'] ?? false);
-            $overriddenRank  = (bool)($data['overridden_rank'] ?? false);
+            $overrideEnabled = (bool) ($data['override_enabled'] ?? false);
+            $overriddenRank = (bool) ($data['overridden_rank'] ?? false);
 
             $url = to_page(
-                page:     new UserDetailPage,
-                resource: new UserResource,
-                params:   ['resourceItem' => $user->id],
+                page: new UserDetailPage(),
+                resource: new UserResource(),
+                params: ['resourceItem' => $user->id],
             );
 
             $rank = $overriddenRank
@@ -574,6 +560,7 @@ class UserResource extends ModelResource
                 : $user->rank;
 
             $level = PartnerLevel::where('level', $rank)->first();
+
             if (! $level) {
                 throw new Exception('Уровень не найден для ранга ' . $rank);
             }
@@ -583,8 +570,7 @@ class UserResource extends ModelResource
                 $user->overridden_rank_from = null;
                 $user->save();
                 Artisan::call('users:recalc-rank --no-bonus', ['--user' => $user->id]);
-            }
-            else {
+            } else {
                 $user->rank = $rank;
                 $user->overridden_rank = $overriddenRank;
                 $user->overridden_rank_from = $overriddenRank ? now() : null;
@@ -604,6 +590,7 @@ class UserResource extends ModelResource
                         ->toast('Настройки процентов сброшены на общие')
                         ->redirect($url);
                 }
+
                 return MoonShineJsonResponse::make()
                     ->toast('Сохранено')
                     ->redirect($url);
@@ -613,7 +600,7 @@ class UserResource extends ModelResource
                 ['user_id' => $userId],
                 [
                     'partner_level_id' => $level->id,
-                    'active_from'      => now(),
+                    'active_from' => now(),
                 ]
             );
 
@@ -625,24 +612,29 @@ class UserResource extends ModelResource
 
             // Заполняем новые значения
             $newRows = [];
+
             foreach ($rows as $row) {
                 foreach (range(1, 5) as $line) {
-                    if (!isset($row["line_$line"])) continue;
+                    if (! isset($row["line_$line"])) {
+                        continue;
+                    }
                     $percent = $row["line_$line"];
+
                     if ($percent === '' || $percent === false || $percent === null) {
                         continue;
                     }
                     $newRows[] = [
-                        'user_id'           => $userId,
-                        'partner_level_id'  => $row['partner_level_id'],
-                        'bonus_type'        => $row['bonus_type'],
-                        'line'              => $line,
-                        'percent'           => $percent,
-                        'created_at'        => now(),
-                        'updated_at'        => now(),
+                        'user_id' => $userId,
+                        'partner_level_id' => $row['partner_level_id'],
+                        'bonus_type' => $row['bonus_type'],
+                        'line' => $line,
+                        'percent' => $percent,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
             }
+
             if ($newRows) {
                 UserLevelPercentOverride::insert($newRows);
             }
@@ -661,7 +653,7 @@ class UserResource extends ModelResource
         return GoogleSheetsExportIndexDataHandler::make('Экспортировать')
             ->spreadsheetId(config('services.export_file.users'))
             ->disk('public')
-            ->filename('users-'.now()->format('Ymd-His'))
+            ->filename('users-' . now()->format('Ymd-His'))
             ->withConfirm();
     }
 }

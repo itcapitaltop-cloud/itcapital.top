@@ -8,49 +8,38 @@ use App\Enums\Transactions\TransactionStatusEnum;
 use App\Models\Transaction;
 use App\Models\Withdraw;
 use App\MoonShine\Pages\User\UserDetailPage;
-use App\MoonShine\Resources\TransactionResource;
 use App\MoonShine\Resources\UserResource;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use Closure;
 use Illuminate\Support\Facades\Log;
-use Illuminate\View\ComponentAttributeBag;
-use Illuminate\Support\HtmlString;
-use MoonShine\ActionButtons\ActionButton;
-use MoonShine\Components\ActionGroup;
-use MoonShine\Components\Dropdown;
-use MoonShine\Components\FormBuilder;
-use MoonShine\Components\Link;
-use MoonShine\Decorations\Block;
 use MoonShine\Exceptions\FieldException;
-use MoonShine\Fields\Date;
-use MoonShine\Fields\Number;
-use MoonShine\Fields\Preview;
-use MoonShine\Fields\Relationships\BelongsTo;
-use MoonShine\Fields\Relationships\HasOne;
-use MoonShine\Fields\Select;
-use MoonShine\Fields\Td;
-use MoonShine\Fields\Text;
-use MoonShine\Fields\Url;
-use MoonShine\Pages\Crud\IndexPage;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Fields\Field;
-use MoonShine\Traits\Fields\ShowOrHide;
+use MoonShine\Laravel\Pages\Crud\IndexPage;
 use MoonShine\TypeCasts\ModelCast;
+use MoonShine\UI\ActionButtons\ActionButton;
+use MoonShine\UI\Components\FormBuilder;
+use MoonShine\UI\Components\MoonShineComponent;
+use MoonShine\UI\Fields\Date;
+use MoonShine\UI\Fields\Field;
+use MoonShine\UI\Fields\Number;
+use MoonShine\UI\Fields\Select;
+use MoonShine\UI\Fields\Td;
+use MoonShine\UI\Fields\Text;
+use MoonShine\UI\Fields\Url;
 use Throwable;
 
 class WithdrawIndexPage extends IndexPage
 {
     /**
      * @return list<MoonShineComponent|Field>
+     *
      * @throws FieldException
      */
     public function fields(): array
     {
         return [
             Date::make('Дата заявки на вывод', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
-            Text::make('Сумма', 'transaction', formatted: fn($item) => round((float)$item->transaction->amount, 2))->showOnExport(),
-            Text::make('Комиссия', 'commission', formatted: fn($item) => round((float)$item->commission, 2))->showOnExport(),
+            Text::make('Сумма', 'transaction', formatted: fn ($item) => round((float) $item->transaction->amount, 2))->showOnExport(),
+            Text::make('Комиссия', 'commission', formatted: fn ($item) => round((float) $item->commission, 2))->showOnExport(),
             Text::make('К выводу', formatted: function (Withdraw $item) {
                 // тут тоже можно логировать, если нужно
                 return BigDecimal::of($item->transaction->amount)
@@ -60,26 +49,27 @@ class WithdrawIndexPage extends IndexPage
             })->showOnExport(),
             Url::make(
                 'Пользователь',
-                formatted: fn($item) => to_page(
-                    page:     new UserDetailPage,
+                formatted: fn ($item) => to_page(
+                    page: new UserDetailPage(),
                     resource: new UserResource(),
-                    params:   ['resourceItem' => $item->transaction?->user?->id]
+                    params: ['resourceItem' => $item->transaction?->user?->id]
                 )
             )
-                ->showOnExport(modifyRawValue: function($href, Url $field) {
+                ->showOnExport(modifyRawValue: function ($href, Url $field) {
                     $user = $field->getData()->transaction?->user;
-//                    Log::channel('source')->debug($user?->username ?? 'пользователь забанен');
+
+                    //                    Log::channel('source')->debug($user?->username ?? 'пользователь забанен');
                     return $user?->username ?? 'пользователь забанен';
                 })
                 ->title(
-                    fn($href, Url $field) => $field->getData()->transaction?->user?->username
+                    fn ($href, Url $field) => $field->getData()->transaction?->user?->username
                 ),
             Text::make('Адрес/Карта/Счёт', 'payout_requisite')
                 ->showOnExport(),
-            Text::make('Крипто/Фиат', 'wallet_address', formatted: function(Withdraw $item) {
+            Text::make('Крипто/Фиат', 'wallet_address', formatted: function (Withdraw $item) {
                 $addr = $item->wallet_address;
 
-                if (!is_string($addr) || $addr === '') {
+                if (! is_string($addr) || $addr === '') {
                     return 'Фиат';
                 }
 
@@ -101,132 +91,132 @@ class WithdrawIndexPage extends IndexPage
                     return 'Крипто (BTC)';
                 }
 
-                return "Фиат";
+                return 'Фиат';
             })->showOnExport(),
             Td::make('Статус')
-                ->fields( function(Td $field) {
-                $item = $field->getData();
-                $statusName = TransactionStatusEnum::fromDates(
-                    $field->getData()?->transaction?->accepted_at,
-                    $field->getData()?->transaction?->rejected_at
-                )->getName() ?? '';
+                ->fields(function (Td $field) {
+                    $item = $field->getData();
+                    $statusName = TransactionStatusEnum::fromDates(
+                        $field->getData()?->transaction?->accepted_at,
+                        $field->getData()?->transaction?->rejected_at
+                    )->getName() ?? '';
 
-                if ($statusName === 'На модерации' && $item?->transaction) {
+                    if ($statusName === 'На модерации' && $item?->transaction) {
+                        return [
+                            ActionButton::make('')
+                                ->method(
+                                    'accept',
+                                    params: fn () => ['resourceItem' => $item->uuid]
+                                )
+                                ->icon('heroicons.check')
+                                ->success(),
+                            ActionButton::make('')
+                                ->method(
+                                    'reject',
+                                    params: fn () => ['resourceItem' => $item->uuid]
+                                )
+                                ->icon('heroicons.x-mark')
+                                ->error(),
+                        ];
+                    }
+
                     return [
-                        ActionButton::make('')
-                            ->method(
-                                'accept',
-                                params: fn () => ['resourceItem' => $item->uuid]
-                            )
-                            ->icon('heroicons.check')
-                            ->success(),
-                        ActionButton::make('')
-                            ->method(
-                                'reject',
-                                params: fn () => ['resourceItem' => $item->uuid]
-                            )
-                            ->icon('heroicons.x-mark')
-                            ->error(),
-                    ];
-                }
-                return [
-                    $statusName !== 'На модерации'
-                        ? Text::make('Статус', formatted: fn() =>
-                            $statusName
-                            . (
-                            $statusName === TransactionStatusEnum::ACCEPTED->getName()
-                                ? ' (' . $item->transaction->accepted_at->format('d.m.Y H:i') . ')'
-                                : ''
-                            )
-                        )->showOnExport(modifyRawValue: fn ($text, Text $field) =>
-                            TransactionStatusEnum::fromDates(
+                        $statusName !== 'На модерации'
+                            ? Text::make('Статус', formatted: fn () => $statusName
+                                . (
+                                    $statusName === TransactionStatusEnum::ACCEPTED->getName()
+                                        ? ' (' . $item->transaction->accepted_at->format('d.m.Y H:i') . ')'
+                                        : ''
+                                )
+                            )->showOnExport(modifyRawValue: fn ($text, Text $field) => TransactionStatusEnum::fromDates(
                                 $field->getData()?->transaction?->accepted_at,
                                 $field->getData()?->transaction?->rejected_at
                             )->getName()
-                        )
-                        : Text::make(''),
-                    $statusName !== 'На модерации'
-                        ? ActionButton::make('')
-                        ->icon('heroicons.outline.pencil')
-                        ->inModal(
-                            title: 'Редактировать заявку на вывод',
-                            content: function() use ($item) {
-                                /** @var Transaction $tx */
-                                $tx = $item->transaction;
-                                $currentStatus = TransactionStatusEnum::fromDates(
-                                    $tx->accepted_at,
-                                    $tx->rejected_at,
-                                );
+                            )
+                            : Text::make(''),
+                        $statusName !== 'На модерации'
+                            ? ActionButton::make('')
+                                ->icon('pencil')
+                                ->inModal(
+                                    title: 'Редактировать заявку на вывод',
+                                    content: function () use ($item) {
+                                        /** @var Transaction $tx */
+                                        $tx = $item->transaction;
+                                        $currentStatus = TransactionStatusEnum::fromDates(
+                                            $tx->accepted_at,
+                                            $tx->rejected_at,
+                                        );
 
-                                // Подготовка опций в зависимости от текущего статуса
-                                if ($currentStatus === TransactionStatusEnum::ACCEPTED) {
-                                    $statusOptions = [
-                                        TransactionStatusEnum::REJECTED->getName()  => TransactionStatusEnum::REJECTED->getName(),
-                                        TransactionStatusEnum::MODERATE->getName()  => TransactionStatusEnum::MODERATE->getName(),
-                                    ];
-                                } elseif ($currentStatus === TransactionStatusEnum::REJECTED) {
-                                    $statusOptions = [
-                                        TransactionStatusEnum::ACCEPTED->getName()  => TransactionStatusEnum::ACCEPTED->getName(),
-                                        TransactionStatusEnum::MODERATE->getName()  => TransactionStatusEnum::MODERATE->getName(),
-                                    ];
-                                }
+                                        // Подготовка опций в зависимости от текущего статуса
+                                        if ($currentStatus === TransactionStatusEnum::ACCEPTED) {
+                                            $statusOptions = [
+                                                TransactionStatusEnum::REJECTED->getName() => TransactionStatusEnum::REJECTED->getName(),
+                                                TransactionStatusEnum::MODERATE->getName() => TransactionStatusEnum::MODERATE->getName(),
+                                            ];
+                                        } elseif ($currentStatus === TransactionStatusEnum::REJECTED) {
+                                            $statusOptions = [
+                                                TransactionStatusEnum::ACCEPTED->getName() => TransactionStatusEnum::ACCEPTED->getName(),
+                                                TransactionStatusEnum::MODERATE->getName() => TransactionStatusEnum::MODERATE->getName(),
+                                            ];
+                                        }
 
-                                return FormBuilder::make()
-                                    ->action(route('withdraw-update', ['uuid' => $item->uuid]))
-                                    ->method('POST')
-                                    ->fillCast(
-                                        $tx,
-                                        ModelCast::make(Transaction::class)
-                                    )
-                                    ->fields([
-                                        Number::make('Сумма', 'amount'),
-                                        Select::make('Статус заявки', 'status')
-                                            ->nullable()
-                                            ->options($statusOptions)
-                                    ])
-                                    ->async()
-                                    ->submit('Сохранить');
-                            }
-                        )
-                        : Text::make(''),
+                                        return FormBuilder::make()
+                                            ->action(route('withdraw-update', ['uuid' => $item->uuid]))
+                                            ->method('POST')
+                                            ->fillCast(
+                                                $tx,
+                                                ModelCast::make(Transaction::class)
+                                            )
+                                            ->fields([
+                                                Number::make('Сумма', 'amount'),
+                                                Select::make('Статус заявки', 'status')
+                                                    ->nullable()
+                                                    ->options($statusOptions),
+                                            ])
+                                            ->async()
+                                            ->submit('Сохранить');
+                                    }
+                                )
+                            : Text::make(''),
 
-                ];
-            })
+                    ];
+                }),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         return [
-            ...parent::mainLayer()
+            ...parent::mainLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
-
-
 }

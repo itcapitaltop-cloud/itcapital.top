@@ -32,9 +32,8 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
             'client_x509_cert_url' => config('services.google.client_x509_cert_url'),
             'universe_domain' => config('services.google.universe_domain'),
         ]);
-        $client->setScopes([GoogleSheets::SPREADSHEETS]);
+        $client->addScope(GoogleSheets::SPREADSHEETS);
         $this->service = new GoogleSheets($client);
-
     }
 
     /**

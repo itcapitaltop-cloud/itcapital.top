@@ -4,31 +4,28 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages;
 
-use MoonShine\Pages\Page;
-use MoonShine\Components\MoonShineComponent;
+use MoonShine\Laravel\Pages\Page;
+use MoonShine\UI\Components\MoonShineComponent;
 
 class Dashboard extends Page
 {
+    protected string $title = 'Dashboard';
+
     /**
      * @return array<string, string>
      */
-    public function breadcrumbs(): array
+    public function getBreadcrumbs(): array
     {
         return [
-            '#' => $this->title()
+            '#' => $this->getTitle(),
         ];
-    }
-
-    public function title(): string
-    {
-        return $this->title ?: 'Dashboard';
     }
 
     /**
      * @return list<MoonShineComponent>
      */
     public function components(): array
-	{
-		return [];
-	}
+    {
+        return [];
+    }
 }

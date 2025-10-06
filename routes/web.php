@@ -7,11 +7,10 @@ use App\Http\Controllers\CommonFundController;
 use App\Http\Controllers\EmailChangeController;
 use App\Http\Controllers\MainPageModalsController;
 use App\Http\Controllers\WalletQrController;
-use App\Livewire\Auth\PasswordReset;
-use Illuminate\Support\Facades\Route;
-use MoonShine\Http\Middleware\Authenticate;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use MoonShine\Laravel\Http\Middleware\Authenticate;
 
 $domain = config('app.domain');
 
@@ -51,6 +50,7 @@ Route::get('/email/change/verify/{user}/{hash}', EmailChangeController::class)
 /* повторная отправка письма */
 Route::post('/email/verification-notification', function (Request $request) {
     $request->user()->sendEmailVerificationNotification();
+
     return back()->with('status', 'verification-link-sent');
 })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
 
@@ -97,11 +97,11 @@ Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])
 
 Route::controller(AdminController::class)->middleware(Authenticate::class)->prefix('itcapitalmoonshineadminpanel')->group(function () {
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
-    Route::post('reinvest-profit/{uuid}/withdraw','withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
+    Route::post('reinvest-profit/{uuid}/withdraw', 'withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
     Route::delete('reinvest-profit/{uuid}/delete', 'deleteProfitReinvest')->name('reinvest-profit-delete');
     Route::post('reinvest-profit/{uuid}/extend', 'extendProfitReinvest')->name('reinvest-profit-extend');
     Route::post('reinvest-profit/{uuid}/remove-all', 'removeAllProfitsAndReinvests')->name('reinvest-profit-remove-all');
-    Route::post('reinvest-profit-withdraw/bulk','bulkWithdraw')->name('reinvest-profit-withdraw-bulk');
+    Route::post('reinvest-profit-withdraw/bulk', 'bulkWithdraw')->name('reinvest-profit-withdraw-bulk');
     Route::post('itc-packages/{uuid}/close', 'closeItcPackage')->name('itc-package-close');
     Route::post('users/amount', 'addAmountToBalance');
     Route::post('itc-packages/{uuid}', 'updateItcPackage');
@@ -123,5 +123,5 @@ Route::controller(MainPageModalsController::class)
     });
 
 Route::controller(AdminLogActionController::class)->middleware(Authenticate::class)->prefix('admin')->group(function () {
-    Route::post('log-admin-action','withdrawOneProfitReinvest')->name('admin.log.store');
+    Route::post('log-admin-action', 'withdrawOneProfitReinvest')->name('admin.log.store');
 });

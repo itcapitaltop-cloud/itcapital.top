@@ -3,18 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\PartnerLevelPercent;
-use App\MoonShine\Resources\SummaryResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\View\ComponentAttributeBag;
-use MoonShine\Components\FormBuilder;
-use MoonShine\Components\TableBuilder;
-use MoonShine\Exceptions\FieldException;
-use MoonShine\Fields\Number;
-use MoonShine\Fields\Text;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\MoonShineRequest;
-use MoonShine\Pages\PageComponents;
+use MoonShine\Contracts\Core\TypeCasts\DataWrapperContract;
+use MoonShine\Laravel\Http\Responses\MoonShineJsonResponse;
+use MoonShine\Support\Enums\ToastType;
+use MoonShine\UI\Components\FormBuilder;
+use MoonShine\UI\Components\Table\TableBuilder;
+use MoonShine\UI\Exceptions\FieldException;
+use MoonShine\UI\Fields\Number;
+use MoonShine\UI\Fields\Text;
 use Throwable;
 
 class MainPageModalsController extends Controller
@@ -25,11 +22,8 @@ class MainPageModalsController extends Controller
      */
     public function percents(): string
     {
-        $resource = app(SummaryResource::class);
-
-        $formPercents = FormBuilder::make(
-            action: route('modal.percents.save'),
-        )
+        $formPercents = FormBuilder::make()
+            ->action(route('modal.percents.save'))
             ->name('global-percent-form')
             ->async()
             ->fields([
@@ -89,16 +83,14 @@ class MainPageModalsController extends Controller
                         [
                             'class' => 'table-partners-percents',
                         ])
-                    ->tdAttributes(function (mixed $data, int $row, int $cell, ComponentAttributeBag $attr) {
+                    ->tdAttributes(function (?DataWrapperContract $data, int $row, int $cell, TableBuilder $table): array {
                         $class = match (true) {
                             $cell === 0 => 'col-sticky-0',
                             $cell === 1 => 'col-sticky-80 w-100',
-                            default     => 'w-140',
+                            default => 'w-140',
                         };
 
-                        $existing = trim((string) $attr->get('class', ''));
-                        $attr->setAttributes(['class' => trim($existing . ' ' . $class)]);
-                        return $attr;
+                        return ['class' => $class];
                     })
                     ->sticky()
                     ->name('percentsCommon'),
@@ -109,31 +101,35 @@ class MainPageModalsController extends Controller
                 ])
             ->submit('Сохранить');
 
-        return $formPercents->render();
+        return (string) $formPercents;
     }
 
-    public function saveGlobalPercents(MoonShineRequest $request): MoonShineJsonResponse
+    public function saveGlobalPercents(Request $request): MoonShineJsonResponse
     {
         try {
             $data = $request->all();
             $rows = $data['percentsCommon'] ?? [];
             PartnerLevelPercent::truncate();
-//            Log::channel('source')->debug($data['percentsCommon']);
+            //            Log::channel('source')->debug($data['percentsCommon']);
             $newRows = [];
+
             foreach ($rows as $row) {
                 foreach (range(1, 20) as $line) {
-                    if (!isset($row["line_$line"])) continue;
+                    if (! isset($row["line_$line"])) {
+                        continue;
+                    }
                     $percent = $row["line_$line"];
+
                     if ($percent === '' || $percent === false || $percent === null) {
                         continue;
                     }
                     $newRows[] = [
                         'partner_level_id' => $row['partner_level_id'],
-                        'bonus_type'       => $row['bonus_type'],
-                        'line'             => $line,
-                        'percent'          => $percent,
-                        'created_at'       => now(),
-                        'updated_at'       => now(),
+                        'bonus_type' => $row['bonus_type'],
+                        'line' => $line,
+                        'percent' => $percent,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
             }
@@ -147,7 +143,7 @@ class MainPageModalsController extends Controller
                 ->redirect(request()->headers->get('referer') ?? '/');
         } catch (Throwable $e) {
             return MoonShineJsonResponse::make()
-                ->toast('Ошибка: ' . $e->getMessage(), 'error');
+                ->toast('Ошибка: ' . $e->getMessage(), ToastType::ERROR);
         }
     }
 }

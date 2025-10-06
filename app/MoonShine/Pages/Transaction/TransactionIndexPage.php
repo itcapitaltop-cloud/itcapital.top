@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\Transaction;
 
-use MoonShine\Pages\Crud\IndexPage;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Fields\Field;
-use MoonShine\Fields\Text;
+use MoonShine\Laravel\Pages\Crud\IndexPage;
+use MoonShine\UI\Components\MoonShineComponent;
+use MoonShine\UI\Fields\Field;
+use MoonShine\UI\Fields\Text;
 use Throwable;
 
 class TransactionIndexPage extends IndexPage
@@ -24,34 +24,37 @@ class TransactionIndexPage extends IndexPage
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         return [
-            ...parent::mainLayer()
+            ...parent::mainLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
 }

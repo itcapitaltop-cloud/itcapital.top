@@ -23,38 +23,37 @@ use App\MoonShine\Resources\UserResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
-use MoonShine\ActionButtons\ActionButton;
-use MoonShine\Components\Alert;
-use MoonShine\Components\FlexibleRender;
-use MoonShine\Components\FormBuilder;
-use MoonShine\Components\Modal;
-use MoonShine\Components\MoonShineComponent;
-use MoonShine\Components\TableBuilder;
-use MoonShine\Decorations\Block;
-use MoonShine\Decorations\Divider;
-use MoonShine\Decorations\Heading;
-use MoonShine\Decorations\Tab;
-use MoonShine\Decorations\Tabs;
-use MoonShine\Fields\Date;
-use MoonShine\Fields\Email;
-use MoonShine\Fields\Enum;
-use MoonShine\Fields\Field;
-use MoonShine\Fields\Fields;
-use MoonShine\Fields\Hidden;
-use MoonShine\Fields\Number;
-use MoonShine\Fields\Password;
-use MoonShine\Fields\Preview;
-use MoonShine\Fields\Relationships\BelongsTo;
-use MoonShine\Fields\Select;
-use MoonShine\Fields\Switcher;
-use MoonShine\Fields\Template;
-use MoonShine\Fields\Text;
-use MoonShine\Fields\Url;
-use MoonShine\Http\Requests\MoonShineFormRequest;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\Pages\Crud\DetailPage;
-use MoonShine\Pages\PageComponents;
+use MoonShine\Laravel\Fields\Relationships\BelongsTo;
+use MoonShine\Laravel\Http\Requests\MoonShineFormRequest;
+use MoonShine\Laravel\Http\Responses\MoonShineJsonResponse;
+use MoonShine\Laravel\Pages\Crud\DetailPage;
 use MoonShine\TypeCasts\ModelCast;
+use MoonShine\UI\ActionButtons\ActionButton;
+use MoonShine\UI\Components\Alert;
+use MoonShine\UI\Components\Block;
+use MoonShine\UI\Components\FlexibleRender;
+use MoonShine\UI\Components\FormBuilder;
+use MoonShine\UI\Components\Heading;
+use MoonShine\UI\Components\Layout\Divider;
+use MoonShine\UI\Components\Modal;
+use MoonShine\UI\Components\MoonShineComponent;
+use MoonShine\UI\Components\Tab;
+use MoonShine\UI\Components\Table\TableBuilder;
+use MoonShine\UI\Components\Tabs;
+use MoonShine\UI\Fields\Date;
+use MoonShine\UI\Fields\Email;
+use MoonShine\UI\Fields\Enum;
+use MoonShine\UI\Fields\Field;
+use MoonShine\UI\Fields\Fields;
+use MoonShine\UI\Fields\Hidden;
+use MoonShine\UI\Fields\Number;
+use MoonShine\UI\Fields\Password;
+use MoonShine\UI\Fields\Preview;
+use MoonShine\UI\Fields\Select;
+use MoonShine\UI\Fields\Switcher;
+use MoonShine\UI\Fields\Template;
+use MoonShine\UI\Fields\Text;
+use MoonShine\UI\Fields\Url;
 use Throwable;
 
 class UserDetailPage extends DetailPage
@@ -134,16 +133,12 @@ class UserDetailPage extends DetailPage
             ->primary()
             ->customAttributes(['class' => 'mb-6']);
 
-        $formComponents = PageComponents::make([
-            $bonusForm,
-        ]);
-
         $balanceModal = Modal::make(
             title: 'Редактировать баланс',
             content: fn () => null,
             outer: $trigger,
             asyncUrl: null,
-            components: $formComponents
+            components: [$bonusForm]
         )->name('edit-balance-modal');
 
         $formChangePassword = FormBuilder::make()
@@ -155,10 +150,6 @@ class UserDetailPage extends DetailPage
             ])
             ->submit('Подтвердить');
 
-        $formComponents = PageComponents::make([
-            $formChangePassword,
-        ]);
-
         $trigger = ActionButton::make('Редактировать пароль', '#')
             ->icon('heroicons.key')
             ->toggleModal('edit-password-modal')
@@ -169,7 +160,7 @@ class UserDetailPage extends DetailPage
             content: fn () => null,
             outer: $trigger,
             asyncUrl: null,
-            components: $formComponents
+            components: [$formChangePassword]
         )->name('edit-password-modal');
 
         $createPackageForm = FormBuilder::make()
@@ -231,8 +222,6 @@ class UserDetailPage extends DetailPage
             ])
             ->submit('Создать');
 
-        $packageComponents = PageComponents::make([$createPackageForm]);
-
         $createPackageTrigger = ActionButton::make('Создать пакет')
             ->icon('heroicons.document-plus')
             ->toggleModal('create-package-modal')
@@ -243,7 +232,7 @@ class UserDetailPage extends DetailPage
             content: fn () => null,
             outer: $createPackageTrigger,
             asyncUrl: null,
-            components: $packageComponents
+            components: [$createPackageForm]
         )->name('create-package-modal');
 
         $packages = ItcPackage::query()
@@ -983,7 +972,7 @@ class UserDetailPage extends DetailPage
         ];
     }
 
-    public function breadcrumbs(): array
+    public function getBreadcrumbs(): array
     {
         $user = $this->getResource()->getItem();
 
@@ -999,7 +988,7 @@ class UserDetailPage extends DetailPage
         ];
     }
 
-    public function title(): string
+    public function getTitle(): string
     {
         // получаем модель из ресурса
         $user = $this->getResource()->getItem();

@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Models\Transaction;
-use App\MoonShine\Pages\Transaction\TransactionIndexPage;
-use App\MoonShine\Pages\Transaction\TransactionFormPage;
 use App\MoonShine\Pages\Transaction\TransactionDetailPage;
-
-use MoonShine\Resources\ModelResource;
-use MoonShine\Pages\Page;
+use App\MoonShine\Pages\Transaction\TransactionFormPage;
+use App\MoonShine\Pages\Transaction\TransactionIndexPage;
+use MoonShine\Laravel\Pages\Page;
+use MoonShine\Laravel\Resources\ModelResource;
 
 /**
  * @extends ModelResource<Transaction>
@@ -25,26 +23,22 @@ class TransactionResource extends ModelResource
     /**
      * @return list<Page>
      */
-    public function pages(): array
+    protected function pages(): array
     {
         return [
-            TransactionIndexPage::make($this->title()),
-            TransactionFormPage::make(
-                $this->getItemID()
-                    ? __('moonshine::ui.edit')
-                    : __('moonshine::ui.add')
-            ),
-            TransactionDetailPage::make(__('moonshine::ui.show')),
+            TransactionIndexPage::class,
+            TransactionFormPage::class,
+            TransactionDetailPage::class,
         ];
     }
 
     /**
      * @param Transaction $item
-     *
      * @return array<string, string[]|string>
+     *
      * @see https://laravel.com/docs/validation#available-validation-rules
      */
-    public function rules(Model $item): array
+    public function rules(mixed $item): array
     {
         return [];
     }

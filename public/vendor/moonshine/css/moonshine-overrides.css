@@ -1,5 +1,5 @@
 .dropdown[data-dropdown-placement="bottom-end"][data-searchable] {
-    display: none!important;
+    display: none !important;
 }
 .btn.detail-button {
     display: none !important;
@@ -15,7 +15,7 @@ td.has-copy-tooltip::after {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.8);
+    background: rgba(0, 0, 0, 0.8);
     color: #fff;
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
@@ -32,24 +32,24 @@ td.has-copy-tooltip:hover::after {
 }
 
 td.has-copy-tooltip::before {
-    content: attr(data-copy);             /* берём полный адрес из data-copy */
+    content: attr(data-copy); /* берём полный адрес из data-copy */
     position: absolute;
-    top: 25%;                            /* под ячейкой */
+    top: 25%; /* под ячейкой */
     left: 50%;
     transform: translateX(-50%);
-    padding: .25rem .5rem;
+    padding: 0.25rem 0.5rem;
     max-width: 600px;
     background: #fff;
     border: 1px solid #d0d0d0;
-    border-radius: .25rem;
+    border-radius: 0.25rem;
     font-size: 15px;
     line-height: 1.35;
     word-break: break-all;
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .15s;
+    transition: opacity 0.15s;
     z-index: 1001;
 }
 
@@ -69,17 +69,17 @@ td.has-copy-tooltip.show-overflow::before {
 }
 
 .text-label-report-card {
-    margin-top: .5rem;
+    margin-top: 0.5rem;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: .9375rem;
+    font-size: 0.9375rem;
     line-height: 1.5em;
     --tw-text-opacity: 1;
     color: rgb(100 116 139 / var(--tw-text-opacity));
 }
 
 .pagination-list {
-    display: flex;          /* Обычно уже так, но явно указываем */
+    display: flex; /* Обычно уже так, но явно указываем */
     flex-wrap: nowrap;
     overflow-x: auto;
     justify-content: center; /* Центрирует номера внутри контейнера */
@@ -88,9 +88,9 @@ td.has-copy-tooltip.show-overflow::before {
 .pagination {
     display: flex;
     flex-direction: column;
-    align-items: center;    /* Центрирует вложенные элементы */
-    width: auto;            /* Не растягиваем на всю ширину */
-    margin: 0 auto;         /* Центрируем относительно страницы */
+    align-items: center; /* Центрирует вложенные элементы */
+    width: auto; /* Не растягиваем на всю ширину */
+    margin: 0 auto; /* Центрируем относительно страницы */
 }
 
 /* оформление многоточий */
@@ -126,11 +126,55 @@ td.has-copy-tooltip.show-overflow::before {
 }
 
 .modal.modal-change-percents .modal-dialog {
-    max-width: 900px;
+    max-width: 95vw;
+    width: 1300px;
+}
+
+.modal.modal-change-percents .modal-content {
+    overflow: visible;
+}
+
+.modal.modal-change-percents .modal-body {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+}
+
+.modal.modal-change-percents .table-partners-percents {
+    position: relative;
 }
 
 .modal.modal-change-requirements .modal-dialog {
-    max-width: 900px;
+    max-width: 95vw;
+    width: 1400px;
+}
+
+.modal.modal-change-requirements .modal-content {
+    overflow: visible;
+}
+
+.modal.modal-change-requirements .modal-body {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+}
+
+.modal.modal-change-requirements table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.modal.modal-change-requirements th:nth-child(1),
+.modal.modal-change-requirements td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 3;
+    min-width: 80px;
+}
+
+.modal.modal-change-requirements th:nth-child(1) {
+    z-index: 4;
 }
 
 .input-invisible {
@@ -153,37 +197,51 @@ td.has-copy-tooltip.show-overflow::before {
     background: white !important;
 }
 
-.table-partners-percents th:nth-child(1) {
-    position: sticky;
-    background: #fff;
-    left: 0;
-    z-index: 2;
-}
-.table-partners-percents th:nth-child(2) {
-    position: sticky;
-    background: #fff;
-    left: 80px;
-    z-index: 2;
-}
-
 .table-partners-percents {
     width: 1200px;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-.col-sticky-0  {
+.table-partners-percents th:nth-child(1),
+.table-partners-percents td:nth-child(1) {
     position: sticky;
     left: 0;
     background: #fff;
-    z-index: 2;
+    z-index: 3;
+    min-width: 80px;
+    width: 80px;
+}
+
+.table-partners-percents th:nth-child(2),
+.table-partners-percents td:nth-child(2) {
+    position: sticky;
+    left: 80px;
+    background: #fff;
+    z-index: 3;
+    min-width: 100px;
+    width: 100px;
+}
+
+.table-partners-percents th:nth-child(1),
+.table-partners-percents th:nth-child(2) {
+    z-index: 4;
+}
+
+.col-sticky-0 {
+    position: sticky;
+    left: 0 !important;
+    background: #fff !important;
+    z-index: 3 !important;
     min-width: 80px;
     width: 80px;
 }
 
 .col-sticky-80 {
     position: sticky;
-    left: 80px;
-    background: #fff;
-    z-index: 2;
+    left: 80px !important;
+    background: #fff !important;
+    z-index: 3 !important;
 }
 
 .w-100 {
