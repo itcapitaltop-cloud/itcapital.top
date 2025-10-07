@@ -23,6 +23,7 @@ SQL_DUMP_FILE="itc.sql"
 IMPORT_SQL=false
 SKIP_MIGRATIONS=false
 FORCE_REBUILD=false
+CLEANUP_DOCKER=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
             FORCE_REBUILD=true
             shift
             ;;
+        --cleanup)
+            CLEANUP_DOCKER=true
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -50,6 +55,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --sql-file FILE        Specify SQL dump file (default: itc.sql)"
             echo "  --skip-migrations      Skip running migrations (use with --import-sql)"
             echo "  --rebuild              Force rebuild Docker images (ignores cache)"
+            echo "  --cleanup              Clean up old Docker images and containers"
             echo "  --help                 Show this help message"
             exit 0
             ;;
@@ -95,15 +101,14 @@ echo -e "${YELLOW}📁 Step 2: Creating storage directories...${NC}"
 mkdir -p storage/logs
 mkdir -p storage/framework/{sessions,views,cache}
 mkdir -p bootstrap/cache
-chmod -R 775 storage bootstrap/cache
-echo -e "${GREEN}✅ Directories created${NC}"
+echo -e "${GREEN}✅ Directories created (permissions will be set by container)${NC}"
 echo ""
 
 # Step 3: Enable maintenance mode (if app is already running)
 echo -e "${YELLOW}🔧 Step 3: Enabling maintenance mode...${NC}"
 if docker ps | grep -q "$CONTAINER_NAME"; then
     docker_exec php artisan down --render="errors::503" --retry=60 || true
-    echo -e "${GREEN}✅ Maintenance mode enabled (users see friendly page)${NC}"
+    echo -e "${GREEN}✅ Maintenance mode enabled (users see beautiful update page)${NC}"
 else
     echo -e "${YELLOW}⚠️  Container not running, skipping maintenance mode${NC}"
 fi
@@ -151,6 +156,13 @@ echo ""
 # Wait for containers to be ready
 echo -e "${YELLOW}⏳ Waiting for containers to be ready...${NC}"
 sleep 5
+
+# Fix permissions inside container (in case files were created with wrong permissions)
+echo -e "${YELLOW}🔧 Fixing file permissions...${NC}"
+docker_exec chown -R sail:sail storage bootstrap/cache 2>/dev/null || true
+docker_exec chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+echo -e "${GREEN}✅ Permissions fixed${NC}"
+echo ""
 
 # Step 7: Install dependencies
 echo -e "${YELLOW}📦 Step 7: Installing Composer dependencies...${NC}"
@@ -238,8 +250,8 @@ docker_exec php artisan event:cache
 if docker_exec php -r "echo ini_get('opcache.enable');" 2>/dev/null | grep -q "1"; then
     echo -e "${YELLOW}Clearing OPcache...${NC}"
     docker_exec php artisan optimize:clear || true
-    # Restart PHP-FPM or reload supervisor to clear opcache
-    docker_exec supervisorctl restart all || true
+    # Restart PHP-FPM to clear opcache
+    docker_exec supervisorctl restart php-fpm || true
 fi
 
 echo -e "${GREEN}✅ Configuration cached${NC}"
@@ -275,7 +287,36 @@ else
 fi
 echo ""
 
-# Step 15: Final info
+# Step 15: Docker cleanup (if requested)
+if [ "$CLEANUP_DOCKER" = true ]; then
+    echo -e "${YELLOW}🧹 Step 15: Cleaning up old Docker resources...${NC}"
+    echo -e "${YELLOW}This will remove:${NC}"
+    echo -e "  - Stopped containers"
+    echo -e "  - Unused images"
+    echo -e "  - Unused networks"
+    echo -e "  - Build cache"
+    echo ""
+
+    # Show disk usage before cleanup
+    echo -e "${YELLOW}Disk usage before cleanup:${NC}"
+    docker system df
+    echo ""
+
+    # Clean up
+    docker container prune -f
+    docker image prune -a -f --filter "until=24h"
+    docker network prune -f
+    docker builder prune -f
+
+    echo ""
+    echo -e "${YELLOW}Disk usage after cleanup:${NC}"
+    docker system df
+    echo ""
+    echo -e "${GREEN}✅ Cleanup completed${NC}"
+    echo ""
+fi
+
+# Step 16: Final info
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
@@ -291,8 +332,10 @@ echo -e "   Enter container: ${BLUE}docker exec -it $CONTAINER_NAME bash${NC}"
 echo -e "   Restart: ${BLUE}docker-compose -f $COMPOSE_FILE restart${NC}"
 echo -e "   Stop: ${BLUE}docker-compose -f $COMPOSE_FILE stop${NC}"
 echo ""
-echo -e "${YELLOW}🔄 To import SQL dump later:${NC}"
-echo -e "   ${BLUE}./deploy-production.sh --import-sql --skip-migrations${NC}"
+echo -e "${YELLOW}🔄 Other useful commands:${NC}"
+echo -e "   Import SQL: ${BLUE}./deploy-production.sh --import-sql --skip-migrations${NC}"
+echo -e "   Clean Docker: ${BLUE}./deploy-production.sh --cleanup${NC}"
+echo -e "   Full rebuild: ${BLUE}./deploy-production.sh --rebuild --cleanup${NC}"
 echo ""
 echo -e "${YELLOW}📝 Recent logs:${NC}"
 docker logs --tail=20 "$CONTAINER_NAME"

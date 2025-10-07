@@ -14,8 +14,10 @@ rm -f bootstrap/cache/packages.php
 rm -f bootstrap/cache/services.php
 
 # Set correct ownership and permissions
-chown -R sail:sail storage bootstrap/cache
-chmod -R 775 storage bootstrap/cache
+# Using || true to prevent script from failing if some files can't be changed
+chown -R sail:sail storage bootstrap/cache 2>/dev/null || true
+chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+chmod 775 storage bootstrap/cache 2>/dev/null || true
 
 # Clear all Laravel caches to ensure fresh configuration
 if [ -f artisan ]; then
