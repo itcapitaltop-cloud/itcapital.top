@@ -16,6 +16,18 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🔧 Install npm dependencies
+        run: npm ci
+
+      - name: 🏗️ Build frontend assets
+        run: npm run build
+
       - name: 🔑 Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -24,11 +36,6 @@ jobs:
 
       - name: 📦 Add server to known hosts
         run: |
-          echo "🔍 Debug: Checking secrets..."
-          echo "SERVER_HOST is set: ${{ secrets.SERVER_HOST != '' }}"
-          echo "SERVER_USER is set: ${{ secrets.SERVER_USER != '' }}"
-          echo "SERVER_PATH is set: ${{ secrets.SERVER_PATH != '' }}"
-          echo "SERVER_PORT is set: ${{ secrets.SERVER_PORT != '' }}"
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.SERVER_PORT }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
