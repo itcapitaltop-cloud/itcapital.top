@@ -93,20 +93,30 @@ chmod -R 775 storage bootstrap/cache
 echo -e "${GREEN}✅ Directories created${NC}"
 echo ""
 
-# Step 3: Clear old caches on host
-echo -e "${YELLOW}🧹 Step 3: Clearing old cache files...${NC}"
+# Step 3: Enable maintenance mode (if app is already running)
+echo -e "${YELLOW}🔧 Step 3: Enabling maintenance mode...${NC}"
+if docker ps | grep -q "$CONTAINER_NAME"; then
+    docker_exec php artisan down --render="errors::503" --retry=60 || true
+    echo -e "${GREEN}✅ Maintenance mode enabled (users see friendly page)${NC}"
+else
+    echo -e "${YELLOW}⚠️  Container not running, skipping maintenance mode${NC}"
+fi
+echo ""
+
+# Step 4: Clear old caches on host
+echo -e "${YELLOW}🧹 Step 4: Clearing old cache files...${NC}"
 rm -f bootstrap/cache/*.php
 echo -e "${GREEN}✅ Cache cleared${NC}"
 echo ""
 
-# Step 4: Build Docker images
-echo -e "${YELLOW}🔨 Step 4: Building Docker images...${NC}"
+# Step 5: Build Docker images
+echo -e "${YELLOW}🔨 Step 5: Building Docker images...${NC}"
 docker compose -f "$COMPOSE_FILE" build --no-cache
 echo -e "${GREEN}✅ Images built${NC}"
 echo ""
 
-# Step 5: Start containers
-echo -e "${YELLOW}🚀 Step 5: Starting containers...${NC}"
+# Step 6: Start containers
+echo -e "${YELLOW}🚀 Step 6: Starting containers...${NC}"
 docker compose -f "$COMPOSE_FILE" up -d
 echo -e "${GREEN}✅ Containers started${NC}"
 echo ""
@@ -115,14 +125,14 @@ echo ""
 echo -e "${YELLOW}⏳ Waiting for containers to be ready...${NC}"
 sleep 5
 
-# Step 6: Install dependencies
-echo -e "${YELLOW}📦 Step 6: Installing Composer dependencies...${NC}"
+# Step 7: Install dependencies
+echo -e "${YELLOW}📦 Step 7: Installing Composer dependencies...${NC}"
 docker_exec composer install --no-dev --optimize-autoloader --no-interaction
 echo -e "${GREEN}✅ Dependencies installed${NC}"
 echo ""
 
-# Step 7: Generate app key if needed
-echo -e "${YELLOW}🔑 Step 7: Checking application key...${NC}"
+# Step 8: Generate app key if needed
+echo -e "${YELLOW}🔑 Step 8: Checking application key...${NC}"
 if ! grep -q "APP_KEY=base64:" .env; then
     echo -e "${YELLOW}Generating application key...${NC}"
     docker_exec php artisan key:generate --force
@@ -132,9 +142,9 @@ else
 fi
 echo ""
 
-# Step 8: Database setup
+# Step 9: Database setup
 if [ "$IMPORT_SQL" = true ]; then
-    echo -e "${YELLOW}🗄️  Step 8: Importing SQL dump...${NC}"
+    echo -e "${YELLOW}🗄️  Step 9: Importing SQL dump...${NC}"
 
     if [ ! -f "$SQL_DUMP_FILE" ]; then
         echo -e "${RED}❌ SQL dump file not found: $SQL_DUMP_FILE${NC}"
@@ -163,7 +173,7 @@ if [ "$IMPORT_SQL" = true ]; then
         exit 1
     fi
 else
-    echo -e "${YELLOW}🗄️  Step 8: Running database migrations...${NC}"
+    echo -e "${YELLOW}🗄️  Step 9: Running database migrations...${NC}"
     if [ "$SKIP_MIGRATIONS" = true ]; then
         echo -e "${YELLOW}⚠️  Skipping migrations as requested${NC}"
     else
@@ -173,14 +183,14 @@ else
 fi
 echo ""
 
-# Step 9: Create storage link
-echo -e "${YELLOW}🔗 Step 9: Creating storage symlink...${NC}"
+# Step 10: Create storage link
+echo -e "${YELLOW}🔗 Step 10: Creating storage symlink...${NC}"
 docker_exec php artisan storage:link || echo -e "${YELLOW}⚠️  Link already exists${NC}"
 echo -e "${GREEN}✅ Storage link verified${NC}"
 echo ""
 
-# Step 10: Build frontend assets
-echo -e "${YELLOW}🏗️  Step 10: Building frontend assets...${NC}"
+# Step 11: Build frontend assets
+echo -e "${YELLOW}🏗️  Step 11: Building frontend assets...${NC}"
 if docker_exec test -f "package.json"; then
     docker_exec npm ci --include=dev
     docker_exec npm run build
@@ -190,17 +200,32 @@ else
 fi
 echo ""
 
-# Step 11: Cache configuration
-echo -e "${YELLOW}⚡ Step 11: Caching configuration...${NC}"
+# Step 12: Cache configuration
+echo -e "${YELLOW}⚡ Step 12: Caching configuration...${NC}"
 docker_exec php artisan config:cache
 docker_exec php artisan route:cache
 docker_exec php artisan view:cache
 docker_exec php artisan event:cache
+
+# Clear OPcache if enabled
+if docker_exec php -r "echo ini_get('opcache.enable');" 2>/dev/null | grep -q "1"; then
+    echo -e "${YELLOW}Clearing OPcache...${NC}"
+    docker_exec php artisan optimize:clear || true
+    # Restart PHP-FPM or reload supervisor to clear opcache
+    docker_exec supervisorctl restart all || true
+fi
+
 echo -e "${GREEN}✅ Configuration cached${NC}"
 echo ""
 
-# Step 12: Health check
-echo -e "${YELLOW}🏥 Step 12: Running health checks...${NC}"
+# Step 13: Disable maintenance mode
+echo -e "${YELLOW}🎉 Step 13: Disabling maintenance mode...${NC}"
+docker_exec php artisan up || true
+echo -e "${GREEN}✅ Site is now live!${NC}"
+echo ""
+
+# Step 14: Health check
+echo -e "${YELLOW}🏥 Step 14: Running health checks...${NC}"
 echo ""
 docker compose -f "$COMPOSE_FILE" ps
 echo ""
@@ -223,7 +248,7 @@ else
 fi
 echo ""
 
-# Step 13: Final info
+# Step 15: Final info
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
