@@ -179,8 +179,19 @@ docker_exec php artisan storage:link || echo -e "${YELLOW}⚠️  Link already e
 echo -e "${GREEN}✅ Storage link verified${NC}"
 echo ""
 
-# Step 10: Cache configuration
-echo -e "${YELLOW}⚡ Step 10: Caching configuration...${NC}"
+# Step 10: Build frontend assets
+echo -e "${YELLOW}🏗️  Step 10: Building frontend assets...${NC}"
+if docker_exec test -f "package.json"; then
+    docker_exec npm ci --include=dev
+    docker_exec npm run build
+    echo -e "${GREEN}✅ Frontend assets built${NC}"
+else
+    echo -e "${YELLOW}⚠️  No package.json found, skipping frontend build${NC}"
+fi
+echo ""
+
+# Step 11: Cache configuration
+echo -e "${YELLOW}⚡ Step 11: Caching configuration...${NC}"
 docker_exec php artisan config:cache
 docker_exec php artisan route:cache
 docker_exec php artisan view:cache
@@ -188,8 +199,8 @@ docker_exec php artisan event:cache
 echo -e "${GREEN}✅ Configuration cached${NC}"
 echo ""
 
-# Step 11: Health check
-echo -e "${YELLOW}🏥 Step 11: Running health checks...${NC}"
+# Step 12: Health check
+echo -e "${YELLOW}🏥 Step 12: Running health checks...${NC}"
 echo ""
 docker compose -f "$COMPOSE_FILE" ps
 echo ""
@@ -212,7 +223,7 @@ else
 fi
 echo ""
 
-# Step 12: Final info
+# Step 13: Final info
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
