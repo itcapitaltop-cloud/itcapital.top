@@ -23,6 +23,10 @@ jobs:
 
       - name: 📦 Add server to known hosts
         run: |
+          echo "🔍 Debug: Checking secrets..."
+          echo "SERVER_HOST is set: ${{ secrets.SERVER_HOST != '' }}"
+          echo "SERVER_USER is set: ${{ secrets.SERVER_USER != '' }}"
+          echo "SERVER_PATH is set: ${{ secrets.SERVER_PATH != '' }}"
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
