@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 
-chown -R sail:sail /var/www/html/storage /var/www/html/bootstrap/cache
-chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Change to the application directory
+cd /var/www/html
+
+# Ensure storage and cache directories exist
+mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache
+
+# Set correct ownership and permissions
+chown -R sail:sail storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
 
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'sail' or 'root'."
