@@ -6,9 +6,25 @@ cd /var/www/html
 # Ensure storage and cache directories exist
 mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache
 
+# Remove cached configuration files that might have wrong paths
+rm -f bootstrap/cache/config.php
+rm -f bootstrap/cache/routes-v7.php
+rm -f bootstrap/cache/events.php
+rm -f bootstrap/cache/packages.php
+rm -f bootstrap/cache/services.php
+
 # Set correct ownership and permissions
 chown -R sail:sail storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
+
+# Clear all Laravel caches to ensure fresh configuration
+if [ -f artisan ]; then
+    php artisan config:clear || true
+    php artisan cache:clear || true
+    php artisan view:clear || true
+    php artisan route:clear || true
+    php artisan event:clear || true
+fi
 
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'sail' or 'root'."
