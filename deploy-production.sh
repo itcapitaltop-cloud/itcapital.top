@@ -22,6 +22,7 @@ SQL_DUMP_FILE="itc.sql"
 # Parse command line arguments
 IMPORT_SQL=false
 SKIP_MIGRATIONS=false
+FORCE_REBUILD=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -37,6 +38,10 @@ while [[ $# -gt 0 ]]; do
             SQL_DUMP_FILE="$2"
             shift 2
             ;;
+        --rebuild)
+            FORCE_REBUILD=true
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -44,6 +49,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --import-sql           Import SQL dump after deployment"
             echo "  --sql-file FILE        Specify SQL dump file (default: itc.sql)"
             echo "  --skip-migrations      Skip running migrations (use with --import-sql)"
+            echo "  --rebuild              Force rebuild Docker images (ignores cache)"
             echo "  --help                 Show this help message"
             exit 0
             ;;
@@ -109,10 +115,31 @@ rm -f bootstrap/cache/*.php
 echo -e "${GREEN}✅ Cache cleared${NC}"
 echo ""
 
-# Step 5: Build Docker images
-echo -e "${YELLOW}🔨 Step 5: Building Docker images...${NC}"
-docker compose -f "$COMPOSE_FILE" build --no-cache
-echo -e "${GREEN}✅ Images built${NC}"
+# Step 5: Build Docker images (smart caching)
+echo -e "${YELLOW}🔨 Step 5: Checking Docker images...${NC}"
+
+# Check if we need to rebuild from scratch
+NEED_REBUILD=false
+if [ "$FORCE_REBUILD" = true ]; then
+    echo -e "${YELLOW}Force rebuild requested...${NC}"
+    NEED_REBUILD=true
+elif ! docker images | grep -q "itcapital-app"; then
+    echo -e "${YELLOW}No image found, building...${NC}"
+    NEED_REBUILD=true
+elif [ -f ".dockerfile_changed" ]; then
+    echo -e "${YELLOW}Dockerfile changed, rebuilding...${NC}"
+    NEED_REBUILD=true
+    rm -f ".dockerfile_changed"
+fi
+
+if [ "$NEED_REBUILD" = true ]; then
+    docker compose -f "$COMPOSE_FILE" build --no-cache
+    echo -e "${GREEN}✅ Images built from scratch${NC}"
+else
+    # Use cache for much faster builds (30 seconds vs 10 minutes)
+    docker compose -f "$COMPOSE_FILE" build
+    echo -e "${GREEN}✅ Images checked (using cache)${NC}"
+fi
 echo ""
 
 # Step 6: Start containers
