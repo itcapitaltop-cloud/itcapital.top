@@ -101,13 +101,13 @@ echo ""
 
 # Step 4: Build Docker images
 echo -e "${YELLOW}🔨 Step 4: Building Docker images...${NC}"
-docker-compose -f "$COMPOSE_FILE" build --no-cache
+docker compose -f "$COMPOSE_FILE" build --no-cache
 echo -e "${GREEN}✅ Images built${NC}"
 echo ""
 
 # Step 5: Start containers
 echo -e "${YELLOW}🚀 Step 5: Starting containers...${NC}"
-docker-compose -f "$COMPOSE_FILE" up -d
+docker compose -f "$COMPOSE_FILE" up -d
 echo -e "${GREEN}✅ Containers started${NC}"
 echo ""
 
@@ -191,7 +191,7 @@ echo ""
 # Step 11: Health check
 echo -e "${YELLOW}🏥 Step 11: Running health checks...${NC}"
 echo ""
-docker-compose -f "$COMPOSE_FILE" ps
+docker compose -f "$COMPOSE_FILE" ps
 echo ""
 
 if docker_exec php artisan --version > /dev/null 2>&1; then
