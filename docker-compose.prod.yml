@@ -65,31 +65,6 @@ services:
       - net
     restart: unless-stopped
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: "${COMPOSE_PROJECT_NAME}-pgadmin"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
-    depends_on:
-      - pgdb
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  redisinsight:
-    image: redislabs/redisinsight:latest
-    container_name: "${COMPOSE_PROJECT_NAME}-redisinsight"
-    ports:
-      - "${REDISINSIGHT_PORT:-8001}:8001"
-    volumes:
-      - ./docker/redisinsight:/db
-    networks:
-      - monitoring
-    restart: unless-stopped
-
 networks:
   net:
     driver: bridge
