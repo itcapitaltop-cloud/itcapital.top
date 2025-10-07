@@ -20,6 +20,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          log-public-key: false
 
       - name: 📦 Add server to known hosts
         run: |
@@ -27,19 +28,22 @@ jobs:
           echo "SERVER_HOST is set: ${{ secrets.SERVER_HOST != '' }}"
           echo "SERVER_USER is set: ${{ secrets.SERVER_USER != '' }}"
           echo "SERVER_PATH is set: ${{ secrets.SERVER_PATH != '' }}"
+          echo "SERVER_PORT is set: ${{ secrets.SERVER_PORT != '' }}"
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ secrets.SERVER_PORT }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: 🚀 Deploy to server
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PATH: ${{ secrets.SERVER_PATH }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
         run: |
-          echo "🚀 Starting deployment to $SERVER_HOST"
+          echo "🚀 Starting deployment to $SERVER_HOST:$SERVER_PORT"
 
           # Sync files to server (excluding sensitive files)
           rsync -avz --delete \
+            -e "ssh -p ${SERVER_PORT}" \
             --exclude '.git' \
             --exclude '.github' \
             --exclude 'node_modules' \
@@ -52,7 +56,7 @@ jobs:
             ./ $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
 
           # Run deployment script on server
-          ssh $SERVER_USER@$SERVER_HOST "cd $SERVER_PATH && bash deploy-production.sh"
+          ssh -p ${SERVER_PORT} $SERVER_USER@$SERVER_HOST "cd $SERVER_PATH && bash deploy-production.sh"
 
       - name: ✅ Deployment successful
         run: |
