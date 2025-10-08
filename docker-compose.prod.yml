@@ -10,7 +10,6 @@ services:
       - .env
     networks:
       - net
-      - monitoring
     restart: unless-stopped
     volumes:
       - ./:/var/www/html
@@ -66,10 +65,48 @@ services:
       - net
     restart: unless-stopped
 
+  cron:
+    build:
+      context: ./docker/cron
+      args:
+        BASE_IMAGE: ubuntu:22.04
+    container_name: "${COMPOSE_PROJECT_NAME}-cron"
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep crond || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  supervisor:
+    build:
+      context: ./docker/supervisor
+      args:
+        BASE_IMAGE: ubuntu:22.04
+    container_name: "${COMPOSE_PROJECT_NAME}-supervisor"
+    env_file:
+      - .env
+    depends_on:
+      - app
+    networks:
+      - net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep supervisord || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 networks:
   net:
-    driver: bridge
-  monitoring:
     driver: bridge
 
 volumes:

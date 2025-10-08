@@ -9,4 +9,4 @@ if [ "$APP_ENV" != "local" ] && [ "$APP_ENV" != "testing" ]; then
     php artisan view:cache
 fi
 
-exec crond -f -l 2
+exec cron -f

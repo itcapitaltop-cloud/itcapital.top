@@ -15,7 +15,7 @@ Schedule::command('app:backup-processing-command')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
 
 Schedule::command('quotes:cache')
-    ->cron('*/12 * * * *');
+    ->cron('*/1 * * * *');
 
 Schedule::command('itc:close-present-packages')
     ->cron('* * * * *');
@@ -26,7 +26,7 @@ Schedule::command('quotes:cache-alphavantage')
 Schedule::command('regular-premium:accrual')
     ->cron('59 23 * * 1')
     ->when(function () {
-        // Якорный понедельник 
+        // Якорный понедельник
         $anchor = CarbonImmutable::create(2025, 8, 11)->startOfWeek(CarbonInterface::MONDAY);
         $nowW   = now()->startOfWeek(CarbonInterface::MONDAY);
         return $anchor->diffInWeeks($nowW) % 2 === 0; // только “каждый второй”

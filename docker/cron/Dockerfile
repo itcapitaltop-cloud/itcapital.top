@@ -4,11 +4,11 @@ FROM ${BASE_IMAGE}
 
 USER root
 
-RUN apk update && apk add --no-cache busybox-suid
+RUN apt-get update && apt-get install -y cron && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY crontab /etc/crontabs/root
+COPY crontab /etc/cron.d/app
 
-RUN chmod 0600 /etc/crontabs/root && chown root:root /etc/crontabs/root
+RUN chmod 0644 /etc/cron.d/app && chown root:root /etc/cron.d/app
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 

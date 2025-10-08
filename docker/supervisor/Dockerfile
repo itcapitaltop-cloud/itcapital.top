@@ -4,7 +4,7 @@ FROM ${BASE_IMAGE}
 
 USER root
 
-RUN apk update && apk add --no-cache supervisor
+RUN apt-get update && apt-get install -y supervisor && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY supervisord.conf /etc/supervisord.conf
 COPY app.ini /etc/supervisor.d/app.ini
