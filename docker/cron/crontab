@@ -1,2 +1,7 @@
+# Empty line at start is important for cron
+SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-* * * * * cd /var/www/html && php artisan schedule:run 2>&1 | grep -v '^[[:space:]]*$' | awk 'NF {printf "%s ", $0} END {print ""}' >> /proc/1/fd/1
+
+* * * * * . /var/www/html/.env.cron && cd /var/www/html && /usr/local/bin/php artisan schedule:run >> /var/log/cron.log 2>&1
+
+# Empty line at end is important for cron

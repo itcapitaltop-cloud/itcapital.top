@@ -75,11 +75,14 @@ services:
       - .env
     depends_on:
       - app
+      - pgdb
+      - redis
     networks:
       - net
     restart: unless-stopped
     volumes:
       - ./:/var/www/html
+    command: /usr/local/bin/entrypoint.sh
     healthcheck:
       test: ["CMD-SHELL", "pgrep crond || exit 1"]
       interval: 30s

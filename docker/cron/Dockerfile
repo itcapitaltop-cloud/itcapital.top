@@ -1,9 +1,6 @@
 ARG BASE_IMAGE
-
 FROM ${BASE_IMAGE}
-
 USER root
-
 ENV DEBIAN_FRONTEND noninteractive
 ENV TZ=UTC
 
@@ -28,9 +25,11 @@ RUN ln -s /usr/bin/php8.4 /usr/local/bin/php
 # Set working directory
 WORKDIR /var/www/html
 
+# Copy crontab
 COPY crontab /etc/cron.d/app
-
-RUN chmod 0644 /etc/cron.d/app && chown root:root /etc/cron.d/app
+RUN chmod 0644 /etc/cron.d/app && \
+    chown root:root /etc/cron.d/app && \
+    crontab /etc/cron.d/app
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
