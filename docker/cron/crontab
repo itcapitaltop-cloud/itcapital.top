@@ -1,1 +1,1 @@
-* * * * * /usr/local/bin/php /var/www/html/artisan schedule:run 2>&1 | grep -v '^[[:space:]]*$' | awk 'NF {printf "%s ", $0} END {print ""}' >> /proc/1/fd/1
+* * * * * php /var/www/html/artisan schedule:run 2>&1 | grep -v '^[[:space:]]*$' | awk 'NF {printf "%s ", $0} END {print ""}' >> /proc/1/fd/1
