@@ -21,7 +21,7 @@ final class VerifyRecaptcha
 
         $validator = Validator::make($request->all(), $rules, $messages);
 
-        if (! $validator->fails()) {
+        if ($validator->fails()) {
             return back()
                 ->withErrors($validator)
                 ->withInput($request->except('password'));
