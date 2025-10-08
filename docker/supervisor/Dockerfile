@@ -25,6 +25,9 @@ RUN apt-get update \
 # Create symlink for php command
 RUN ln -s /usr/bin/php8.4 /usr/local/bin/php
 
+# Set working directory
+WORKDIR /var/www/html
+
 COPY supervisord.conf /etc/supervisord.conf
 COPY app.ini /etc/supervisor.d/app.ini
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh

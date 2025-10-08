@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# Change to the application directory
+cd /var/www/html
+
 if [ "$APP_ENV" != "local" ]; then
     php artisan config:cache
     php artisan route:cache

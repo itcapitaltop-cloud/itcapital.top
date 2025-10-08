@@ -25,6 +25,9 @@ RUN apt-get update \
 # Create symlink for php command
 RUN ln -s /usr/bin/php8.4 /usr/local/bin/php
 
+# Set working directory
+WORKDIR /var/www/html
+
 COPY crontab /etc/cron.d/app
 
 RUN chmod 0644 /etc/cron.d/app && chown root:root /etc/cron.d/app
