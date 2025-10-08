@@ -1,7 +1,4 @@
-# Empty line at start is important for cron
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-* * * * * . /var/www/html/.env.cron && cd /var/www/html && /usr/local/bin/php artisan schedule:run >> /var/log/cron.log 2>&1
-
-# Empty line at end is important for cron
+* * * * * docker exec itcapital-app php artisan schedule:run >> /var/log/cron.log 2>&1
