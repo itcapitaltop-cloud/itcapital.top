@@ -1,4 +1,1 @@
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-* * * * * docker exec itcapital-app php artisan schedule:run >> /var/log/cron.log 2>&1
+* * * * * /usr/local/bin/php /var/www/html/artisan schedule:run 2>&1 | grep -v '^[[:space:]]*$' | awk 'NF {printf "%s ", $0} END {print ""}' >> /proc/1/fd/1
