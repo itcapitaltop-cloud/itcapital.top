@@ -29,8 +29,23 @@ class CacheQuotes extends Command
             'symbol' => 'XAU/USD,SPY,QQQ,EUR/USD,BTC/USD,ETH/USD',
             'apikey' => config('services.twelvedata.key'),
         ]);
+
+        // Проверяем HTTP статус
+        if (!$response->successful()) {
+            Log::channel('source')->warning('TwelveData API HTTP Error: ' . $response->status());
+            $this->warn('HTTP Error: ' . $response->status());
+            return;
+        }
+
         $data = $response->json();
-//        Log::channel('source')->debug($data);
+        // Log::channel('source')->debug('TwelveData API Response:', $data);
+
+        // Проверяем на ошибки API
+        if (isset($data['status']) && $data['status'] === 'error') {
+            Log::channel('source')->warning('TwelveData API Error: ' . ($data['message'] ?? 'Unknown error'));
+            $this->warn('API Error: ' . ($data['message'] ?? 'Unknown error'));
+            return;
+        }
         // XAU/USD
         if (isset($data['XAU/USD'])) {
             $gold = $data['XAU/USD'];
@@ -135,6 +150,6 @@ class CacheQuotes extends Command
         // Сохраняем массив в кеш на сутки
         Cache::put('quotes.marquee', $quotes, now()->addDay());
 
-        $this->info('Quotes cached!');
+        $this->info('Quotes cached! Count: ' . count($quotes));
     }
 }
