@@ -4,10 +4,10 @@ namespace App\Repositories;
 
 use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Enums\Partners\PartnerRewardTypeEnum;
-use App\Helpers\Notify;
 use App\Enums\Transactions\{BalanceTypeEnum, TrxTypeEnum};
+use App\Helpers\Notify;
 use App\Models\{
-    PartnerClosure, PartnerLevelPercent, PartnerReward,
+    ItcPackage, PartnerClosure, PartnerLevelPercent, PartnerReward,
     Transaction, User
 };
 use Illuminate\Support\Facades\DB;
@@ -17,6 +17,15 @@ class StartBonusAccrualRepository implements StartBonusAccrualContract
 {
     public function accrue(int $buyerId, float $packageAmount): void
     {
+        $package = ItcPackage::whereHas('transaction', function ($q) use ($buyerId) {
+            $q->where('user_id', $buyerId)
+              ->where('trx_type', TrxTypeEnum::BUY_PACKAGE);
+        })->latest()->first();
+
+        if ($package && $package->type === \App\Enums\Itc\PackageTypeEnum::PRESENT) {
+            return;
+        }
+
         PartnerClosure::where('descendant_id', $buyerId)
             ->whereBetween('depth', [1, 20])
             ->orderBy('depth')
@@ -25,6 +34,10 @@ class StartBonusAccrualRepository implements StartBonusAccrualContract
                 foreach ($rows as $row) {
                     $ancestor = $row->ancestor_id;
                     $line     = $row->depth;
+
+                    // Проверяем, что у пользователя ранг больше 0
+                    $user = User::find($ancestor);
+                    if (!$user || $user->rank <= 0) continue;
 
                     $percent = $this->percentFor($ancestor, $line);
                     if ($percent <= 0) continue;
@@ -41,7 +54,7 @@ class StartBonusAccrualRepository implements StartBonusAccrualContract
                             'user_id'      => $ancestor,
                             'amount'       => $reward,
                             'trx_type'     => TrxTypeEnum::START_BONUS_ACCRUAL,
-                            'balance_type' => BalanceTypeEnum::PARTNER,
+                            'balance_type' => BalanceTypeEnum::MAIN,
                             'accepted_at'  => now(),
                         ]);
 

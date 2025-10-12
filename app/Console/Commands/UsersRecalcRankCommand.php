@@ -67,7 +67,7 @@ class UsersRecalcRankCommand extends Command
                                 new CreateTransactionDto(
                                     userId:      $user->id,
                                     trxType:     TrxTypeEnum::RANK_BONUS_ACCRUAL,
-                                    balanceType: BalanceTypeEnum::PARTNER,
+                                    balanceType: BalanceTypeEnum::MAIN,
                                     amount:      $bonus,
                                     acceptedAt:  now(),
                                     prefix:      'RB-',

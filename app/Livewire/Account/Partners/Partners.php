@@ -22,10 +22,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
-use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 use Throwable;
 
@@ -60,20 +60,20 @@ class Partners extends Component
     public function boot(): void
     {
         Validator::extend('not_self', function ($attribute, $value, $params, $validator) {
-            return $value !== auth()->user()?->username;
+            return $value !== Auth::user()?->username;
         });
 
         Validator::extend('balance', function ($attribute, $value): bool {
 
             $val = (float)str_replace([' ', ','], ['', '.'], $value);
 
-            $debit = auth()->user()->transactions()
+            $debit = Auth::user()->transactions()
                 ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereIn('trx_type', TrxTypeEnum::getDebits())
                 ->whereNull('rejected_at')
                 ->sum('amount');
 
-            $credit = auth()->user()->transactions()
+            $credit = Auth::user()->transactions()
                 ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereIn('trx_type', TrxTypeEnum::getCredits())
                 ->whereNull('rejected_at')
@@ -113,24 +113,27 @@ class Partners extends Component
 
     public function getRegularBalancesProperty(): array
     {
+        // Регулярная премия теперь начисляется на партнерский баланс
         $debit = Transaction::where('user_id', Auth::id())
-            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
-            ->whereIn('trx_type', TrxTypeEnum::getDebits())
+            ->where('balance_type', BalanceTypeEnum::PARTNER)
+            ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
             ->sum('amount');
 
         $credit = Transaction::where('user_id', Auth::id())
-            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
-            ->whereIn('trx_type', TrxTypeEnum::getCredits())
+            ->where('balance_type', BalanceTypeEnum::PARTNER)
+            ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER_MIRROR)
             ->sum('amount');
 
         $available = $debit - $credit;
 
         $total = Transaction::where('user_id', Auth::id())
             ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
+            ->where('balance_type', BalanceTypeEnum::PARTNER)
             ->sum('amount');
 
         $week = Transaction::where('user_id', Auth::id())
             ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
+            ->where('balance_type', BalanceTypeEnum::PARTNER)
             ->where('created_at', '>=', now()->subWeek())
             ->sum('amount');
 
@@ -459,30 +462,13 @@ class Partners extends Component
 
     public function regularToPartner(): void
     {
-        $amount = $this->regularBalances['available'];
-        if ($amount <= 0) return;
-
-        DB::transaction(function () use ($amount) {
-            $uuid = 'RP-' . Str::random(10);
-
-            Transaction::create([
-                'uuid' => $uuid,
-                'amount' => $amount,
-                'trx_type' => TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER,
-                'balance_type' => BalanceTypeEnum::PARTNER,
-                'user_id' => Auth::id(),
-                'accepted_at' => now(),
-            ]);
-
-            Transaction::create([
-                'uuid' => $uuid . '-M',
-                'amount' => $amount,
-                'trx_type' => TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER_MIRROR,
-                'balance_type' => BalanceTypeEnum::REGULAR_PREMIUM,
-                'user_id' => Auth::id(),
-                'accepted_at' => now(),
-            ]);
-        });
+        // Регулярная премия теперь начисляется напрямую на партнерский баланс
+        // Этот метод больше не нужен, но оставляем для совместимости
+        $this->dispatch(
+            'new-system-notification',
+            type: 'info',
+            message: 'Регулярная премия уже на партнерском балансе',
+        );
     }
 
     public function getPackagesForTopupProperty()

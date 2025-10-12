@@ -141,7 +141,8 @@ class TransactionRepository implements TransactionRepositoryContract
             $amount = $this->getBalanceAmountByUserIdAndType($dto->userId, $dto->balanceType);
             //            Log::channel('source')->debug($amount);
 
-            if ($amount - $dto->amount < 0) {
+            // Разрешаем отрицательные значения только для основного баланса
+            if ($dto->balanceType !== BalanceTypeEnum::MAIN && $amount - $dto->amount < 0) {
                 throw new InvalidAmountException();
             }
 
