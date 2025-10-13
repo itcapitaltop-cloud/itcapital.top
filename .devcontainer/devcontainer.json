@@ -3,7 +3,7 @@
     "dockerComposeFile": "../docker-compose.prod.yml",
     "service": "app",
     "workspaceFolder": "/var/www/html",
-    "remoteUser": "www-data",
+    "remoteUser": "root",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -21,7 +21,13 @@
                 "streetsidesoftware.code-spell-checker",
                 "ms-vscode.vscode-typescript-next",
                 "yzhang.markdown-all-in-one",
-                "devsense.composer-php-vscode"
+                "devsense.composer-php-vscode",
+                "ms-azuretools.vscode-docker",
+                "dbaeumer.vscode-eslint",
+                "jaguadoromero.vscode-php-create-class",
+                "esbenp.prettier-vscode",
+                "streetsidesoftware.code-spell-checker-russian",
+                "redhat.vscode-yaml"
             ],
             "settings": {
                 "php.validate.executablePath": "/usr/bin/php",
@@ -38,5 +44,8 @@
                 }
             }
         }
-    }
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+    ]
 }
