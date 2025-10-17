@@ -9,18 +9,16 @@ use App\Models\ItcPackage;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
-use MoonShine\ActionButtons\ActionButton;
+use Illuminate\Support\Facades\Log;
 use MoonShine\Components\Alert;
 use MoonShine\Components\Link;
-use MoonShine\Fields\Date;
-use MoonShine\Fields\Number;
-use MoonShine\Pages\Crud\IndexPage;
 use MoonShine\Components\MoonShineComponent;
+use MoonShine\Fields\Date;
 use MoonShine\Fields\Email;
 use MoonShine\Fields\Field;
-use MoonShine\Fields\ID;
+use MoonShine\Fields\Number;
 use MoonShine\Fields\Text;
-use Illuminate\Support\Facades\Log;
+use MoonShine\Pages\Crud\IndexPage;
 use Throwable;
 
 class UserIndexPage extends IndexPage
@@ -28,11 +26,9 @@ class UserIndexPage extends IndexPage
     /**
      * @return list<MoonShineComponent|Field>
      */
-
-
     protected function multiSortCallback(): Closure
     {
-        return function(Builder $q, string $col, string $dir) {
+        return function (Builder $q, string $col, string $dir) {
             // Берём именно наш параметр
 
             $sorts = json_decode(request('multi_sort', '{}'), true) ?: [];
@@ -44,7 +40,8 @@ class UserIndexPage extends IndexPage
 
             // Обновляем карту
             $sorts[$col] = $dir;
-//            Log::channel('source')->debug($sorts);
+
+            //            Log::channel('source')->debug($sorts);
             // Применяем все orderBy по порядку ключей
             foreach ($sorts as $c => $d) {
                 $q->orderBy($c, $d);
@@ -55,9 +52,10 @@ class UserIndexPage extends IndexPage
     public function fields(): array
     {
         $multi = $this->multiSortCallback();
+
         return [
             Email::make('Email')->showOnExport()->sortable($multi),
-            Text::make('ФИО', 'first_name', formatted: fn(User $user) => $user->first_name . ' ' . $user->last_name)
+            Text::make('ФИО', 'first_name', formatted: fn (User $user) => $user->first_name . ' ' . $user->last_name)
                 ->showOnExport()
                 ->sortable($multi),
             Text::make('Имя пользователя', 'username')->showOnExport()->sortable($multi),
@@ -68,6 +66,7 @@ class UserIndexPage extends IndexPage
                     ->withSum('transaction', 'amount')
                     ->get()
                     ->sum('transaction_sum_amount');
+
                 return round((float) $sum, 2);
             })->showOnExport()->sortable($multi),
             Number::make('Реинвесты', 'reinvests_sum')->showOnExport()->sortable($multi),
@@ -79,31 +78,34 @@ class UserIndexPage extends IndexPage
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
 
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         // получаем paginator от ресурса
         $paginator = $this->getResource()->paginate();
+
         // если ничего не нашлось — показываем сообщение и кнопку «Сбросить фильтр»
         if ($paginator->isEmpty()) {
             return [
                 Alert::make(type: 'info')
                     ->content('Поиск с текущими настройками фильтра не дал результатов'),
                 Link::make(request()->url() . '?reset=1', 'Сбросить фильтр')
-                    ->customAttributes(['class' => 'btn btn-filter btn-secondary'])
+                    ->customAttributes(['class' => 'btn btn-filter btn-secondary']),
             ];
         }
 
@@ -115,12 +117,13 @@ class UserIndexPage extends IndexPage
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
 
