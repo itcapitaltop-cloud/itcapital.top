@@ -55,7 +55,7 @@ enum TrxTypeEnum: string
             self::REGULAR_PREMIUM_ACCRUAL           => 'Регулярная премия',
             self::REGULAR_PREMIUM_TO_PARTNER        => 'Перевод регулярной премии в партнёрский',
             self::REGULAR_PREMIUM_TO_PARTNER_MIRROR => 'Списание c баланса регулярной премии',
-            self::PARTNER_BONUS_ROLLBACK            => 'Возврат партнёрской премии',
+            self::PARTNER_BONUS_ROLLBACK            => 'Сторно партнёрской премии',
             self::PARTNER_TO_PACKAGE            => 'Перевод партнерского баланса в пакет',
             self::WITHDRAW_PACKAGE_TO_BALANCE => 'Вывод части пакета на основной баланс',
             self::RANK_BONUS_ACCRUAL => 'Начисление бонуса при достижении ранга',

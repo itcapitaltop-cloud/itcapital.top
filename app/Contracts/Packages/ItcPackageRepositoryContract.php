@@ -25,11 +25,4 @@ interface ItcPackageRepositoryContract
         bool $skipBalance = false
     ): mixed;
 
-    public function partnerTransferToPackage(
-        int $userId,
-        string $packageUuid,
-        float $amount,
-        TransactionRepositoryContract $trxRepo
-    ): void;
-
 }

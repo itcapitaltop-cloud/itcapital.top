@@ -12,13 +12,9 @@ final class VerifyRecaptcha
 {
     public function handle(Request $request, Closure $next)
     {
-        if (app()->environment('local')) {
-            return $next($request);
-        }
-
         $rules = ['g-recaptcha-response' => 'required|captcha'];
 
-        $messages = [
+        $messages = [                         // <‑‑‑ добавили
             'g-recaptcha-response.required' => 'Подтвердите, что вы не робот',
             'g-recaptcha-response.captcha' => 'Капча пройдена неверно',
         ];

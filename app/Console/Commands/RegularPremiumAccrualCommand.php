@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Partners\PartnerRewardTypeEnum;
-use App\Enums\Transactions\{BalanceTypeEnum, TrxTypeEnum};
 use App\Helpers\Notify;
+use App\Enums\Transactions\{BalanceTypeEnum, TrxTypeEnum};
+use Illuminate\Support\Facades\Log;
 use App\Models\{
     ItcPackage, PackageProfit, PackageProfitReinvest,
     PackageProfitWithdraw, PackageProfitReinvestWithdraw,
@@ -15,7 +15,6 @@ use App\Models\{
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 
@@ -66,10 +65,6 @@ class RegularPremiumAccrualCommand extends Command
                 $net = $descendantsNet[$descId];
                 if ($net <= 0) return;
 
-                // Проверяем, что у пользователя ранг больше 0
-                $user = User::find($ancestor);
-                if (!$user || $user->rank <= 0) return;
-
                 $percent = $this->percentForAncestor($ancestor, $line);
                 if ($percent <= 0) return;
 
@@ -99,7 +94,7 @@ class RegularPremiumAccrualCommand extends Command
                     'user_id'      => $userId,
                     'amount'       => $sum,
                     'trx_type'     => TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL,
-                    'balance_type' => BalanceTypeEnum::PARTNER,
+                    'balance_type' => BalanceTypeEnum::REGULAR_PREMIUM,
                     'accepted_at'  => now(),
                 ]);
 
@@ -130,7 +125,6 @@ class RegularPremiumAccrualCommand extends Command
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
             ->select('itc_packages.uuid', 'transactions.user_id')
             ->whereNotIn('transactions.trx_type', [TrxTypeEnum::PRESENT_PACKAGE])
-            ->where('itc_packages.type', '!=',  PackageTypeEnum::ARCHIVE)
             ->where(function ($q) {
                 $q->whereHas('profits', fn ($p) =>
                 $p->whereBetween('package_profits.created_at', [$this->from, $this->to]))
@@ -182,12 +176,10 @@ class RegularPremiumAccrualCommand extends Command
                 + ($dividends - $dividendsWithdraw)
                 + ($reinvests - $reinvestsWithdraw);
         }
-
-        // Debug output for each user's net profit calculation
-        foreach ($net as $userId => $netAmount) {
-            $this->line("USER_ID {$userId}: net profit = {$netAmount}");
-        }
-
+        $this->line(
+            "USER_ID {$user_id}: ({$dividends} − {$dividendsWithdraw}) + "
+            . "({$reinvests} − {$reinvestsWithdraw}) = {$net[$user_id]}"
+        );
         return $net;
     }
 
@@ -229,7 +221,6 @@ class RegularPremiumAccrualCommand extends Command
 
             $trxUuids = Transaction::where('user_id', $userId)
                 ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
-                ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereBetween('accepted_at', [$this->from, $this->to])
                 ->pluck('uuid');
 
@@ -252,7 +243,6 @@ class RegularPremiumAccrualCommand extends Command
         DB::transaction(function () {
 
             $trxUuids = Transaction::where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
-                ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereBetween('accepted_at', [$this->from, $this->to])
                 ->pluck('uuid');
 

@@ -1,9 +1,9 @@
 {
-    "name": "ITCapital",
-    "dockerComposeFile": "../docker-compose.prod.yml",
-    "service": "app",
+    "name": "Laravel Sail Dev Container",
+    "dockerComposeFile": ["../docker-compose.yml"],
+    "service": "laravel.test",
     "workspaceFolder": "/var/www/html",
-    "remoteUser": "www-data",
+
     "customizations": {
         "vscode": {
             "extensions": [
@@ -14,29 +14,17 @@
                 "jaguadoromero.vscode-php-create-class",
                 "neilbrayfield.php-docblocker",
                 "bmewburn.vscode-intelephense-client",
-                "sanderronde.phpstan-vscode",
-                "Vue.volar",
-                "Vue.vscode-typescript-vue-plugin",
-                "bracketpaircolordlw.bracket-pair-color-dlw",
-                "streetsidesoftware.code-spell-checker",
-                "ms-vscode.vscode-typescript-next",
-                "yzhang.markdown-all-in-one",
-                "devsense.composer-php-vscode"
+                "sanderronde.phpstan-vscode"
             ],
             "settings": {
                 "php.validate.executablePath": "/usr/bin/php",
                 "editor.formatOnSave": true,
-                "editor.defaultFormatter": "open-southeners.laravel-pint",
-                "[php]": {
-                    "editor.defaultFormatter": "open-southeners.laravel-pint"
-                },
-                "intelephense.environment.phpVersion": "8.4",
-                "intelephense.files.maxSize": 5000000,
-                "files.exclude": {
-                    "**/node_modules": true,
-                    "**/vendor": false
-                }
+                "intelephense.environment.phpVersion": "8.4"
             }
         }
-    }
+    },
+
+    "mounts": ["source=${localWorkspaceFolder},target=/var/www/html,type=bind"],
+
+    "remoteUser": "sail"
 }
