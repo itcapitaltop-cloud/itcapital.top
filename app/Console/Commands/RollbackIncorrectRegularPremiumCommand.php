@@ -20,9 +20,7 @@ class RollbackIncorrectRegularPremiumCommand extends Command
                             {--to= : Дата окончания периода (YYYY-MM-DD)}
                             {--user= : ID пользователя для отката}
                             {--dry-run : Показать что будет откачено без выполнения}
-                            {--force : Принудительно выполнить откат}
-                            {--include-rank-0 : Включить откат для пользователей с рангом 0}
-                            {--check-withdrawals : Проверить выводы перед откатом}';
+                            {--force : Принудительно выполнить откат}';
 
     protected $description = 'Откатить неправильные начисления регулярной премии (с архивными пакетами)';
 
@@ -42,8 +40,6 @@ class RollbackIncorrectRegularPremiumCommand extends Command
         $onlyUser = $this->option('user') ? intval($this->option('user')) : null;
         $dryRun = $this->option('dry-run');
         $force = $this->option('force');
-        $includeRank0 = $this->option('include-rank-0');
-        $checkWithdrawals = $this->option('check-withdrawals');
 
         if (!$dryRun && !$force) {
             $this->error('Для выполнения отката используйте флаг --force');
@@ -59,13 +55,6 @@ class RollbackIncorrectRegularPremiumCommand extends Command
 
         if ($onlyUser) {
             $query->where('user_id', $onlyUser);
-        }
-
-        // Если не включен флаг для ранга 0, исключаем пользователей с рангом 0
-        if (!$includeRank0) {
-            $query->whereHas('user', function ($q) {
-                $q->where('rank', '>', 0);
-            });
         }
 
         $transactions = $query->with('user')->get();
@@ -96,9 +85,7 @@ class RollbackIncorrectRegularPremiumCommand extends Command
         }
 
         // Проверить, есть ли выводы средств с регулярной премии
-        if ($checkWithdrawals) {
-            $this->checkWithdrawals($affectedUsers);
-        }
+        $this->checkWithdrawals($affectedUsers);
 
         if (!$this->confirm('Продолжить откат?')) {
             $this->info('Откат отменен.');
@@ -120,9 +107,6 @@ class RollbackIncorrectRegularPremiumCommand extends Command
         $this->info('Проверка выводов средств...');
 
         foreach ($affectedUsers as $userId => $amount) {
-            $user = User::find($userId);
-            $username = $user ? $user->username : 'Unknown';
-
             // Проверить переводы в партнерский баланс
             $partnerTransfers = Transaction::where('user_id', $userId)
                 ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER)
@@ -130,7 +114,7 @@ class RollbackIncorrectRegularPremiumCommand extends Command
                 ->sum('amount');
 
             if ($partnerTransfers > 0) {
-                $this->warn("  - Пользователь {$username} (ID: {$userId}): переведено в партнерский баланс: {$partnerTransfers}");
+                $this->warn("  - Пользователь {$userId}: переведено в партнерский баланс: {$partnerTransfers}");
             }
 
             // Проверить выводы с основного баланса (если переводили с партнерского)
@@ -140,31 +124,7 @@ class RollbackIncorrectRegularPremiumCommand extends Command
                 ->sum('amount');
 
             if ($mainWithdrawals > 0) {
-                $this->warn("  - Пользователь {$username} (ID: {$userId}): выведено с основного баланса: {$mainWithdrawals}");
-            }
-
-            // Проверить отмененные заявки на вывод
-            $cancelledWithdrawals = \App\Models\Withdraw::query()
-                ->join('transactions', 'withdraws.uuid', '=', 'transactions.uuid')
-                ->where('transactions.user_id', $userId)
-                ->whereNotNull('transactions.rejected_at')
-                ->whereBetween('transactions.rejected_at', [$this->from, $this->to])
-                ->sum('transactions.amount');
-
-            if ($cancelledWithdrawals > 0) {
-                $this->warn("  - Пользователь {$username} (ID: {$userId}): отменено заявок на вывод: {$cancelledWithdrawals}");
-            }
-
-            // Проверить активные заявки на вывод
-            $activeWithdrawals = \App\Models\Withdraw::query()
-                ->join('transactions', 'withdraws.uuid', '=', 'transactions.uuid')
-                ->where('transactions.user_id', $userId)
-                ->whereNull('transactions.accepted_at')
-                ->whereNull('transactions.rejected_at')
-                ->sum('transactions.amount');
-
-            if ($activeWithdrawals > 0) {
-                $this->warn("  - Пользователь {$username} (ID: {$userId}): активные заявки на вывод: {$activeWithdrawals}");
+                $this->warn("  - Пользователь {$userId}: выведено с основного баланса: {$mainWithdrawals}");
             }
         }
     }
