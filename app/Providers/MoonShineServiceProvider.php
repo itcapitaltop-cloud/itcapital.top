@@ -6,23 +6,21 @@ namespace App\Providers;
 
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
-use App\MoonShine\Pages\ItcPackage\ItcPackageIndexPage;
-use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
-use App\MoonShine\Resources\UserResource;
-use App\MoonShine\Resources\WithdrawResource;
 use App\MoonShine\Resources\SummaryResource;
-use MoonShine\Providers\MoonShineApplicationServiceProvider;
-use MoonShine\Menu\MenuItem;
+use App\MoonShine\Resources\UserResource;
+use App\MoonShine\Resources\VerifyingUserResource;
+use App\MoonShine\Resources\WithdrawResource;
+use Closure;
 use MoonShine\Contracts\Resources\ResourceContract;
 use MoonShine\Menu\MenuElement;
+use MoonShine\Menu\MenuItem;
 use MoonShine\Pages\Page;
-use Closure;
+use MoonShine\Providers\MoonShineApplicationServiceProvider;
 
 class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
 {
-
     public function register(): void
     {
         parent::register();
@@ -56,11 +54,12 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     protected function menu(): array
     {
         return [
-            MenuItem::make('Сводка', new SummaryResource),
-            MenuItem::make('Пользователи', new UserResource),
-            MenuItem::make('Ввод', new DepositResource),
-            MenuItem::make('Выводы', new WithdrawResource),
-            MenuItem::make('Пакеты', new ItcPackageResource),
+            MenuItem::make('Сводка', new SummaryResource()),
+            MenuItem::make('Пользователи', new UserResource()),
+            MenuItem::make('Ввод', new DepositResource()),
+            MenuItem::make('Выводы', new WithdrawResource()),
+            MenuItem::make('Пакеты', new ItcPackageResource()),
+            MenuItem::make('Верификация', new VerifyingUserResource()),
         ];
     }
 

@@ -34,19 +34,27 @@
                 </x-ui.alert>
             @endif
 
-            {{-- форма повторной отправки --}}
-            <form method="POST" action="{{ route('verification.send') }}" class="relative mt-[34px]" @submit="restartTimer">
-                @csrf
-                <x-ui.submit-button class="w-full" x-bind:disabled="wait > 0">
-                    {{ __('livewire_auth_verify_resend_button') }}
-                </x-ui.submit-button>
+            @if (session('status') === 'error-verification-link-sent')
+                <x-ui.alert type="error" class="mt-6">
+                    {{ __('livewire_auth_verify_resend_error') }}
+                </x-ui.alert>
+            @endif
 
-                <p x-show="wait > 0"
-                   class="absolute left-0 right-0 top-full mt-2
+            {{-- форма повторной отправки --}}
+            @if(!is_null(auth()->user()->email_verification_sent_at))
+                <form method="POST" action="{{ route('verification.send') }}" class="relative mt-[34px]" @submit="restartTimer">
+                    @csrf
+                    <x-ui.submit-button class="w-full" x-bind:disabled="wait > 0">
+                        {{ __('livewire_auth_verify_resend_button') }}
+                    </x-ui.submit-button>
+
+                    <p x-show="wait > 0"
+                       class="absolute left-0 right-0 top-full mt-2
                    text-center text-[12px] text-white/30">
-                    {{ __('livewire_auth_verify_resend_wait') }} <span x-text="wait"></span> {{ __('livewire_auth_verify_resend_wait_seconds') }}
-                </p>
-            </form>
+                        {{ __('livewire_auth_verify_resend_wait') }} <span x-text="wait"></span> {{ __('livewire_auth_verify_resend_wait_seconds') }}
+                    </p>
+                </form>
+            @endif
 
             {{-- сменить адрес --}}
             <form method="POST" action="{{ route('logout') }}" class="mt-8 text-center">

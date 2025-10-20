@@ -483,6 +483,7 @@
     "livewire_auth_verify_sent_to_1": "address.",
     "livewire_auth_verify_check_spam": "If you can’t find the email, check your Spam folder.",
     "livewire_auth_verify_resend_success": "Confirmation email resent successfully",
+    "livewire_auth_verify_resend_error": "The verification email was not sent",
     "livewire_auth_verify_resend_button": "Resend Link",
     "livewire_auth_verify_resend_wait": "You can resend the link in",
     "livewire_auth_verify_resend_wait_seconds": "seconds",
