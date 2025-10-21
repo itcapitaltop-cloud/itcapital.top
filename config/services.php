@@ -36,18 +36,8 @@ return [
     ],
 
     'google' => [
-        'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
-        'client_email' => env('GOOGLE_SERVICE_ACCOUNT_EMAIL'),
-        'private_key' => env('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'),
-        'private_key_id' => env('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_ID'),
+        'service_account' => env('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64'),
         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
-        'auth_uri' => env('GOOGLE_SERVICE_ACCOUNT_AUTH_URI'),
-        'token_uri' => env('GOOGLE_SERVICE_ACCOUNT_TOKEN_URI'),
-        'type' => env('GOOGLE_SERVICE_TYPE_ACCOUNT'),
-        'client_id' => env('GOOGLE_SERVICE_CLIENT_ID'),
-        'client_x509_cert_url' => env('GOOGLE_CLIENT_X509_CERT_URL'),
-        'auth_provider_x509_cert_url' => env('GOOGLE_PROVIDER_X509_CERT_URL'),
-        'universe_domain' => env('GOOGLE_UNIVERSE_DOMAIN'),
     ],
 
     'twelvedata' => [
