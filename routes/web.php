@@ -7,11 +7,10 @@ use App\Http\Controllers\CommonFundController;
 use App\Http\Controllers\EmailChangeController;
 use App\Http\Controllers\MainPageModalsController;
 use App\Http\Controllers\WalletQrController;
-use App\Livewire\Auth\PasswordReset;
-use Illuminate\Support\Facades\Route;
-use MoonShine\Http\Middleware\Authenticate;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use MoonShine\Http\Middleware\Authenticate;
 
 $domain = config('app.domain');
 
@@ -25,13 +24,21 @@ Route::domain("academy.{$domain}")->group(function () {
 });
 
 /* страница «Проверьте почту» */
-Route::get('/email/verify', function () {
+Route::get('/email/verify', static function () {
+    if (auth()->check() && ! is_null(auth()->user()->email_verified_at)) {
+        return redirect()->route('dashboard');
+    }
+
     return view('pages.auth.verify-email');
 })->middleware('auth')->name('verification.notice');
 
 /* переход по ссылке из письма */
-Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+Route::get('/email/verify/{id}/{hash}', static function (EmailVerificationRequest $request) {
     $user = $request->user();
+
+    if (is_null($user->email_verification_sent_at)) {
+        return redirect()->route('email.verified');
+    }
 
     $wasVerified = $user->hasVerifiedEmail();
 
@@ -49,12 +56,17 @@ Route::get('/email/change/verify/{user}/{hash}', EmailChangeController::class)
     ->name('email.change.verify');
 
 /* повторная отправка письма */
-Route::post('/email/verification-notification', function (Request $request) {
+Route::post('/email/verification-notification', static function (Request $request) {
+    if (! is_null(auth()->user()->email_verification_sent_at)) {
+        return back()->with('status', 'error-verification-link-sent');
+    }
+
     $request->user()->sendEmailVerificationNotification();
+
     return back()->with('status', 'verification-link-sent');
 })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
 
-Route::get('/email/verified', function () {
+Route::get('/email/verified', static function () {
     return view('pages.auth.email-verified');
 })->middleware('auth')->name('email.verified');
 
@@ -64,7 +76,7 @@ Route::middleware('guest')->group(function () {
     Route::view('sign-up', 'pages.auth.sign-up')->name('sign-up');
     Route::view('login', 'pages.auth.login')->name('login');
     Route::view('email-restore', 'pages.auth.email-restore')->name('email-restore');
-    Route::get('password/reset/{token}', function (string $token) {
+    Route::get('password/reset/{token}', static function (string $token) {
         return view('pages.auth.password-reset', ['token' => $token]);
     })->name('password.reset');
 });
@@ -97,11 +109,11 @@ Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])
 
 Route::controller(AdminController::class)->middleware(Authenticate::class)->prefix('itcapitalmoonshineadminpanel')->group(function () {
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
-    Route::post('reinvest-profit/{uuid}/withdraw','withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
+    Route::post('reinvest-profit/{uuid}/withdraw', 'withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
     Route::delete('reinvest-profit/{uuid}/delete', 'deleteProfitReinvest')->name('reinvest-profit-delete');
     Route::post('reinvest-profit/{uuid}/extend', 'extendProfitReinvest')->name('reinvest-profit-extend');
     Route::post('reinvest-profit/{uuid}/remove-all', 'removeAllProfitsAndReinvests')->name('reinvest-profit-remove-all');
-    Route::post('reinvest-profit-withdraw/bulk','bulkWithdraw')->name('reinvest-profit-withdraw-bulk');
+    Route::post('reinvest-profit-withdraw/bulk', 'bulkWithdraw')->name('reinvest-profit-withdraw-bulk');
     Route::post('itc-packages/{uuid}/close', 'closeItcPackage')->name('itc-package-close');
     Route::post('users/amount', 'addAmountToBalance');
     Route::post('itc-packages/{uuid}', 'updateItcPackage');
@@ -123,5 +135,5 @@ Route::controller(MainPageModalsController::class)
     });
 
 Route::controller(AdminLogActionController::class)->middleware(Authenticate::class)->prefix('admin')->group(function () {
-    Route::post('log-admin-action','withdrawOneProfitReinvest')->name('admin.log.store');
+    Route::post('log-admin-action', 'withdrawOneProfitReinvest')->name('admin.log.store');
 });

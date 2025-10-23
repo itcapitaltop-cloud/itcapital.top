@@ -80,6 +80,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'extended_lines',
         'overridden_rank',
         'overridden_rank_from',
+        'email_verification_sent_at',
     ];
 
     /**

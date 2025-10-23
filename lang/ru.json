@@ -483,6 +483,7 @@
     "livewire_auth_verify_sent_to_1": "отправлена ссылка для подтверждения аккаунта.",
     "livewire_auth_verify_check_spam": "Если вы не можете найти письмо, проверьте папку «Спам».",
     "livewire_auth_verify_resend_success": "Письмо со ссылкой подтверждения отправлено повторно",
+    "livewire_auth_verify_resend_error": "Письмо со ссылкой подтверждения не отправлено",
     "livewire_auth_verify_resend_button": "Отправить заново",
     "livewire_auth_verify_resend_wait": "Отправить ссылку повторно можно через",
     "livewire_auth_verify_resend_wait_seconds": "секунд",

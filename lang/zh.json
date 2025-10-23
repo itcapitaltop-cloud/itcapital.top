@@ -483,6 +483,7 @@
     "livewire_auth_verify_sent_to_1": "地址。",
     "livewire_auth_verify_check_spam": "如未收到邮件，请检查垃圾邮件文件夹。",
     "livewire_auth_verify_resend_success": "确认邮件已重新发送",
+    "livewire_auth_verify_resend_error": "验证邮件未发送",
     "livewire_auth_verify_resend_button": "重新发送链接",
     "livewire_auth_verify_resend_wait": "可于",
     "livewire_auth_verify_resend_wait_seconds": "秒后重发",

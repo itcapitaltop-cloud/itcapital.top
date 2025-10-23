@@ -11,5 +11,6 @@ readonly class CreatePackageReinvestDto
         public Carbon $expire
     )
     {
+        // ..
     }
 }

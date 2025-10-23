@@ -1,12 +1,12 @@
 <div class="relative min-h-screen overflow-hidden bg-[#17162d] flex flex-col items-center justify-center">
     <x-index.header />
 
-    <div class=" absolute
+    <div
+        class=" absolute
                     left-1/2 top-1/2 w-[450px] md:w-[410px]max-w-none
                     -translate-x-[50%] md:-translate-x-[130%] -translate-y-[50%] md:-translate-y-[90%]">
-        <img src="{{ vite()->icon('/backgrounds/cards-input.png') }}"
-             alt="cards background"
-             class="pointer-events-none select-none
+        <img src="{{ vite()->icon('/backgrounds/cards-input.png') }}" alt="cards background"
+            class="pointer-events-none select-none
                     opacity-80" />
         <span
             class="absolute left-[28px] top-[267px] font-ocr uppercase text-[#B26E00]
@@ -19,8 +19,7 @@
     </div>
     <div class="relative mt-[115px] w-[370px] sm:w-[447px]">
         <form wire:submit.prevent="submit" method="post" action="#"
-
-              class="rounded-[26px]
+            class="rounded-[26px]
                      [background:radial-gradient(circle,#2D286480,#211F4180)]
                      border border-white/5 backdrop-blur-[10px] shadow-lg ring-1 ring-white/10
                      px-[24px] py-[18px]">
@@ -30,65 +29,47 @@
             </h2>
 
             {{-- поля ввода --}}
-            <div class="mt-[34px] grid gap-[38px]">
-                <x-ui.input
-                    name="username"
-                    validate="username"
-
-                    placeholder="{{ __('livewire_sign_up_nickname_placeholder') }}"
-                    input-class="py-[5px] px-[12px]"
-                    notice="{{ __('livewire_sign_up_nickname_notice') }}"
-                    autocomplete="username"
-                >
+            <div class="mt-[34px] grid gap-[38px]" x-data @reset-recaptcha.window="typeof grecaptcha !== 'undefined' && grecaptcha.reset()">
+                <x-ui.input name="username" validate="username"
+                    placeholder="{{ __('livewire_sign_up_nickname_placeholder') }}" input-class="py-[5px] px-[12px]"
+                    notice="{{ __('livewire_sign_up_nickname_notice') }}" autocomplete="username">
                     {{ __('livewire_sign_up_nickname_label') }}
                 </x-ui.input>
 
                 <x-ui.input name="firstName" placeholder="{{ __('livewire_sign_up_first_name_placeholder') }}"
-                            x-on:input="$store.user.first = $event.target.value"
-                            input-class="py-[5px] px-[12px]">
+                    x-on:input="$store.user.first = $event.target.value" input-class="py-[5px] px-[12px]">
                     {{ __('livewire_sign_up_first_name_label') }}
                 </x-ui.input>
 
                 <x-ui.input name="lastName" placeholder="{{ __('livewire_sign_up_last_name_placeholder') }}"
-                            x-on:input="$store.user.last = $event.target.value"
-                            input-class="py-[5px] px-[12px]">
+                    x-on:input="$store.user.last = $event.target.value" input-class="py-[5px] px-[12px]">
                     {{ __('livewire_sign_up_last_name_label') }}
                 </x-ui.input>
 
-                <x-ui.input
-                    type="email"
-                    name="email"
-                    placeholder="{{ __('livewire_sign_up_email_placeholder') }}"
-                    validate="email"
-                    input-class="py-[5px] px-[12px]"
-                    autocomplete="email">
+                <x-ui.input type="email" name="email" placeholder="{{ __('livewire_sign_up_email_placeholder') }}"
+                    validate="email" input-class="py-[5px] px-[12px]" autocomplete="email">
                     {{ __('livewire_sign_up_email_label') }}
                 </x-ui.input>
 
                 {{-- пароль + глазик --}}
-                <x-ui.input type="password"
-                    name="password"
-                    validate="password"
-                    placeholder="{{ __('livewire_sign_up_password_placeholder') }}"
-                    confirmWith="passwordConfirm"
-                    required
-                    input-class="py-[5px] px-[12px]"
-                    notice="{{ __('livewire_sign_up_password_notice') }}"
+                <x-ui.input type="password" name="password" validate="password"
+                    placeholder="{{ __('livewire_sign_up_password_placeholder') }}" confirmWith="passwordConfirm"
+                    required input-class="py-[5px] px-[12px]" notice="{{ __('livewire_sign_up_password_notice') }}"
                     autocomplete="new-password">
                     {{ __('livewire_sign_up_password_label') }}
                 </x-ui.input>
 
-                <x-ui.input type="password"
-                    name="passwordConfirm"
-                    validate="password"
-                    confirmWith="password"
-                    placeholder="{{ __('livewire_sign_up_password_confirm_placeholder') }}"
-                    required
-                    input-class="py-[5px] px-[12px]"
-                    notice="{{ __('livewire_sign_up_password_confirm_notice') }}"
+                <x-ui.input type="password" name="passwordConfirm" validate="password" confirmWith="password"
+                    placeholder="{{ __('livewire_sign_up_password_confirm_placeholder') }}" required
+                    input-class="py-[5px] px-[12px]" notice="{{ __('livewire_sign_up_password_confirm_notice') }}"
                     autocomplete="new-password">
                     {{ __('livewire_sign_up_password_confirm_label') }}
                 </x-ui.input>
+
+                <div wire:ignore>
+                    {!! NoCaptcha::renderJs() !!}
+                    {!! NoCaptcha::display(['data-callback' => 'onCaptchaSuccess']) !!}
+                </div>
             </div>
 
             <div class="mt-[34px]">
@@ -114,8 +95,35 @@
     </p>
 </div>
 
-@script
-    <script>
-        Alpine.store('user', { first: '', last: '' })
-    </script>
-@endscript
+
+<script>
+    function onCaptchaSuccess(token) {
+        @this.set('gRecaptchaResponse', token);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        Livewire.on('reset-recaptcha', function() {
+            console.log('Resetting recaptcha...');
+            if (typeof grecaptcha !== 'undefined') {
+                try {
+                    grecaptcha.reset();
+                    console.log('reCAPTCHA reset successful');
+                } catch (e) {
+                    console.error('Error resetting reCAPTCHA:', e);
+                }
+            } else {
+                console.error('grecaptcha is not defined');
+            }
+        });
+
+        Livewire.on('validation-failed', function() {
+            console.log('Validation failed, resetting recaptcha...');
+            setTimeout(function() {
+                if (typeof grecaptcha !== 'undefined') {
+                    grecaptcha.reset();
+                }
+            }, 100);
+        });
+    });
+</script>
+
