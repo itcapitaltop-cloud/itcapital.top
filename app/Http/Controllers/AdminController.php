@@ -67,13 +67,11 @@ class AdminController extends Controller
             ->withSum(['reinvestToBody' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->chunkById(50, function (Collection $packages) use ($request) {
             $packages->each(function (ItcPackage $package) use ($request) {
-                $base = ($package->type === PackageTypeEnum::PRESENT && Carbon::parse($package->work_to)->lte(now()))
-                    ? BigDecimal::of($package->reinvest_profits_sum_amount)
-                    : BigDecimal::of($package->transaction->amount)
-                        ->plus($package->reinvest_profits_sum_amount)
-                        ->plus($package->partner_transfers_sum_amount ?? 0)
-                        ->plus($package->reinvest_to_body_sum_amount ?? 0)
-                        ->minus($package->balance_withdraws_sum_amount ?? 0);
+                $base = BigDecimal::of($package->transaction->amount)
+                    ->plus($package->reinvest_profits_sum_amount)
+                    ->plus($package->partner_transfers_sum_amount ?? 0)
+                    ->plus($package->reinvest_to_body_sum_amount ?? 0)
+                    ->minus($package->balance_withdraws_sum_amount ?? 0);
 
 
                 $profit = PackageProfit::query()->create([

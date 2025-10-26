@@ -628,7 +628,7 @@ class UserDetailPage extends DetailPage
                                 Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
                                 Number::make('Сумма реинвеста', 'reinvest_profits_sum_amount', formatted: fn ($item) => round((float) $item['reinvest_profits_sum_amount'], 2)),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
-                                Number::make('Прибыль после реинвеста', 'profits_sum_amount', formatted: fn ($item) => round((float) $item['profits_sum_amount'], 2)
+                                Number::make('Дивидендов начислено', 'profits_sum_amount', formatted: fn ($item) => round((float) $item['profits_sum_amount'], 2)
                                 ),
                                 Enum::make('Тип пакета', 'type')->attach(PackageTypeEnum::class),
                             ])

@@ -20,7 +20,7 @@ class UpdateExpiredPackageProfit extends Command
     {
         $query = ItcPackage::query()
             ->where('work_to', '<', now())
-//            ->where('month_profit_percent', '!=', 5.5)
+            ->where('month_profit_percent', '<>', 5.5)
             ->with(['reinvestProfits']);
 
         if ($uuid = $this->option('uuid')) {

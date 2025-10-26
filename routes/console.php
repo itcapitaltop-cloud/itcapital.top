@@ -32,3 +32,7 @@ Schedule::command('regular-premium:accrual')
         return $anchor->diffInWeeks($nowW) % 2 === 0; // только “каждый второй”
     })
     ->sendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command('packages:expired-set-profit')
+    ->withoutOverlapping()
+    ->everyMinute();
