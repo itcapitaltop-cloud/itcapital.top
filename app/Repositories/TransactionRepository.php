@@ -203,7 +203,6 @@ class TransactionRepository implements TransactionRepositoryContract
             ->whereIn('trx_type', [
                 TrxTypeEnum::BUY_PACKAGE,
                 TrxTypeEnum::WITHDRAW_PACKAGE_PROFIT,
-                TrxTypeEnum::WITHDRAW_PACKAGE,
                 TrxTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT,
                 TrxTypeEnum::PRESENT_PACKAGE,
                 TrxTypeEnum::ZERO_PRESENT_PACKAGE,
