@@ -12,6 +12,8 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\LogAdminAction;
+use App\Models\PackageProfit;
+use App\Models\PackageProfitReinvest;
 use App\Models\Partner;
 use App\Models\PartnerLevelPercent;
 use App\Models\PartnerReward;
@@ -267,8 +269,14 @@ class UserDetailPage extends DetailPage
                 'amount' => $pkg->transaction->amount,
                 'type' => $pkg->type,
                 'month_profit_percent' => $pkg->month_profit_percent,
-                'reinvest_profits_sum_amount' => $pkg->reinvest_profits_sum_amount,
-                'profits_sum_amount' => $pkg->profits_sum_amount,
+                // все реинвесты по пакету (включая soft-deleted и снятые)
+                'reinvest_total_all' => (float) PackageProfitReinvest::withTrashed()
+                    ->where('package_uuid', $pkg->uuid)
+                    ->sum('amount'),
+                // все дивиденды по пакету (включая soft-deleted)
+                'profits_total_all' => (float) PackageProfit::withTrashed()
+                    ->where('package_uuid', $pkg->uuid)
+                    ->sum('amount'),
                 'itc_created_at' => $pkg->created_at,
                 'reinvest_profits' => $pkg->reinvestProfits
                     ->map(fn ($r) => [
@@ -624,11 +632,12 @@ class UserDetailPage extends DetailPage
                         TableBuilder::make()
                             ->withNotFound()
                             ->fields([
+                                Text::make('ID', 'uuid')->showOnExport(),
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                 Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
-                                Number::make('Сумма реинвеста', 'reinvest_profits_sum_amount', formatted: fn ($item) => round((float) $item['reinvest_profits_sum_amount'], 2)),
+                                Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
-                                Number::make('Дивидендов начислено', 'profits_sum_amount', formatted: fn ($item) => round((float) $item['profits_sum_amount'], 2)
+                                Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)
                                 ),
                                 Enum::make('Тип пакета', 'type')->attach(PackageTypeEnum::class),
                             ])

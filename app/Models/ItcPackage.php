@@ -9,17 +9,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Log;
 
 /**
- *
- *
  * @property int $id
  * @property string $uuid
  * @property string $month_profit_percent
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage query()
@@ -28,17 +25,21 @@ use Illuminate\Support\Facades\Log;
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereMonthProfitPercent($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereUuid($value)
+ *
  * @property-read \App\Models\Transaction|null $transaction
  * @property string $type
  * @property string $work_to
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereWorkTo($value)
+ *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PackageProfit> $profits
  * @property-read int|null $profits_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PackageProfitReinvest> $reinvestProfits
  * @property-read int|null $reinvest_profits_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Transaction> $withdrawProfitsTransactions
  * @property-read int|null $withdraw_profits_transactions_count
+ *
  * @mixin \Eloquent
  */
 class ItcPackage extends Model
@@ -53,7 +54,7 @@ class ItcPackage extends Model
         'type',
         'work_to',
         'duration_months',
-        'created_at'
+        'created_at',
     ];
 
     public function transaction(): HasOne
@@ -131,7 +132,7 @@ class ItcPackage extends Model
 
     public function canProlong(): bool
     {
-        return !$this->isActive() && $this->residual_amount >= 100;
+        return ! $this->isActive() && $this->residual_amount >= 100;
     }
 
     public function partnerTransfers(): HasManyThrough
@@ -160,11 +161,8 @@ class ItcPackage extends Model
 
     protected $casts = [
         'work_to' => 'datetime',
-        'closed_at'    => 'datetime',
+        'closed_at' => 'datetime',
         'prolonged_to' => 'datetime',
-        'type' => PackageTypeEnum::class
+        'type' => PackageTypeEnum::class,
     ];
-
-
 }
-

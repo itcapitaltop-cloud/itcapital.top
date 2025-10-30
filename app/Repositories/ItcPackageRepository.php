@@ -21,7 +21,6 @@ use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ItcPackageRepository implements ItcPackageRepositoryContract
 {
@@ -54,6 +53,7 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
 
             if ($amount->isPositive()) {
                 $callback($amount);
+
                 return;
             }
 
@@ -97,17 +97,18 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
             $userId = $package->transaction->user_id;
 
             $amount = BigDecimal::of($package->transaction->amount);
+
             if (
                 $package->type !== PackageTypeEnum::PRESENT
                 && $amount->isPositive()
             ) {
                 $transactionRepo->commonStore(new CreateTransactionDto(
-                    userId:      $userId,
-                    trxType:     TrxTypeEnum::WITHDRAW_PACKAGE,
+                    userId: $userId,
+                    trxType: TrxTypeEnum::WITHDRAW_PACKAGE,
                     balanceType: BalanceTypeEnum::MAIN,
-                    amount:      $amount,
-                    acceptedAt:  Carbon::now(),
-                    prefix:      'WPC-',
+                    amount: $amount,
+                    acceptedAt: Carbon::now(),
+                    prefix: 'WPC-',
                 ));
             }
 
@@ -116,19 +117,20 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
             }
 
             $profit = $this->getCurrentProfitAmountByPackageUuid($uuid);
+
             if ($profit->isPositive()) {
                 $trx = $transactionRepo->commonStore(new CreateTransactionDto(
-                    userId:      $userId,
-                    trxType:     TrxTypeEnum::WITHDRAW_PACKAGE_PROFIT,
+                    userId: $userId,
+                    trxType: TrxTypeEnum::WITHDRAW_PACKAGE_PROFIT,
                     balanceType: BalanceTypeEnum::MAIN,
-                    amount:      $profit,
-                    acceptedAt:  Carbon::now(),
-                    prefix:      'WPP-',
+                    amount: $profit,
+                    acceptedAt: Carbon::now(),
+                    prefix: 'WPP-',
                 ));
 
                 PackageProfitWithdraw::query()->create([
-                    'uuid'          => $trx->uuid,
-                    'package_uuid'  => $uuid,
+                    'uuid' => $trx->uuid,
+                    'package_uuid' => $uuid,
                 ]);
             }
 
@@ -140,12 +142,12 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
                 $package,
                 'close_itc_package',
                 [
-                    'old_type'   => $package->getOriginal('type'),
+                    'old_type' => $package->getOriginal('type'),
                     'old_amount' => $package->transaction->getOriginal('amount'),
                     'old_user_id' => $userId,
                 ],
                 [
-                    'new_type'   => PackageTypeEnum::ARCHIVE,
+                    'new_type' => PackageTypeEnum::ARCHIVE,
                     'new_amount' => $package->transaction->amount,
                     'new_user_id' => $userId,
                 ],
@@ -155,24 +157,23 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
     }
 
     public function partnerTransferToPackage(
-        int    $userId,
+        int $userId,
         string $packageUuid,
-        float  $amount,
+        float $amount,
         TransactionRepositoryContract $trxRepo
-    ): void
-    {
+    ): void {
         $trxRepo->checkBalanceAndStore(
             new CreateTransactionDto(
-                userId:      $userId,
-                trxType:     TrxTypeEnum::PARTNER_TO_PACKAGE,
+                userId: $userId,
+                trxType: TrxTypeEnum::PARTNER_TO_PACKAGE,
                 balanceType: BalanceTypeEnum::PARTNER,
-                amount:      $amount,
-                acceptedAt:  now(),
-                prefix:      'PP-',
+                amount: $amount,
+                acceptedAt: now(),
+                prefix: 'PP-',
             ),
             function (Transaction $trx) use ($packageUuid) {
                 PackagePartnerTransfer::create([
-                    'uuid'         => $trx->uuid,
+                    'uuid' => $trx->uuid,
                     'package_uuid' => $packageUuid,
                 ]);
             }

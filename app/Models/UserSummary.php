@@ -8,11 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 class UserSummary extends Model
 {
     use HasFactory;
+
     protected $table = 'user_summary';
 
     protected $primaryKey = 'user_id';
+
     public $incrementing = false;
+
     protected $keyType = 'int';
+
+    public $timestamps = false;
 
     protected $fillable = [
         'user_id',

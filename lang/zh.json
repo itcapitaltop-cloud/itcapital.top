@@ -258,6 +258,7 @@
     "components_account_itc_package_confirm_withdraw_question": "您确定要提取股息吗？",
     "components_account_itc_package_withdraw_action": "提取",
     "components_account_itc_package_restore_profitability_question": "恢复套餐收益率？",
+    "components_account_itc_package_restore_profitability_question_desc": "此操作会将套餐的所有分红划入套餐本身，并重新启动套餐的运行，为期六个月",
     "components_account_itc_package_continue_action": "继续",
     "components_account_itc_package_edit_balance_title": "编辑余额",
     "components_account_itc_package_amount_placeholder": "ITC 金额",

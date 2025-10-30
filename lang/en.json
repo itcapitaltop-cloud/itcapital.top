@@ -258,6 +258,7 @@
     "components_account_itc_package_confirm_withdraw_question": "Are you sure you want to withdraw dividends?",
     "components_account_itc_package_withdraw_action": "Withdraw",
     "components_account_itc_package_restore_profitability_question": "Restore package profitability?",
+    "components_account_itc_package_restore_profitability_question_desc": "This action will allocate all dividends on the package to the package itself and restart the package's operation for six months",
     "components_account_itc_package_continue_action": "Continue",
     "components_account_itc_package_edit_balance_title": "Edit Balance",
     "components_account_itc_package_amount_placeholder": "Amount in ITC",

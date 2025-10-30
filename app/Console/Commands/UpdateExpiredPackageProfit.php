@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\ItcPackage;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class UpdateExpiredPackageProfit extends Command
@@ -13,7 +12,8 @@ class UpdateExpiredPackageProfit extends Command
      *
      * @var string
      */
-    protected $signature   = 'packages:expired-set-profit {--uuid=}';
+    protected $signature = 'packages:expired-set-profit {--uuid=}';
+
     protected $description = 'Устанавливает доходность 5.5% для истекших пакетов';
 
     public function handle(): int
@@ -32,18 +32,8 @@ class UpdateExpiredPackageProfit extends Command
         $count = 0;
 
         foreach ($expired as $package) {
-            $sum = $package->reinvestProfits->sum('amount');
-
-            if ($sum > 0) {
-                $package->transaction->amount += $sum;
-                $package->transaction->save();
-
-                $package->reinvestProfits->each(function ($reinvest) {
-                    $reinvest->delete();
-                });
-            }
-
             $balance = $package->transaction->amount;
+
             if ($balance > 100) {
                 $package->month_profit_percent = 5.5;
             } else {
@@ -55,6 +45,7 @@ class UpdateExpiredPackageProfit extends Command
         }
 
         $this->info("Обновлено пакетов: {$count}");
+
         return self::SUCCESS;
     }
 }

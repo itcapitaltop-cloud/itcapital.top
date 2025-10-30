@@ -28,7 +28,8 @@ Schedule::command('regular-premium:accrual')
     ->when(function () {
         // Якорный понедельник
         $anchor = CarbonImmutable::create(2025, 8, 11)->startOfWeek(CarbonInterface::MONDAY);
-        $nowW   = now()->startOfWeek(CarbonInterface::MONDAY);
+        $nowW = now()->startOfWeek(CarbonInterface::MONDAY);
+
         return $anchor->diffInWeeks($nowW) % 2 === 0; // только “каждый второй”
     })
     ->sendOutputTo(storage_path('logs/scheduler.log'));
