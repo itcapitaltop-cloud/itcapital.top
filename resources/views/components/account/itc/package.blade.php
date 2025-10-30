@@ -174,7 +174,7 @@
                                 class="w-[19px] invisible translate-y-[2px]" alt="ITC">
                             <div>
                                 <p class="text-[16px] md:text-[20px] font-dela leading-none">
-                                    {{ scale($package->getCurrentProfitAmount())->stripTrailingZeros() }}
+                                    {{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros() }}
                                 </p>
                                 <p class="text-[12px] text-white/50 tracking-wide">
                                     {{ __('components_account_itc_package_dividends') }}
@@ -214,19 +214,19 @@
         @if ($withButtons)
             <div class="flex z-[11] flex-col items-start gap-3">
 
-                <x-ui.button :disabled="$package->getCurrentProfitAmount()->isEqualTo('0')" x-on:click="showConfirmReinvest = true"
+                <x-ui.button :disabled="$package->getCurrentProfitAmount()->isNegativeOrZero()" x-on:click="showConfirmReinvest = true"
                     class="!text-[14px] !md:text-[16px]">
                     {{ __('components_account_itc_package_reinvest_dividends') }}
                     <span
-                        class="ml-2 text-[14px] md:text-[16px]">({{ scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
+                        class="ml-2 text-[14px] md:text-[16px]">({{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
                         ITC)</span>
                 </x-ui.button>
 
-                <x-ui.button variant="secondary" class="justify-between" :disabled="$package->getCurrentProfitAmount()->isEqualTo('0')"
+                <x-ui.button variant="secondary" class="justify-between" :disabled="$package->getCurrentProfitAmount()->isNegativeOrZero()"
                     x-on:click="showConfirmWithdraw = true" class="!text-[14px] !md:text-[16px]">
                     {{ __('components_account_itc_package_withdraw_dividends_to_balance') }}
                     <span
-                        class="ml-2 text-[14px] md:text-[16px]">({{ scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
+                        class="ml-2 text-[14px] md:text-[16px]">({{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
                         ITC)</span>
                 </x-ui.button>
 
