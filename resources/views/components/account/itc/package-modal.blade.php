@@ -23,7 +23,9 @@
             </div>
             <div>
                 <h3 class="text-gray-300 text-sm">{{ __('components_account_itc_package_modal_dividends') }}</h3>
-                <h4 class="text-base text-white">{{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount()) }} ITC</h4>
+                <h4 class="text-base text-white">
+                    {{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount()) }}
+                    ITC</h4>
             </div>
             <div>
                 <h3 class="text-gray-300 text-sm">{{ __('components_account_itc_package_modal_all_dividends') }}</h3>
@@ -41,19 +43,22 @@
                         alt="">
                 </figure>
             </button>
-            <button @disabled($package->getCurrentProfitAmount()->isNegativeOrZero()) title="{{ __('components_account_itc_package_modal_withdraw_dividends') }}"
+            <button @disabled($package->getCurrentProfitAmount()->isNegativeOrZero())
+                title="{{ __('components_account_itc_package_modal_withdraw_dividends') }}"
                 wire:click="withdrawProfit('{{ $package->uuid }}')" type="button"
                 class="flex-1 py-1.5 enabled:hover:bg-gray-450 disabled:opacity-70">
                 <figure>
                     <img src="{{ vite()->icon('/actions/coin.svg') }}" class="w-3 icon-green mx-auto" alt="">
                 </figure>
             </button>
-            <button title="{{ __('components_account_itc_package_modal_reinvest_stock') }}" type="button" class="flex-1 py-1.5 hover:bg-gray-450">
+            <button title="{{ __('components_account_itc_package_modal_reinvest_stock') }}" type="button"
+                class="flex-1 py-1.5 hover:bg-gray-450">
                 <figure>
                     <img src="{{ vite()->icon('/actions/cube.svg') }}" class="w-3 icon-yellow mx-auto" alt="">
                 </figure>
             </button>
-            <button title="{{ __('components_account_itc_package_modal_close_stock') }}" type="button" class="flex-1 py-1.5 hover:bg-gray-450">
+            <button title="{{ __('components_account_itc_package_modal_close_stock') }}" type="button"
+                class="flex-1 py-1.5 hover:bg-gray-450">
                 <figure>
                     <img src="{{ vite()->icon('/actions/cancel.svg') }}" class="w-3 icon-red mx-auto" alt="">
                 </figure>
