@@ -15,7 +15,7 @@ Schedule::command('app:backup-processing-command')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
 
 Schedule::command('quotes:cache')
-    ->cron('*/1 * * * *');
+    ->cron('*/12 * * * *');
 
 Schedule::command('itc:close-present-packages')
     ->cron('* * * * *');
