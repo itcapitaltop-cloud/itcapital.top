@@ -31,6 +31,11 @@ class ItcPackageResource extends ModelResource
     protected string $title = 'Пакеты';
     protected bool $editInModal   = true;
 
+    public function search(): array
+    {
+        return ['uuid'];
+    }
+
     /**
      * @return list<Page>
      */

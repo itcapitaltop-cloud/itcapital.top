@@ -19,6 +19,7 @@ class ItcPackageIndexPage extends IndexPage
     public function fields(): array
     {
         return [
+            Text::make('ID', 'uuid')->showOnExport(),
             Date::make('Дата покупки пакета', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
             Text::make('Пользователь', formatted: fn ($item) => $item->transaction?->user?->username)->showOnExport(
                 modifyRawValue: fn ($value, $field) => $field->getData()->transaction?->user?->username ?? 'пользователь забанен'

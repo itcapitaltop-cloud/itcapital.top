@@ -235,9 +235,9 @@
                         {{ __('components_account_itc_package_edit_balance') }}
                     </x-ui.button>
 
-                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="showConfirmContinue = true">
-                        {{ __('components_account_itc_package_continue_work') }}
-                    </x-ui.button>
+{{--                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="showConfirmContinue = true">--}}
+{{--                        {{ __('components_account_itc_package_continue_work') }}--}}
+{{--                    </x-ui.button>--}}
                 @endif
 
 
