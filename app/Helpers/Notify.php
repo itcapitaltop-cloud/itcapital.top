@@ -30,6 +30,38 @@ class Notify
         ));
     }
 
+    public static function recalculateDividends(User $user, string $amount, string $packageCreated, string $packageType, string $dividendsUuid): void
+    {
+        $icon      = vite()->icon('currency/itc.svg');
+        $amountEsc = e($amount);
+        $typeEsc   = e($packageType);
+        $dateEsc   = e($packageCreated);
+        $uuidEsc   = e($dividendsUuid);
+
+        $title = "
+            <div class='flex flex-col leading-snug'>
+                <span class='text-[13px] text-white/90'>
+                    В связи с ошибкой в расчетах, вам доначислено
+                </span>
+                <span class='inline-flex items-center gap-1 text-[13px] font-semibold text-white'>
+                    <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' />
+                    {$amountEsc} <span class='font-normal opacity-80'>дивидендов на пакет</span>
+                </span>
+            </div>
+            ";
+
+        $message = "<span class='block'>{$typeEsc} {$dateEsc}</span>";
+
+        $user->notify(new InAppNotification(
+            title: $title,
+            message: $message,
+            icon: 'notifications/dividends.svg',
+            action: ['type' => 'call', 'name' => 'reinvest', 'params' => ['uuid' => $uuidEsc]],
+            buttonText: 'Реинвестировать',
+            display: 'block',
+        ));
+    }
+
     public static function welcome(User $user): void
     {
         $user->notify(new InAppNotification(
