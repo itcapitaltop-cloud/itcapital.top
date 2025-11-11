@@ -47,6 +47,7 @@ class TransactionRepository implements TransactionRepositoryContract
         $sum = Transaction::query()
             ->where('user_id', $userId)
             ->where('balance_type', $balanceType)
+            ->whereNotNull('accepted_at')
             ->whereNull('rejected_at')
             ->selectRaw("
             SUM(
