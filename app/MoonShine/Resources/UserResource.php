@@ -434,19 +434,21 @@ class UserResource extends ModelResource
      */
     public function updateBalance(MoonShineRequest $request): MoonShineJsonResponse
     {
+        $transactionRepo = app(TransactionRepositoryContract::class);
+
         $userId     = (int)   $request->input('user_id');
         $newInvest  = (float) $request->input('investments_sum');
         $newPartner = (float) $request->input('partner_balance');
 
         $summary    = UserSummary::firstWhere('user_id', $userId);
-        $origInvest = (float) $summary->investments_sum;
-        $origPartner= (float) $summary->partner_balance;
+        $origInvest = (float) $transactionRepo->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::MAIN);
+        $origPartner= (float) $transactionRepo->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::PARTNER);
 
         $deltaInvest  = round($newInvest  - $origInvest, 2);
         $deltaPartner = round($newPartner - $origPartner, 2);
+
         $logRepo = app(LogRepositoryContract::class);
         // отправляем изменение инвестиций
-        $transactionRepo = app(TransactionRepositoryContract::class);
 
         if ($deltaInvest != 0) {
             $txMain = $transactionRepo->commonStore(new CreateTransactionDto(

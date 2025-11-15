@@ -469,11 +469,11 @@ class UserDetailPage extends DetailPage
 
         $balanceFields = new Fields([
             Number::make('Инвестиции', 'investments_sum')
-                ->fill($item->summary?->investments_sum ?? 0)
+                ->fill(number_format((float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($item->id, BalanceTypeEnum::MAIN), 2, '.', ''))
                 ->step(0.01),
 
             Number::make('Партнёрский баланс', 'partner_balance')
-                ->fill($item->summary?->partner_balance ?? 0)
+                ->fill(number_format((float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($item->id, BalanceTypeEnum::PARTNER), 2, '.', ''))
                 ->step(0.01),
             Hidden::make('user_id')->fill($item->id),
         ]);
@@ -634,7 +634,25 @@ class UserDetailPage extends DetailPage
                             ->fields([
                                 Text::make('ID', 'uuid')->showOnExport(),
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
-                                Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
+                                Text::make('Сумма', formatted: function ($item) {
+                                    $package = ItcPackage::query()
+                                        ->whereHas('transaction')
+                                        ->where('uuid', $item['uuid'])
+                                        ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
+                                        ->with(['transaction', 'zeroing'])
+                                        ->withSum('partnerTransfers', 'amount')
+                                        ->withSum('reinvestToBody', 'amount')
+                                        ->withSum('balanceWithdraws', 'amount')
+                                        ->first();
+
+                                    $body =
+                                        ($package->transaction->amount ?? 0) +
+                                        ($package->partner_transfers_sum_amount ?? 0) +
+                                        ($package->reinvest_to_body_sum_amount ?? 0) -
+                                        ($package->balance_withdraws_sum_amount ?? 0);
+
+                                    return number_format($body, 2, '.', '');
+                                }),
                                 Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)

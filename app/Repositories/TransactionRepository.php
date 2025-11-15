@@ -63,16 +63,6 @@ class TransactionRepository implements TransactionRepositoryContract
         return (string) ($sum ?? 0);
     }
 
-    public function getInvestedAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
-    {
-        return (string) Transaction::query()
-            ->where('user_id', $userId)
-            ->where('balance_type', $balanceType)
-            ->where('trx_type', TrxTypeEnum::DEPOSIT)
-            ->whereNotNull('accepted_at')
-            ->sum('amount');
-    }
-
     public function store(CreateTransactionDto $dto, Closure $callback): mixed
     {
         return DB::transaction(function () use ($dto, $callback) {
