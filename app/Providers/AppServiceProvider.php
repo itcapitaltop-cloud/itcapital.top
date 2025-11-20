@@ -34,16 +34,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(TransactionRepositoryContract::class, TransactionRepository::class);
-        $this->app->bind(PackageRepositoryContract::class, PackageRepository::class);
-        $this->app->bind(PackageReinvestRepositoryContract::class, PackageReinvestRepository::class);
-
-        $this->app->bind(ItcPackageRepositoryContract::class, ItcPackageRepository::class);
-
-        $this->app->bind(LogRepositoryContract::class, LogRepository::class);
-
-        $this->app->bind(StartBonusAccrualContract::class, StartBonusAccrualRepository::class);
-
         $this->app->singleton(
             GoogleSheetsUploaderContract::class,
             GoogleSheetsUploaderRepository::class

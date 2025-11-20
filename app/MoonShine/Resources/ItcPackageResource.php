@@ -13,6 +13,7 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageIndexPage;
 use App\MoonShine\Pages\User\UserDetailPage;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FormBuilder;
@@ -20,6 +21,8 @@ use MoonShine\Decorations\Block;
 use MoonShine\Fields\Number;
 use MoonShine\Fields\Select;
 use MoonShine\Handlers\ExportHandler;
+use MoonShine\Http\Responses\MoonShineJsonResponse;
+use MoonShine\MoonShineRequest;
 use MoonShine\Pages\Page;
 use MoonShine\Resources\ModelResource;
 
@@ -90,6 +93,11 @@ class ItcPackageResource extends ModelResource
                     ]);
                 },
             )->primary(),
+            ActionButton::make('Начислить регулярную премию')
+                ->method('accrueRegularPremium')
+                ->icon('heroicons.banknotes')
+                ->success()
+                ->showInDropdown(),
         ];
     }
 
@@ -132,5 +140,33 @@ class ItcPackageResource extends ModelResource
             ->disk('public')
             ->filename('itc-packages-' . now()->format('Ymd-His'))
             ->withConfirm();
+    }
+
+    public function accrueRegularPremium(MoonShineRequest $request): MoonShineJsonResponse
+    {
+        try {
+            $userId = $request->input('user') ? (int) $request->input('user') : null;
+            $reset = $request->input('reset', false);
+
+            $command = 'regular-premium:accrual';
+            $params = [];
+
+            if ($userId) {
+                $params['--user'] = $userId;
+            }
+
+            if ($reset) {
+                $params['--reset'] = true;
+            }
+
+            Artisan::call($command, $params);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Регулярная премия успешно начислена')
+                ->redirect(request()->headers->get('referer'));
+        } catch (\Throwable $e) {
+            return MoonShineJsonResponse::make()
+                ->toast('Ошибка: ' . $e->getMessage(), 'error');
+        }
     }
 }

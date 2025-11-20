@@ -12,6 +12,18 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if(!Schema::hasTable('user_summary')) {
+            Schema::create('user_summary', function (Blueprint $table) {
+                $table->bigInteger('user_id')->primary();
+                $table->decimal('investments_sum', 18, 2)->default(0);
+                $table->decimal('reinvests_sum', 18, 2)->default(0);
+                $table->decimal('partner_balance', 18, 2)->default(0);
+                $table->integer('partners_count')->default(0);
+                $table->timestamp('first_package_at')->nullable();
+                $table->decimal('buy_packages_sum', 18, 2)->default(0);
+            });
+        }
+
         // Обновляем функцию триггера с исправленными типами транзакций
         DB::unprepared("
             CREATE OR REPLACE FUNCTION public.trg_user_summary_on_transaction()
@@ -532,6 +544,10 @@ return new class extends Migration
             END;
             \$\$;
         ");
+
+        if(!Schema::hasTable('user_summary')) {
+            Schema::dropIfExists('user_summary');
+        }
     }
 
     /**

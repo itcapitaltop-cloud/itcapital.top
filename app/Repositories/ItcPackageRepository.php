@@ -16,10 +16,14 @@ use App\Models\PackagePartnerTransfer;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitWithdraw;
+use App\Models\PartnerRank;
 use App\Models\Transaction;
+use App\Models\User;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ItcPackageRepository implements ItcPackageRepositoryContract
@@ -178,5 +182,124 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
                 ]);
             }
         );
+    }
+
+    /**
+     * @param \App\Models\User $user
+     * @return float
+     */
+    public function personalDepositToPackage(User $user): float
+    {
+        $baseQuery = ItcPackage::join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
+            ->where('transactions.user_id', $user->id)
+            ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
+            ->whereNull('itc_packages.closed_at')
+            ->with('transaction:id,uuid,amount,accepted_at,user_id');
+
+        $allPersonal = (clone $baseQuery)
+            ->withSum('reinvestProfitsAll', 'amount')
+            ->get()
+            ->sum(fn ($p) => (float) $p->transaction->amount +
+                (float) $p->reinvest_profits_all_sum_amount
+            );
+
+        if ($user->overridden_rank) {
+            $baseRank = PartnerRank::with('requirements')
+                ->where('rank', $user->rank)
+                ->first();
+
+            if (is_null($baseRank)) {
+                return $allPersonal;
+            }
+
+            $personalMin = (float) ($baseRank->requirements->whereNull('line')->first()?->personal_deposit ?? 0);
+
+            $fromDate = $user->overridden_rank_from;
+
+            if ($allPersonal < $personalMin) {
+                $sinceSum = (clone $baseQuery)
+                    ->withSum([
+                        'reinvestProfitsAll' => function ($q) use ($fromDate) {
+                            $q->when($fromDate, fn ($qq) => $qq->where('created_at', '>=', $fromDate));
+                        },
+                    ], 'amount')
+                    ->get()
+                    ->sum(function ($p) use ($fromDate) {
+                        $buy = ($p->transaction?->accepted_at && $p->transaction->accepted_at >= $fromDate)
+                            ? (float) $p->transaction->amount
+                            : 0.0;
+
+                        return $buy + (float) $p->reinvest_profits_all_sum_amount;
+                    });
+
+                return $personalMin + $sinceSum;
+            }
+        }
+
+        return $allPersonal;
+
+    }
+
+    /**
+     * @param \App\Models\User $user
+     * @param \DateTime|null $fromDate
+     * @return float
+     */
+    public function personalDepositSince(User $user, ?\DateTime $fromDate): float
+    {
+        if (! $fromDate) {
+            return 0.0;
+        }
+
+        $baseQuery = $this->getActivePackagesQuery($user->id);
+
+        return $baseQuery
+            ->withSum([
+                'reinvestProfitsAll' => function ($q) use ($fromDate) {
+                    $q->where('created_at', '>=', $fromDate);
+                },
+            ], 'amount')
+            ->get()
+            ->sum(function ($p) use ($fromDate) {
+                $buyAmount = ($p->transaction?->accepted_at && $p->transaction->accepted_at >= $fromDate)
+                    ? (float) $p->transaction->amount
+                    : 0.0;
+
+                return $buyAmount + (float) $p->reinvest_profits_all_sum_amount;
+            });
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection $userIds
+     * @param \DateTime|null $fromDate
+     * @return float
+     */
+    public function reinvestAmountForUsers(Collection $userIds, ?\DateTime $fromDate = null): float
+    {
+        $query = ItcPackage::join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
+            ->whereIn('transactions.user_id', $userIds);
+
+        return (float) $query
+            ->withSum([
+                'reinvestProfitsAll' => function ($q) use ($fromDate) {
+                    if ($fromDate) {
+                        $q->where('created_at', '>=', $fromDate);
+                    }
+                },
+            ], 'amount')
+            ->get()
+            ->sum('reinvest_profits_all_sum_amount');
+    }
+
+    /**
+     * Базовый запрос для активных пакетов пользователя
+     */
+    private function getActivePackagesQuery(int $userId): Builder
+    {
+        return ItcPackage::join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
+            ->where('transactions.user_id', $userId)
+            ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
+            ->whereNull('itc_packages.closed_at')
+            ->with('transaction:id,uuid,amount,accepted_at,user_id');
     }
 }

@@ -400,7 +400,7 @@ class UserResource extends ModelResource
                             $item->id
                         );
                     }
-                    Artisan::call("users:recalc-rank --no-bonus");
+                    Artisan::call("user:use-rank --no-bonus");
                 }
             }
             foreach ($changes as $field => $newValue) {
@@ -584,7 +584,7 @@ class UserResource extends ModelResource
                 $user->overridden_rank = false;
                 $user->overridden_rank_from = null;
                 $user->save();
-                Artisan::call('users:recalc-rank --no-bonus', ['--user' => $user->id]);
+                Artisan::call('user:use-rank --no-bonus', ['--user' => $user->id]);
             }
             else {
                 $user->rank = $rank;

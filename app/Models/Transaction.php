@@ -53,7 +53,8 @@ class Transaction extends Model
         'accepted_at' => 'datetime',
         'rejected_at' => 'datetime',
         'trx_type' => TrxTypeEnum::class,
-        'balance_type' => BalanceTypeEnum::class
+        'balance_type' => BalanceTypeEnum::class,
+        'amount' => 'decimal:2',
     ];
 
     public function getStatus(): TransactionStatusEnum

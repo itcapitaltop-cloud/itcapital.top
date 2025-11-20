@@ -407,7 +407,7 @@ class Packages extends Component
             app(StartBonusAccrualContract::class)
                 ->accrue($trx->user_id, (float) $trx->amount);
 
-            Artisan::call('users:recalc-rank');
+            Artisan::call('user:use-rank');
         });
 
         $u = User::where("id", Auth::id())->first();
@@ -496,7 +496,7 @@ class Packages extends Component
             'matured_at'    => Carbon::now()->addDays(180),
         ]);
 
-        Artisan::call('users:recalc-rank');
+        Artisan::call('user:use-rank');
 
         $this->markReinvestNotificationsAsRead($uuid);
     }
@@ -600,7 +600,7 @@ class Packages extends Component
             ]);
         });
 
-        Artisan::call('users:recalc-rank');
+        Artisan::call('user:use-rank');
     }
 
     public function withdrawProfit(string $uuid, ItcPackageRepositoryContract $itcPackageRepo, TransactionRepositoryContract $transactionRepo): void
