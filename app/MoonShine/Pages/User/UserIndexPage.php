@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\User;
 
+use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Transactions\BalanceTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\User;
 use Closure;
@@ -70,7 +72,11 @@ class UserIndexPage extends IndexPage
                 return round((float) $sum, 2);
             })->showOnExport()->sortable($multi),
             Number::make('Реинвесты', 'reinvests_sum')->showOnExport()->sortable($multi),
-            Number::make('Основной', 'investments_sum')->showOnExport()->sortable($multi),
+            Number::make('Основной', formatted: function (User $user) {
+                $balance = (float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($user->id, BalanceTypeEnum::MAIN);
+
+                return number_format($balance, 2, '.', '');
+            })->showOnExport()->sortable($multi),
             Number::make('Партнерский', 'partner_balance')->showOnExport()->sortable($multi),
             Date::make('Дата регистрации', 'created_at')->showOnExport()->sortable($multi),
         ];

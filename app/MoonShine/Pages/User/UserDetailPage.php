@@ -469,11 +469,11 @@ class UserDetailPage extends DetailPage
 
         $balanceFields = new Fields([
             Number::make('Инвестиции', 'investments_sum')
-                ->fill($item->summary?->investments_sum ?? 0)
+                ->fill(number_format((float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($item->id, BalanceTypeEnum::MAIN), 2, '.', ''))
                 ->step(0.01),
 
             Number::make('Партнёрский баланс', 'partner_balance')
-                ->fill($item->summary?->partner_balance ?? 0)
+                ->fill(number_format((float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($item->id, BalanceTypeEnum::PARTNER), 2, '.', ''))
                 ->step(0.01),
             Hidden::make('user_id')->fill($item->id),
         ]);
@@ -634,7 +634,11 @@ class UserDetailPage extends DetailPage
                             ->fields([
                                 Text::make('ID', 'uuid')->showOnExport(),
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
-                                Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
+                                Text::make('Сумма', 'amount', formatted: function ($item) {
+                                    $package = ItcPackage::byUuidWithSums($item['uuid'])->firstOrFail();
+
+                                    return number_format($package->total_amount, 2, '.', '');
+                                }),
                                 Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)

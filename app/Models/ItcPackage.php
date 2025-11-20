@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -157,6 +159,25 @@ class ItcPackage extends Model
             'uuid',
             'uuid'
         );
+    }
+
+    public function scopeByUuidWithSums(Builder $query, string $uuid): Builder
+    {
+        return $query->where('uuid', $uuid)
+            ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
+            ->with(['transaction'])
+            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount');
+    }
+
+    public function getTotalAmountAttribute(): float
+    {
+        return
+            ($this->transaction->amount ?? 0) +
+            ($this->partner_transfers_sum_amount ?? 0) +
+            ($this->reinvest_to_body_sum_amount ?? 0) -
+            ($this->balance_withdraws_sum_amount ?? 0);
     }
 
     protected $casts = [

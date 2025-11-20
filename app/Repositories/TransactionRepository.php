@@ -47,13 +47,18 @@ class TransactionRepository implements TransactionRepositoryContract
         $sum = Transaction::query()
             ->where('user_id', $userId)
             ->where('balance_type', $balanceType)
-            ->whereNotNull('accepted_at')
-            ->whereNull('rejected_at')
             ->selectRaw("
             SUM(
                 CASE
-                    WHEN trx_type IN ($debitsList) THEN amount
-                    WHEN trx_type IN ($creditsList) THEN -amount
+                    WHEN trx_type IN ($debitsList)
+                         AND accepted_at IS NOT NULL
+                         AND rejected_at IS NULL
+                        THEN amount
+
+                    WHEN trx_type IN ($creditsList)
+                         AND rejected_at IS NULL
+                        THEN -amount
+
                     ELSE 0
                 END
             ) as balance
