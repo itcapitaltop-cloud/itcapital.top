@@ -235,29 +235,19 @@ class Partners extends Component
 
     public function getPartnerDynamicsProperty(): array
     {
-        $rangeDelta = function (Carbon $since): float {
-            $debit = Transaction::query()
+        $rangeCredit = function (Carbon $since): float {
+            return (float) Transaction::query()
                 ->where('user_id', Auth::id())
                 ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereIn('trx_type', TrxTypeEnum::getDebits())
                 ->whereNull('rejected_at')
                 ->where('created_at', '>=', $since)
                 ->sum('amount');
-
-            $credit = Transaction::query()
-                ->where('user_id', Auth::id())
-                ->where('balance_type', BalanceTypeEnum::PARTNER)
-                ->whereIn('trx_type', TrxTypeEnum::getCredits())
-                ->whereNull('rejected_at')
-                ->where('created_at', '>=', $since)
-                ->sum('amount');
-
-            return $debit - $credit;
         };
 
         return [
-            'week' => $rangeDelta(now()->subWeek()),
-            'month' => $rangeDelta(now()->subMonth()),
+            'week' => $rangeCredit(now()->subWeek()),
+            'month' => $rangeCredit(now()->subMonth()),
         ];
     }
 
@@ -311,7 +301,11 @@ class Partners extends Component
             $buyQuery->where('accepted_at', '>=', $fromDate);
         }
 
-        $buySum = (float) ($buyQuery->sum('amount') ?? 0);
+        $buySum = $buyQuery->sum('amount');
+
+        //        Log::channel('source')->debug('---buySum----');
+        //        Log::channel('source')->debug($buySum);
+        //        Log::channel('source')->debug('---buySum----');
 
         $reinvestQuery = ItcPackage::query()
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
@@ -326,7 +320,11 @@ class Partners extends Component
                 },
             ], 'amount')
             ->get()
-            ->sum('reinvest_profits_all_sum_amount') ?? 0.0;
+            ->sum('reinvest_profits_all_sum_amount');
+
+        //        Log::channel('source')->debug('---reinvestSum----');
+        //        Log::channel('source')->debug($reinvestSum);
+        //        Log::channel('source')->debug('---reinvestSum----');
 
         return $buySum + $reinvestSum;
     }
@@ -361,6 +359,12 @@ class Partners extends Component
                 ->pluck('total', 'line')
                 ->all();
         }
+
+        //        Log::channel('source')->debug('------------------------');
+        //        Log::channel('source')->debug($user->overridden_rank);
+        //        Log::channel('source')->debug($user->overridden_rank_from);
+        //        Log::channel('source')->debug($personalBase);
+        //        Log::channel('source')->debug('------------------------');
 
         if ($personal = $reqs->firstWhere('line', null)) {
             $baseQuery = ItcPackage::query()
@@ -426,17 +430,15 @@ class Partners extends Component
             // что уже набрано: стартовая база (если есть) + оборот с fromDate
             $actual = ($lineBases[$line] ?? 0) + $this->calcTurnoverByLine($line, $fromDate instanceof Carbon ? $fromDate->toDateTimeString() : $fromDate);
 
-            // Сумма требований по линии от ранга 1 до текущего ранга (кумулятивно)
-            $cumToCurrentRank = PartnerRankRequirement::query()
-                ->whereNotNull('line')
-                ->whereHas('rank', fn ($q) => $q->where('rank', '<=', $user->rank))
-                ->where('line', $line)
-                ->sum('required_turnover') ?? 0.0;
+            // current = target - (cum(1..R+1) - actual)  == target + actual - cum(1..R+1)
+            $current = $target + $actual - ($cumToNextByLine[$line] ?? 0);
 
-            // current = сколько уже набрано сверх кумулятивных требований до текущего ранга
-            // Если actual >= cum(1..R), то current = actual - cum(1..R)
-            // Иначе current = 0 (еще не достигли базового уровня)
-            $current = max(0, $actual - $cumToCurrentRank);
+            //            Log::channel('source')->debug('--------------');
+            //            Log::channel('source')->debug($actual);
+            //            Log::channel('source')->debug($cumToNextByLine[$line]);
+            //            Log::channel('source')->debug($current);
+            //            Log::channel('source')->debug($target);
+            //            Log::channel('source')->debug('--------------');
 
             $bars[] = [
                 'label' => __('livewire_partners_line_income_label', ['line' => $line]),
@@ -514,10 +516,15 @@ class Partners extends Component
         ItcPackageRepositoryContract $pkgRepo
     ): void {
 
+        //        Log::channel('source')->debug($this->selectedPackageUuid);
+        //        Log::channel('source')->debug($this->toPackageAmount);
+
         $this->validateOnly('toPackageAmount');
         $this->validateOnly('selectedPackageUuid');
 
         $amount = (float) str_replace(',', '.', $this->toPackageAmount);
+
+        //        Log::channel('source')->debug($amount);
 
         $pkgRepo->partnerTransferToPackage(
             Auth::id(),
