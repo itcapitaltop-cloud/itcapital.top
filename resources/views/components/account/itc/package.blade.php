@@ -230,15 +230,15 @@
                         ITC)</span>
                 </x-ui.button>
 
-                @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT)
-                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="isModalEditBalanceActive = true">
+                {{-- @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT) --}}
+                {{-- <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="isModalEditBalanceActive = true">
                         {{ __('components_account_itc_package_edit_balance') }}
-                    </x-ui.button>
+                    </x-ui.button> --}}
 
-{{--                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="showConfirmContinue = true">--}}
-{{--                        {{ __('components_account_itc_package_continue_work') }}--}}
-{{--                    </x-ui.button>--}}
-                @endif
+                {{--                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="showConfirmContinue = true"> --}}
+                {{--                        {{ __('components_account_itc_package_continue_work') }} --}}
+                {{--                    </x-ui.button> --}}
+                {{-- @endif --}}
 
 
                 {{--            <x-ui.button variant="secondary" disabled class="!text-[14px] !md:text-[16px]"> --}}
