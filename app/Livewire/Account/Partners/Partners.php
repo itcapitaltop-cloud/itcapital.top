@@ -360,12 +360,6 @@ class Partners extends Component
                 ->all();
         }
 
-        //        Log::channel('source')->debug('------------------------');
-        //        Log::channel('source')->debug($user->overridden_rank);
-        //        Log::channel('source')->debug($user->overridden_rank_from);
-        //        Log::channel('source')->debug($personalBase);
-        //        Log::channel('source')->debug('------------------------');
-
         if ($personal = $reqs->firstWhere('line', null)) {
             $baseQuery = ItcPackage::query()
                 ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
@@ -432,13 +426,6 @@ class Partners extends Component
 
             // current = target - (cum(1..R+1) - actual)  == target + actual - cum(1..R+1)
             $current = $target + $actual - ($cumToNextByLine[$line] ?? 0);
-
-            //            Log::channel('source')->debug('--------------');
-            //            Log::channel('source')->debug($actual);
-            //            Log::channel('source')->debug($cumToNextByLine[$line]);
-            //            Log::channel('source')->debug($current);
-            //            Log::channel('source')->debug($target);
-            //            Log::channel('source')->debug('--------------');
 
             $bars[] = [
                 'label' => __('livewire_partners_line_income_label', ['line' => $line]),
