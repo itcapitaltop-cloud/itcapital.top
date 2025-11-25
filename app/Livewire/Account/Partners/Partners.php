@@ -303,10 +303,6 @@ class Partners extends Component
 
         $buySum = $buyQuery->sum('amount');
 
-        //        Log::channel('source')->debug('---buySum----');
-        //        Log::channel('source')->debug($buySum);
-        //        Log::channel('source')->debug('---buySum----');
-
         $reinvestQuery = ItcPackage::query()
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
             ->whereIn('transactions.user_id', $ids);
@@ -321,10 +317,6 @@ class Partners extends Component
             ], 'amount')
             ->get()
             ->sum('reinvest_profits_all_sum_amount');
-
-        //        Log::channel('source')->debug('---reinvestSum----');
-        //        Log::channel('source')->debug($reinvestSum);
-        //        Log::channel('source')->debug('---reinvestSum----');
 
         return $buySum + $reinvestSum;
     }
@@ -503,15 +495,10 @@ class Partners extends Component
         ItcPackageRepositoryContract $pkgRepo
     ): void {
 
-        //        Log::channel('source')->debug($this->selectedPackageUuid);
-        //        Log::channel('source')->debug($this->toPackageAmount);
-
         $this->validateOnly('toPackageAmount');
         $this->validateOnly('selectedPackageUuid');
 
         $amount = (float) str_replace(',', '.', $this->toPackageAmount);
-
-        //        Log::channel('source')->debug($amount);
 
         $pkgRepo->partnerTransferToPackage(
             Auth::id(),

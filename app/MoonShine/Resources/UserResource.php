@@ -396,7 +396,7 @@ class UserResource extends ModelResource
                             $item->id
                         );
                     }
-                    Artisan::call("user:use-rank --no-bonus");
+                    Artisan::call('user:use-rank --no-bonus');
                 }
             }
 
@@ -432,13 +432,13 @@ class UserResource extends ModelResource
     {
         $transactionRepo = app(TransactionRepositoryContract::class);
 
-        $userId     = (int)   $request->input('user_id');
-        $newInvest  = (float) $request->input('investments_sum');
+        $userId = (int) $request->input('user_id');
+        $newInvest = (float) $request->input('investments_sum');
         $newPartner = (float) $request->input('partner_balance');
 
-        $summary    = UserSummary::firstWhere('user_id', $userId);
+        $summary = UserSummary::firstWhere('user_id', $userId);
         $origInvest = (float) $transactionRepo->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::MAIN);
-        $origPartner= (float) $transactionRepo->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::PARTNER);
+        $origPartner = (float) $transactionRepo->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::PARTNER);
 
         $deltaInvest = round($newInvest - $origInvest, 2);
         $deltaPartner = round($newPartner - $origPartner, 2);
@@ -582,8 +582,7 @@ class UserResource extends ModelResource
                 $user->overridden_rank_from = null;
                 $user->save();
                 Artisan::call('user:use-rank --no-bonus', ['--user' => $user->id]);
-            }
-            else {
+            } else {
                 $user->rank = $rank;
                 $user->overridden_rank = $overriddenRank;
                 $user->overridden_rank_from = $overriddenRank ? now() : null;
