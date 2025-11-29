@@ -128,7 +128,7 @@
                                     <li>
                                         {{ __('livewire_finance_deposit_help_crypto_step_5') }}
                                         <a href="https://t.me/ITCAPITALTOP"
-                                           class="px-5 py-2 rounded-full bg-purple-700 text-white
+                                           class="px-5 py-2 rounded-full text-white
                                                     hover:bg-purple-600 transition font-semibold">
                                             @ITCAPITALTOP
                                         </a>
