@@ -129,6 +129,27 @@ class RegularPremiumAccrualCommand extends Command
 
         $this->info('Regular premium accrual completed' . ($onlyUser ? " for user {$onlyUser}" : ' for all users') . '.');
 
+        $csvFile = storage_path('app/public/regular_premium_report_detailed.csv');
+        $handle = fopen($csvFile, 'w');
+        fputcsv($handle, ['User ID', 'User Name', 'Total Amount', 'Descendant ID', 'Line', 'Detail Amount']);
+
+        foreach ($rewards as $userId => $sum) {
+            $user = User::find($userId);
+
+            foreach ($details[$userId] as [$descId, $line, $amount]) {
+                fputcsv($handle, [
+                    $userId,
+                    $user?->name ?? 'Unknown',
+                    $sum,
+                    $descId,
+                    $line,
+                    $amount,
+                ]);
+            }
+        }
+
+        fclose($handle);
+
         return self::SUCCESS;
     }
 

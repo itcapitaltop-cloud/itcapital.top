@@ -231,7 +231,7 @@
                                         @if ($u->telegram)
                                             <a href="https://t.me/{{ ltrim($u->telegram, '@') }}"
                                                 class="text-[#B4FF59] hover:underline" target="_blank">
-                                                @ {{ $u->telegram }}
+                                                {{ $u->telegram }}
                                             </a>
                                         @else
                                             <span class="text-white/60">—</span>
