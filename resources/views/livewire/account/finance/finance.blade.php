@@ -124,6 +124,15 @@
                                     <li>{{ __('livewire_finance_deposit_help_crypto_step_1') }}</li>
                                     <li>{{ __('livewire_finance_deposit_help_crypto_step_2') }}</li>
                                     <li>{{ __('livewire_finance_deposit_help_crypto_step_3') }}</li>
+                                    <li>{{ __('livewire_finance_deposit_help_crypto_step_4') }}</li>
+                                    <li>
+                                        {{ __('livewire_finance_deposit_help_crypto_step_5') }}
+                                        <a href="https://t.me/ITCAPITALTOP"
+                                           class="px-5 py-2 rounded-full bg-purple-700 text-white
+                                                    hover:bg-purple-600 transition font-semibold">
+                                            @ITCAPITALTOP
+                                        </a>
+                                    </li>
                                 </ul>
                             </div>
                             <div class="flex justify-center">
@@ -159,6 +168,15 @@
                                 <li>{{ __('livewire_finance_deposit_help_crypto_step_1') }}</li>
                                 <li>{{ __('livewire_finance_deposit_help_crypto_step_2') }}</li>
                                 <li>{{ __('livewire_finance_deposit_help_crypto_step_3') }}</li>
+                                <li>{{ __('livewire_finance_deposit_help_crypto_step_4') }}</li>
+                                <li>
+                                    {{ __('livewire_finance_deposit_help_crypto_step_5') }}
+                                    <a href="https://t.me/ITCAPITALTOP"
+                                       class="px-5 py-2 rounded-full bg-purple-700 text-white
+                                                    hover:bg-purple-600 transition font-semibold">
+                                        @ITCAPITALTOP
+                                    </a>
+                                </li>
                             </ul>
                         </div>
                         <div class="mt-auto flex items-end justify-end">
@@ -286,6 +304,7 @@
                             <ul class="list-decimal list-inside mt-2">
                                 <li>{{ __('livewire_finance_withdraw_help_crypto_step_1') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_crypto_step_2') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
                             </ul>
                         </div>
                     </template>
@@ -299,6 +318,7 @@
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_3') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_4') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
                             </ul>
                         </div>
                     </template>
@@ -321,6 +341,7 @@
                         <ul class="list-decimal list-inside mt-2">
                             <li>{{ __('livewire_finance_withdraw_help_crypto_step_1') }}</li>
                             <li>{{ __('livewire_finance_withdraw_help_crypto_step_2') }}</li>
+                            <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
                         </ul>
                     </div>
                 </template>
@@ -334,6 +355,7 @@
                             <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
                             <li>{{ __('livewire_finance_withdraw_help_fiat_step_3') }}</li>
                             <li>{{ __('livewire_finance_withdraw_help_fiat_step_4') }}</li>
+                            <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
                         </ul>
                     </div>
                 </template>
