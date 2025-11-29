@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Contracts\Logs\LogRepositoryContract;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
@@ -15,26 +15,30 @@ use App\Helpers\Notify;
 use App\Models\ItcPackage;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
+use App\Models\PackageProfitReinvestWithdraw;
 use App\Models\PackageProfitWithdraw;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\MoonShine\Pages\ItcPackage\ItcPackageIndexPage;
+use App\MoonShine\Resources\ItcPackageResource;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use MoonShine\Enums\ToastType;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
+use Illuminate\Support\Str;
+use MoonShine\Http\Responses\MoonShineJsonResponse;
 use RuntimeException;
 use Throwable;
 
@@ -42,7 +46,7 @@ class AdminController extends Controller
 {
     use CanStatusModifyTrait;
 
-    public function getItemID(): ?string
+    public function getItemID(): string|null
     {
         return request('uuid');
     }
@@ -97,66 +101,27 @@ class AdminController extends Controller
         return back();
     }
 
-    public function recalculate(MoonShineRequest $request)
-    {
-        $uuids = (array) $request->input('uuid');
-        $amount = BigDecimal::of($request->input('amount', '0'));
-
-        if ($amount->isLessThanOrEqualTo('0') || empty($uuids)) {
-            return back()->with('error', 'Введите корректную сумму и выберите пакеты');
-        }
-
-        ItcPackage::query()
-            ->with('transaction')
-            ->whereIn('uuid', $uuids)
-            ->chunkById(50, function (Collection $packages) use ($amount) {
-                $packages->each(function (ItcPackage $package) use ($amount) {
-                    $profit = PackageProfit::query()->create([
-                        'uuid' => 'PP-' . Str::random(10),
-                        'package_uuid' => $package->uuid,
-                        'amount' => $amount,
-                    ]);
-
-                    $user = User::withoutGlobalScope('notBanned')
-                        ->where('id', $package->transaction?->user_id)
-                        ->first();
-
-                    if ($user) {
-                        Notify::recalculateDividends(
-                            $user,
-                            $amount->toScale(2, RoundingMode::HALF_EVEN),
-                            $package->created_at?->format('d/m/y'),
-                            $package->type->getCAPSName(),
-                            $profit->uuid
-                        );
-                    }
-                });
-            });
-
-        return back();
-    }
-
     public function addAmountToBalance(MoonShineRequest $request, TransactionRepositoryContract $transactionRepo)
     {
-        $userId = $request->input('user_id');
+        $userId      = $request->input('user_id');
         $balanceType = BalanceTypeEnum::from($request->input('balance_type'));
-        $amount = (float) $request->input('amount');
+        $amount      = (float) $request->input('amount');
 
         // 1) Получаем старое значение нужного поля из summary
         $summary = UserSummary::where('user_id', $userId)->firstOrFail();
-        $field = $balanceType === BalanceTypeEnum::MAIN
+        $field     = $balanceType === BalanceTypeEnum::MAIN
             ? 'investments_sum'
             : 'partner_balance';
-        $oldValue = (float) $summary->$field;
+        $oldValue  = (float) $summary->$field;
 
         // 2) Создаём транзакцию
         $tx = $transactionRepo->commonStore(new CreateTransactionDto(
-            userId: $userId,
-            trxType: TrxTypeEnum::HIDDEN_DEPOSIT,
+            userId:      $userId,
+            trxType:     TrxTypeEnum::HIDDEN_DEPOSIT,
             balanceType: $balanceType,
-            amount: (string) $amount,
-            acceptedAt: Carbon::now()->toDateTimeString(),
-            prefix: 'HD-'
+            amount:      (string) $amount,
+            acceptedAt:  Carbon::now()->toDateTimeString(),
+            prefix:      'HD-'
         ));
 
         // 3) После сохранения summary обновится триггером — подгружаем новое значение
@@ -173,7 +138,6 @@ class AdminController extends Controller
             [$field => $newValue],
             $userId
         );
-
         return MoonShineJsonResponse::make()
             ->toast('Отредактировано', ToastType::SUCCESS)
             ->redirect(request()->headers->get('referer'));
@@ -183,14 +147,15 @@ class AdminController extends Controller
     {
         $package = ItcPackage::query()->where('uuid', $uuid)->first();
 
-        $oldAmount = $package->transaction->amount;
-        $oldType = $package->type;
-        $oldPercent = $package->month_profit_percent;
+        $oldAmount    = $package->transaction->amount;
+        $oldType      = $package->type;
+        $oldPercent   = $package->month_profit_percent;
         $targetUserId = $package->transaction->user_id;
         $oldCreatedAt = $package->created_at->toDateString();
 
         $package->transaction->amount = $request->input('amount');
         $newCreatedAt = Carbon::parse($request->input('created_at'))->toDateString();
+
 
         $package->created_at = $newCreatedAt;
         $package->type = $request->input('type');
@@ -201,12 +166,12 @@ class AdminController extends Controller
 
         $logRepo = app(LogRepositoryContract::class);
 
-        if ((float) $oldAmount !== (float) $package->transaction->amount) {
+        if ((float)$oldAmount !== (float)$package->transaction->amount) {
             $logRepo->updated(
                 $package->transaction,
                 'update_itc_package_amount',
-                ['amount' => (string) $oldAmount],
-                ['amount' => (string) $package->transaction->amount],
+                ['amount' => (string)$oldAmount],
+                ['amount' => (string)$package->transaction->amount],
                 $targetUserId
             );
         }
@@ -221,12 +186,12 @@ class AdminController extends Controller
             );
         }
 
-        if ((float) $oldPercent !== (float) $package->month_profit_percent) {
+        if ((float)$oldPercent !== (float)$package->month_profit_percent) {
             $logRepo->updated(
                 $package,
                 'update_itc_package_profit_percent',
-                ['month_profit_percent' => (string) $oldPercent],
-                ['month_profit_percent' => (string) $package->month_profit_percent],
+                ['month_profit_percent' => (string)$oldPercent],
+                ['month_profit_percent' => (string)$package->month_profit_percent],
                 $targetUserId
             );
         }
@@ -277,7 +242,7 @@ class AdminController extends Controller
 
         if (is_null($user)) {
             return MoonShineJsonResponse::make()
-                ->toast(__('admin_controller_user_not_found', ['user' => $request->input('user')]), ToastType::ERROR)
+                ->toast(__('admin_controller_user_not_found', ['user' => $request->input("user")]), ToastType::ERROR)
                 ->redirect($referer);
         }
 
@@ -291,13 +256,13 @@ class AdminController extends Controller
             DB::transaction(function () use ($request, $user) {
                 // 2) Создаём связь Partner
                 Partner::query()->create([
-                    'user_id' => $user->id,
+                    'user_id'    => $user->id,
                     'partner_id' => $request->input('user_id'),
                 ]);
 
                 // 3) Пытаемся создать связь в closure-таблице
                 $parentId = (int) $request->input('user_id');
-                $userId = (int) $user->id;
+                $userId   = (int) $user->id;
 
                 // Все узлы поддерева: пользователь + его потомки (depth относительно $userId)
                 $subtree = PartnerClosure::query()
@@ -312,23 +277,20 @@ class AdminController extends Controller
                 // Вставляем пары: каждый новый предок -> каждый узел поддерева
                 // depth = depth(ancestor -> parent) + 1 + depth(user -> d)
                 $bulk = [];
-
                 foreach ($newAncestors as $na) {
                     foreach ($subtree as $sd) {
                         $bulk[] = [
-                            'ancestor_id' => (int) $na->ancestor_id,
+                            'ancestor_id'   => (int) $na->ancestor_id,
                             'descendant_id' => (int) $sd->descendant_id,
-                            'depth' => (int) $na->depth + 1 + (int) $sd->depth,
+                            'depth'         => (int) $na->depth + 1 + (int) $sd->depth,
                         ];
-
                         if (count($bulk) >= 1000) {
                             PartnerClosure::insert($bulk);
                             $bulk = [];
                         }
                     }
                 }
-
-                if (! empty($bulk)) {
+                if (!empty($bulk)) {
                     PartnerClosure::insert($bulk);
                 }
             });
@@ -348,7 +310,7 @@ class AdminController extends Controller
                 ->redirect($referer);
         }
 
-        Artisan::call('users:recalc-rank --no-bonus');
+        Artisan::call("user:use-rank --no-bonus");
 
         // 4) Успех
         return MoonShineJsonResponse::make()
@@ -404,15 +366,13 @@ class AdminController extends Controller
                 // 5) Вставляем новые пути: каждый новый предок -> каждый d из поддерева
                 //    depth = depth(ancestor -> newPartner) + 1 + depth(user -> d)
                 $bulk = [];
-
                 foreach ($newAncestors as $na) {
                     foreach ($subtree as $sd) {
                         $bulk[] = [
-                            'ancestor_id' => (int) $na->ancestor_id,
+                            'ancestor_id'   => (int) $na->ancestor_id,
                             'descendant_id' => (int) $sd->descendant_id,
-                            'depth' => (int) $na->depth + 1 + (int) $sd->depth,
+                            'depth'         => (int) $na->depth + 1 + (int) $sd->depth,
                         ];
-
                         if (count($bulk) >= 1000) {
                             PartnerClosure::query()->insert($bulk);
                             $bulk = [];
@@ -420,7 +380,7 @@ class AdminController extends Controller
                     }
                 }
 
-                if (! empty($bulk)) {
+                if (!empty($bulk)) {
                     PartnerClosure::query()->insert($bulk);
                 }
                 app(LogRepositoryContract::class)->updated(
@@ -437,7 +397,7 @@ class AdminController extends Controller
                 ->redirect($referer);
         }
 
-        Artisan::call('users:recalc-rank --no-bonus');
+        Artisan::call("user:use-rank --no-bonus");
 
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_referral_updated'), ToastType::SUCCESS)
@@ -447,7 +407,7 @@ class AdminController extends Controller
     public function updateRank(Request $request)
     {
         User::query()->where('id', $request->input('user_id'))->update([
-            'rank' => $request->input('rank'),
+            'rank' => $request->input('rank')
         ]);
 
         return back();
@@ -457,11 +417,11 @@ class AdminController extends Controller
         Request $request,
         TransactionRepositoryContract $transactionRepo,
         PackageReinvestRepositoryContract $reinvestRepo,
-    ): MoonShineJsonResponse {
+    ): MoonShineJsonResponse
+    {
         $uuidsString = $request->query('uuids', '');
         $uuids = $uuidsString !== '' ? explode(',', $uuidsString) : [];
         $errors = [];
-
         foreach ($uuids as $uuid) {
             try {
                 $reinvestRepo->withdraw($uuid, $transactionRepo);
@@ -485,7 +445,7 @@ class AdminController extends Controller
         string $reinvestUuid,
         TransactionRepositoryContract $transactionRepo,
         PackageReinvestRepositoryContract $reinvestRepo,
-    ): MoonShineJsonResponse {
+    ): MoonShineJsonResponse  {
         try {
             $reinvestRepo->withdraw($reinvestUuid, $transactionRepo);
 
@@ -507,14 +467,14 @@ class AdminController extends Controller
             ->firstOrFail();
         $targetUserId = $package->transaction->user_id;
 
-        //        Log::channel('source')->debug($reinvest->matured_at);
+//        Log::channel('source')->debug($reinvest->matured_at);
 
         app(LogRepositoryContract::class)->updated(
             $reinvest,
             'delete_package_reinvest_profit',
             [
-                'amount' => (string) $reinvest->amount,
-                'matured_at' => Carbon::parse($reinvest->matured_at)->toDateTimeString(),
+                'amount'     => (string)$reinvest->amount,
+                'matured_at' => Carbon::parse($reinvest->matured_at)->toDateTimeString()
             ],
             [],
             $targetUserId
@@ -529,6 +489,7 @@ class AdminController extends Controller
             // затем удаляем сам реинвест
             $reinvest->delete();
         });
+
 
         $reinvest->delete();
 
@@ -545,7 +506,7 @@ class AdminController extends Controller
             ->firstOrFail();
 
         $packageUuid = $reinvest->package_uuid;
-        $targetAt = $reinvest->created_at;
+        $targetAt    = $reinvest->created_at;
 
         if ($reinvest->hasprofitLink()) {
             DB::transaction(function () use ($reinvest) {
@@ -586,18 +547,17 @@ class AdminController extends Controller
 
                 foreach ($reinvestEvents as $e) {
                     $events->push([
-                        'type' => $e->uuid === $reinvest->uuid ? 'target-reinvest' : 'reinvest',
-                        'uuid' => $e->uuid,
-                        'at' => $e->created_at,
+                        'type'   => $e->uuid === $reinvest->uuid ? 'target-reinvest' : 'reinvest',
+                        'uuid'   => $e->uuid,
+                        'at'     => $e->created_at,
                         'amount' => BigDecimal::of((string) $e->amount),
                     ]);
                 }
-
                 foreach ($withdrawEvents as $e) {
                     $events->push([
-                        'type' => 'withdraw',
-                        'uuid' => $e->uuid,
-                        'at' => $e->created_at,
+                        'type'   => 'withdraw',
+                        'uuid'   => $e->uuid,
+                        'at'     => $e->created_at,
                         'amount' => BigDecimal::of((string) $e->amount),
                     ]);
                 }
@@ -614,7 +574,7 @@ class AdminController extends Controller
                     $profits = PackageProfit::query()
                         ->where('package_uuid', $packageUuid)
                         ->where('created_at', '<=', $eventAt)
-                        ->when(! empty($exclude), fn ($q) => $q->whereNotIn('uuid', $exclude))
+                        ->when(!empty($exclude), fn ($q) => $q->whereNotIn('uuid', $exclude))
                         ->orderBy('created_at', 'desc')
                         ->orderBy('uuid', 'desc')
                         ->get(['uuid', 'amount', 'created_at']);
@@ -648,7 +608,6 @@ class AdminController extends Controller
 
                     if ($ev['type'] === 'target-reinvest') {
                         $targetProfitUuids = $picked;
-
                         break;
                     }
 
@@ -659,14 +618,14 @@ class AdminController extends Controller
                     throw new RuntimeException("Пустой набор дивидендов для реинвеста {$reinvest->uuid}");
                 }
 
-                //                Log::channel('source')->debug($targetProfitUuids);
-                //
-                //                $sumAmount = PackageProfit::query()
-                //                    ->whereIn('uuid', $targetProfitUuids)
-                //                    ->selectRaw('COALESCE(SUM(amount),0) AS total')
-                //                    ->value('total');
-                //
-                //                Log::channel('source')->debug('targetProfitUuids sum: ' . $sumAmount);
+//                Log::channel('source')->debug($targetProfitUuids);
+//
+//                $sumAmount = PackageProfit::query()
+//                    ->whereIn('uuid', $targetProfitUuids)
+//                    ->selectRaw('COALESCE(SUM(amount),0) AS total')
+//                    ->value('total');
+//
+//                Log::channel('source')->debug('targetProfitUuids sum: ' . $sumAmount);
 
                 // Удаляем дивиденды и сам реинвест
                 PackageProfit::query()
@@ -690,6 +649,7 @@ class AdminController extends Controller
                 ->redirect(url()->previous());
         }
     }
+
 
     public function extendProfitReinvest(string $reinvestUuid): MoonShineJsonResponse
     {
@@ -724,12 +684,13 @@ class AdminController extends Controller
         $query = trim((string) $request->get('query', ''));
 
         $results = User::query()
-            ->when($query !== '', fn ($q) => $q->where('username', 'like', "%{$query}%")
+            ->when($query !== '', fn($q) =>
+            $q->where('username', 'like', "%{$query}%")
                 ->orWhere('email', 'like', "%{$query}%")
             )
             ->limit(10)
             ->get(['id', 'username', 'email'])
-            ->map(fn (User $user) => [
+            ->map(fn(User $user) => [
                 'value' => $user->id,
                 'label' => "{$user->username}, {$user->email}",
             ]);

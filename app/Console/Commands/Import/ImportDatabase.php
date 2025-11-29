@@ -35,7 +35,7 @@ class ImportDatabase extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'UseUserRankCommand description';
 
     protected function getOnlyRecordsFromCsv(string $path, array $header): Collection
     {

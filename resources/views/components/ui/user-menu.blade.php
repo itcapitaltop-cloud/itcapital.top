@@ -49,7 +49,7 @@
                   text-white font-medium hover:bg-[#372963] border border-[#341D78]">
             {{ __('sign-in') }}
         </a>
-        <a href="{{ route('login') }}"
+        <a href="{{ route('sign-up') }}"
            class="px-[16px] pt-[14px] pb-[14px] rounded-lg font-medium
                   bg-[#B4FF59] text-black hover:bg-[#C5FF80] focus:ring-2 focus:ring-[#B4FF59]">
             {{ __('sign-up') }}

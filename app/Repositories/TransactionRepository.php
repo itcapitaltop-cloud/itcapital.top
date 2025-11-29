@@ -68,16 +68,6 @@ class TransactionRepository implements TransactionRepositoryContract
         return (string) ($sum ?? 0);
     }
 
-    public function getInvestedAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
-    {
-        return (string) Transaction::query()
-            ->where('user_id', $userId)
-            ->where('balance_type', $balanceType)
-            ->where('trx_type', TrxTypeEnum::DEPOSIT)
-            ->whereNotNull('accepted_at')
-            ->sum('amount');
-    }
-
     public function store(CreateTransactionDto $dto, Closure $callback): mixed
     {
         return DB::transaction(function () use ($dto, $callback) {
@@ -182,6 +172,7 @@ class TransactionRepository implements TransactionRepositoryContract
                 PartnerRewardTypeEnum::START->value,
                 PartnerRewardTypeEnum::REGULAR->value,
             ])
+            ->whereRaw('COALESCE(descendant.depth, partner_rewards.line) <= 5')
             ->orderByDesc('partner_rewards.created_at')
             ->limit($limit)
             ->get()
@@ -190,9 +181,8 @@ class TransactionRepository implements TransactionRepositoryContract
                 'user' => $r->from_username ?? '—',
                 'level' => $r->real_depth ?? $r->line,
                 'event' => match ($r->reward_type) {
-                    PartnerRewardTypeEnum::START->value => 'Получена стартовая премия ' . scale((float) $r->amount) . ' ITC',
-                    PartnerRewardTypeEnum::REGULAR->value => 'Получена регулярная премия ' . scale((float) $r->amount) . ' ITC',
-                    default => '—',
+                    PartnerRewardTypeEnum::START => 'Начисление стартовой премии от партнера ' . scale((string) $r->amount) . ' ITC',
+                    PartnerRewardTypeEnum::REGULAR => 'Начисление регулярной премии от партнера ' . scale((string) $r->amount) . ' ITC',
                 },
             ]);
     }

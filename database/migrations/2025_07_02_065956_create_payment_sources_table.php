@@ -24,6 +24,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('deposits', function (Blueprint $table) {
+            $table->dropForeign(['payment_source_id']);
+        });
+
+        Schema::table('withdraws', function (Blueprint $table) {
+            $table->dropForeign(['payment_source_id']);
+        });
+
         Schema::dropIfExists('payment_sources');
     }
 };

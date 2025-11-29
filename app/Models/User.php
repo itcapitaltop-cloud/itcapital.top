@@ -104,6 +104,7 @@ final class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'banned_at' => 'datetime',
+            'overridden_rank_from' => 'datetime',
         ];
     }
 

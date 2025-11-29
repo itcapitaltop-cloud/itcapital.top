@@ -12,6 +12,9 @@ class PartnerRank extends Model
 
     protected $fillable = ['rank', 'bonus_usd'];
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\PartnerRankRequirement, $this>
+     */
     public function requirements(): HasMany
     {
         return $this->hasMany(PartnerRankRequirement::class);

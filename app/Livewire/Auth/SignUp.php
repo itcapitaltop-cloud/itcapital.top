@@ -87,7 +87,7 @@ class SignUp extends Component
 
         $partner = null;
 
-        if (! is_null(session()->get('partner'))) {
+        if (! is_null(session()?->get('partner'))) {
             $partner = User::query()->where('username', session()->get('partner'))->first();
             Notify::referralJoined($partner, $this->username);
         }

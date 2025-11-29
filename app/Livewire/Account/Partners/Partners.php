@@ -11,8 +11,6 @@ use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
-use App\Models\PackageProfitReinvest;
-use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\PartnerRankRequirement;
 use App\Models\Transaction;
@@ -22,10 +20,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
-use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 use Throwable;
 
@@ -36,7 +34,6 @@ class Partners extends Component
 
     #[Validate(['required', 'string', 'exists:users,username', 'not_self'])]
     public string $toUsername = '';
-
 
     public array $availableLines = [];
 
@@ -65,7 +62,7 @@ class Partners extends Component
 
         Validator::extend('balance', function ($attribute, $value): bool {
 
-            $val = (float)str_replace([' ', ','], ['', '.'], $value);
+            $val = (float) str_replace([' ', ','], ['', '.'], $value);
 
             $debit = auth()->user()->transactions()
                 ->where('balance_type', BalanceTypeEnum::PARTNER)
@@ -80,7 +77,6 @@ class Partners extends Component
                 ->sum('amount');
 
             $balance = $debit - $credit;
-
 
             return $val <= $balance;
         });
@@ -106,7 +102,7 @@ class Partners extends Component
 
         $this->availableLines = $lines;
 
-        if (!in_array($this->line, $this->availableLines, true)) {
+        if (! in_array($this->line, $this->availableLines, true)) {
             $this->line = $this->availableLines[0] ?? 1;
         }
     }
@@ -143,6 +139,7 @@ class Partners extends Component
 
         if ($amount <= 0) {
             $this->addError('toPartnerAmount', __('livewire_partners_partner_balance_empty'));
+
             return;
         }
 
@@ -180,7 +177,7 @@ class Partners extends Component
             $this->validateOnly('toUsername');
             $receiver = User::where('username', $this->toUsername)->firstOrFail();
 
-            $amount = (float)str_replace(',', '.', $this->toPartnerAmount);
+            $amount = (float) str_replace(',', '.', $this->toPartnerAmount);
 
             DB::transaction(function () use ($receiver, $amount) {
                 $uuid = 'PT-' . Str::random(10);
@@ -204,6 +201,7 @@ class Partners extends Component
             });
         } catch (Throwable $e) {
             Log::channel('source')->debug($e->getMessage());
+
             return;
         }
 
@@ -237,29 +235,19 @@ class Partners extends Component
 
     public function getPartnerDynamicsProperty(): array
     {
-        $rangeDelta = function (Carbon $since): float {
-            $debit = Transaction::query()
+        $rangeCredit = function (Carbon $since): float {
+            return (float) Transaction::query()
                 ->where('user_id', Auth::id())
                 ->where('balance_type', BalanceTypeEnum::PARTNER)
                 ->whereIn('trx_type', TrxTypeEnum::getDebits())
                 ->whereNull('rejected_at')
                 ->where('created_at', '>=', $since)
                 ->sum('amount');
-
-            $credit = Transaction::query()
-                ->where('user_id', Auth::id())
-                ->where('balance_type', BalanceTypeEnum::PARTNER)
-                ->whereIn('trx_type', TrxTypeEnum::getCredits())
-                ->whereNull('rejected_at')
-                ->where('created_at', '>=', $since)
-                ->sum('amount');
-
-            return $debit - $credit;
         };
 
         return [
-            'week' => $rangeDelta(now()->subWeek()),
-            'month' => $rangeDelta(now()->subMonth()),
+            'week' => $rangeCredit(now()->subWeek()),
+            'month' => $rangeCredit(now()->subMonth()),
         ];
     }
 
@@ -300,38 +288,35 @@ class Partners extends Component
             ->where('depth', $line)
             ->pluck('descendant_id');
 
-        $buy = Transaction::whereIn('user_id', $ids)
-            ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
+        if ($ids->isEmpty()) {
+            return 0.0;
+        }
+
+        $buyQuery = DB::table('transactions')
+            ->whereIn('user_id', $ids)
+            ->where('trx_type', TrxTypeEnum::BUY_PACKAGE->value)
             ->whereNotNull('accepted_at');
 
         if ($fromDate) {
-            $buy->where('accepted_at', '>=', $fromDate);
+            $buyQuery->where('accepted_at', '>=', $fromDate);
         }
 
-        $buySum = $buy->sum('amount');
+        $buySum = $buyQuery->sum('amount');
 
-//        Log::channel('source')->debug('---buySum----');
-//        Log::channel('source')->debug($buySum);
-//        Log::channel('source')->debug('---buySum----');
-
-        $reinvest = ItcPackage::query()
+        $reinvestQuery = ItcPackage::query()
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
             ->whereIn('transactions.user_id', $ids);
 
-        $reinvestSum = (float)$reinvest
+        $reinvestSum = (float) $reinvestQuery
             ->withSum([
                 'reinvestProfitsAll' => function ($q) use ($fromDate) {
                     if ($fromDate) {
                         $q->where('created_at', '>=', $fromDate);
                     }
-                }
+                },
             ], 'amount')
             ->get()
             ->sum('reinvest_profits_all_sum_amount');
-
-//        Log::channel('source')->debug('---reinvestSum----');
-//        Log::channel('source')->debug($reinvestSum);
-//        Log::channel('source')->debug('---reinvestSum----');
 
         return $buySum + $reinvestSum;
     }
@@ -342,7 +327,7 @@ class Partners extends Component
         $next = max(1, $user->rank + 1);
 
         // Требования ТОЛЬКО для следующего ранга (R+1)
-        $reqs = PartnerRankRequirement::whereHas('rank', fn($q) => $q->where('rank', $next))->get();
+        $reqs = PartnerRankRequirement::whereHas('rank', fn ($q) => $q->where('rank', $next))->get();
 
         $bars = [];
 
@@ -355,23 +340,17 @@ class Partners extends Component
 
             // стартовые базы для ранга, с которого начали считать вручную
             $baseReqs = PartnerRankRequirement::whereHas('rank',
-                fn($q) => $q->where('rank', $user->rank))->get();
+                fn ($q) => $q->where('rank', $user->rank))->get();
 
             $personalBase = $baseReqs->firstWhere('line', null)?->personal_deposit ?? 0;
             $lineBases = PartnerRankRequirement::query()
                 ->whereNotNull('line')
-                ->whereHas('rank', fn($q) => $q->where('rank', '<=', $user->rank))
+                ->whereHas('rank', fn ($q) => $q->where('rank', '<=', $user->rank))
                 ->selectRaw('line, SUM(required_turnover) as total')
                 ->groupBy('line')
                 ->pluck('total', 'line')
                 ->all();
         }
-
-//        Log::channel('source')->debug('------------------------');
-//        Log::channel('source')->debug($user->overridden_rank);
-//        Log::channel('source')->debug($user->overridden_rank_from);
-//        Log::channel('source')->debug($personalBase);
-//        Log::channel('source')->debug('------------------------');
 
         if ($personal = $reqs->firstWhere('line', null)) {
             $baseQuery = ItcPackage::query()
@@ -385,28 +364,28 @@ class Partners extends Component
             $allDeposit = (clone $baseQuery)
                 ->withSum('reinvestProfitsAll', 'amount')
                 ->get()
-                ->sum(fn($p) => (float)$p->transaction->amount +
-                    (float)$p->reinvest_profits_all_sum_amount
+                ->sum(fn ($p) => (float) $p->transaction->amount +
+                    (float) $p->reinvest_profits_all_sum_amount
                 );
 
             // Минимум для текущего (override) ранга из базы, как раньше
-            $minForRank = (float)$personalBase;
+            $minForRank = (float) $personalBase;
 
             if ($user->overridden_rank && $fromDate && $allDeposit < $minForRank) {
                 // "минимум + прирост с даты override"
                 $since = (clone $baseQuery)
                     ->withSum([
                         'reinvestProfitsAll' => function ($q) use ($fromDate) {
-                            $q->when($fromDate, fn($qq) => $qq->where('created_at', '>=', $fromDate));
-                        }
+                            $q->when($fromDate, fn ($qq) => $qq->where('created_at', '>=', $fromDate));
+                        },
                     ], 'amount')
                     ->get()
                     ->sum(function ($p) use ($fromDate) {
                         $buy = ($p->transaction?->accepted_at && $p->transaction->accepted_at >= $fromDate)
-                            ? (float)$p->transaction->amount
+                            ? (float) $p->transaction->amount
                             : 0.0;
 
-                        return $buy + (float)$p->reinvest_profits_all_sum_amount;
+                        return $buy + (float) $p->reinvest_profits_all_sum_amount;
                     });
 
                 $currentDeposit = $minForRank + $since;
@@ -424,7 +403,7 @@ class Partners extends Component
         // Сумма требований по каждой линии от ранга 1 до R+1 (кумулятивно)
         $cumToNextByLine = PartnerRankRequirement::query()
             ->whereNotNull('line')
-            ->whereHas('rank', fn($q) => $q->where('rank', '<=', $next))
+            ->whereHas('rank', fn ($q) => $q->where('rank', '<=', $next))
             ->selectRaw('line, SUM(required_turnover) as total')
             ->groupBy('line')
             ->pluck('total', 'line'); // [line => cum(1..R+1)]
@@ -435,17 +414,10 @@ class Partners extends Component
             $target = $r->required_turnover; // требование следующего ранга (R+1)
 
             // что уже набрано: стартовая база (если есть) + оборот с fromDate
-            $actual = ($lineBases[$line] ?? 0) + $this->calcTurnoverByLine($line, $fromDate);
+            $actual = ($lineBases[$line] ?? 0) + $this->calcTurnoverByLine($line, $fromDate instanceof Carbon ? $fromDate->toDateTimeString() : $fromDate);
 
             // current = target - (cum(1..R+1) - actual)  == target + actual - cum(1..R+1)
             $current = $target + $actual - ($cumToNextByLine[$line] ?? 0);
-
-//            Log::channel('source')->debug('--------------');
-//            Log::channel('source')->debug($actual);
-//            Log::channel('source')->debug($cumToNextByLine[$line]);
-//            Log::channel('source')->debug($current);
-//            Log::channel('source')->debug($target);
-//            Log::channel('source')->debug('--------------');
 
             $bars[] = [
                 'label' => __('livewire_partners_line_income_label', ['line' => $line]),
@@ -460,7 +432,10 @@ class Partners extends Component
     public function regularToPartner(): void
     {
         $amount = $this->regularBalances['available'];
-        if ($amount <= 0) return;
+
+        if ($amount <= 0) {
+            return;
+        }
 
         DB::transaction(function () use ($amount) {
             $uuid = 'RP-' . Str::random(10);
@@ -488,17 +463,17 @@ class Partners extends Component
     public function getPackagesForTopupProperty()
     {
         return ItcPackage::query()
-            ->whereHas('transaction', fn($q) => $q->where('user_id', Auth::id()))
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', Auth::id()))
             ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::PRESENT])
             ->with(['transaction', 'zeroing'])
-            ->withSum(['profits' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestProfitsAll' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestProfits' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['withdrawProfitsTransactions' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['partnerTransfers' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestProfitWithdraws' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['balanceWithdraws' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestToBody' => fn($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['profits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfitsAll' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['withdrawProfitsTransactions' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfitWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->get();
     }
 
@@ -517,19 +492,13 @@ class Partners extends Component
      */
     public function transferToPackage(
         TransactionRepositoryContract $trxRepo,
-        ItcPackageRepositoryContract  $pkgRepo
-    ): void
-    {
-
-//        Log::channel('source')->debug($this->selectedPackageUuid);
-//        Log::channel('source')->debug($this->toPackageAmount);
+        ItcPackageRepositoryContract $pkgRepo
+    ): void {
 
         $this->validateOnly('toPackageAmount');
         $this->validateOnly('selectedPackageUuid');
 
-        $amount = (float)str_replace(',', '.', $this->toPackageAmount);
-
-//        Log::channel('source')->debug($amount);
+        $amount = (float) str_replace(',', '.', $this->toPackageAmount);
 
         $pkgRepo->partnerTransferToPackage(
             Auth::id(),
@@ -552,7 +521,7 @@ class Partners extends Component
         $this->transactionRepo = app(TransactionRepositoryContract::class);
 
         $logRows = $this->transactionRepo->partnerLog();
-//        Log::channel('source')->debug($this->regularBalances['available']);
+
         return view('livewire.account.partners.partners', [
             'partnerBalance' => $this->partnerBalance,
             'partnerWeek' => max(0, $this->partnerDynamics['week']),

@@ -41,7 +41,7 @@ return [
     ],
 
     'twelvedata' => [
-        'key' => env('RESEND_KEY'),
+        'key' => env('TWELVEDATA_KEY', env('RESEND_KEY')),
     ],
 
     'alphavantage' => [

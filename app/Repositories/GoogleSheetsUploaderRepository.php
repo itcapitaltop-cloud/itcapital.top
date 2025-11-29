@@ -15,7 +15,6 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
 
     /**
      * @throws \Google\Exception
-     * @throws \JsonException
      */
     public function __construct()
     {
@@ -46,7 +45,9 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
             $title = $remoteTitles[$idx];
             $range = "'{$title}'!A1";
 
-            $body = new ValueRange(['values' => $values]);
+            $normalizedValues = $this->normalizeValues($values);
+
+            $body = new ValueRange(['values' => $normalizedValues]);
 
             $this->service
                 ->spreadsheets_values
@@ -57,5 +58,20 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
                     ['valueInputOption' => 'RAW']
                 );
         }
+    }
+
+    /**
+     * Normalize values to ensure proper format for Google Sheets API
+     */
+    protected function normalizeValues(array $values): array
+    {
+        return array_map(function ($row) {
+            if (! is_array($row)) {
+                return [$row ?? ''];
+            }
+
+            // Convert null values to empty strings and re-index
+            return array_map(fn ($cell) => $cell ?? '', array_values($row));
+        }, array_values($values));
     }
 }

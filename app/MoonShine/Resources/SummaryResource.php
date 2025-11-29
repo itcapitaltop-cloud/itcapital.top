@@ -221,7 +221,7 @@ class SummaryResource extends ModelResource
                 if ($newReqs) {
                     PartnerRankRequirement::insert($newReqs);
                 }
-                Artisan::call('users:recalc-rank --no-bonus');
+                Artisan::call('user:use-rank --no-bonus');
             });
 
             return MoonShineJsonResponse::make()

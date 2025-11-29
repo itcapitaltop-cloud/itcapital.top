@@ -1,7 +1,5 @@
 <?php
 
-use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -24,12 +22,5 @@ Schedule::command('quotes:cache-alphavantage')
     ->dailyAt('08:00');
 
 Schedule::command('regular-premium:accrual')
-    ->cron('59 23 * * 1')
-    ->when(function () {
-        // Якорный понедельник
-        $anchor = CarbonImmutable::create(2025, 8, 11)->startOfWeek(CarbonInterface::MONDAY);
-        $nowW = now()->startOfWeek(CarbonInterface::MONDAY);
-
-        return $anchor->diffInWeeks($nowW) % 2 === 0; // только “каждый второй”
-    })
+    ->weeklyOn(1, '23:59')
     ->sendOutputTo(storage_path('logs/scheduler.log'));

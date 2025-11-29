@@ -32,7 +32,7 @@ class UserFactory extends Factory
             'email_verification_sent_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'rank' => fake()->numberBetween(0, 5),
+            'rank' => 0,
         ];
     }
 

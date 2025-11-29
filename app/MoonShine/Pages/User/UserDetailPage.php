@@ -634,13 +634,7 @@ class UserDetailPage extends DetailPage
                             ->fields([
                                 Text::make('ID', 'uuid')->showOnExport(),
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
-                                Text::make('Сумма', 'amount', formatted: function ($item) {
-                                    $package = ItcPackage::byUuidWithSums($item['uuid'])->first();
-
-                                    return $package
-                                        ? number_format($package->total_amount, 2, '.', '')
-                                        : '0.00';
-                                }),
+                                Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
                                 Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)

@@ -16,6 +16,7 @@ return new class extends Migration
                 ->nullable()
                 ->after('email')
                 ->constrained('partner_ranks')
+                ->cascadeOnDelete()
                 ->nullOnDelete();
         });
     }
@@ -26,7 +27,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            //
+            $table->dropForeign(['rank_id']);
+            $table->dropColumn('rank_id');
         });
     }
 };
