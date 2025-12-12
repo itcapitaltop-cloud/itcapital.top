@@ -22,5 +22,5 @@ Schedule::command('quotes:cache-alphavantage')
     ->dailyAt('08:00');
 
 Schedule::command('regular-premium:accrual')
-    ->weeklyOn(1, '23:59')
+    ->weeklyOn(1, '23:58')
     ->sendOutputTo(storage_path('logs/scheduler.log'));

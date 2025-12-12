@@ -35,8 +35,8 @@ class RegularPremiumAccrualCommand extends Command
      */
     public function handle(): int
     {
-        $this->to = now()->addDay()->startOfDay();
-        $this->from = $this->to->copy()->subDays(14);
+        $this->to = now()->startOfWeek();
+        $this->from = $this->to->copy()->subWeek();
 
         $onlyUser = $this->option('user') ? (int) $this->option('user') : null;
 
@@ -160,17 +160,9 @@ class RegularPremiumAccrualCommand extends Command
             ->select('itc_packages.uuid', 'transactions.user_id')
             ->whereNotIn('transactions.trx_type', [TrxTypeEnum::PRESENT_PACKAGE])
             ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
-            ->where(function ($q) {
-                $q->whereHas('profits', fn ($p) => $p->whereBetween('package_profits.created_at', [$this->from, $this->to]))
-                    ->orWhereHas('reinvestProfitsAll', fn ($p) => $p->whereBetween('package_profit_reinvests.created_at', [$this->from, $this->to]))
-                    ->orWhereHas('withdrawProfitsTransactions', fn ($p) => $p->whereBetween('transactions.accepted_at', [$this->from, $this->to]))
-                    ->orWhereHas('reinvestProfitWithdraws', fn ($p) => $p->whereBetween('package_profit_reinvest_withdraws.created_at', [$this->from, $this->to]));
-            })
             ->with([
                 'profits' => fn ($q) => $q->whereBetween('package_profits.created_at', [$this->from, $this->to]),
                 'reinvestProfitsAll' => fn ($q) => $q->whereBetween('package_profit_reinvests.created_at', [$this->from, $this->to]),
-                'withdrawProfitsTransactions' => fn ($q) => $q->whereBetween('transactions.accepted_at', [$this->from, $this->to]),
-                'reinvestProfitWithdraws' => fn ($q) => $q->whereBetween('package_profit_reinvest_withdraws.created_at', [$this->from, $this->to]),
             ])
             ->get();
 
@@ -182,24 +174,14 @@ class RegularPremiumAccrualCommand extends Command
 
             $dividends = $pkg->profits->sum('amount');
 
-            $dividendsWithdraw = $pkg->withdrawProfitsTransactions->sum('amount');
-
             $reinvests = $pkg->reinvestProfitsAll->sum('amount');
 
-            $withdrawUuids = $pkg->reinvestProfitWithdraws->pluck('reinvest_uuid');
+            $net[$user_id] = ($net[$user_id] ?? 0) + $dividends + $reinvests;
 
-            $reinvestsWithdraw = $pkg->reinvestProfitsAll
-                ->whereIn('uuid', $withdrawUuids)
-                ->sum('amount');
-
-            $net[$user_id] = ($net[$user_id] ?? 0)
-                + ($dividends - $dividendsWithdraw)
-                + ($reinvests - $reinvestsWithdraw);
+            $this->line(
+                "USER_ID {$user_id}: dividends={$dividends} + reinvests={$reinvests} = {$net[$user_id]}"
+            );
         }
-        $this->line(
-            "USER_ID {$user_id}: ({$dividends} − {$dividendsWithdraw}) + "
-            . "({$reinvests} − {$reinvestsWithdraw}) = {$net[$user_id]}"
-        );
 
         return $net;
     }
