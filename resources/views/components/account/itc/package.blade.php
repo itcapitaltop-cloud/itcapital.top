@@ -126,10 +126,10 @@
             </x-widget.modal>
         @endif
 
-        <div class="w-full h-[208px] rounded-[28px]">
+        <div class="w-[356px] h-[208px] rounded-[28px]">
             <img src="{{ vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
-                class="w-full h-[208px] absolute z-[10]" alt="">
-            <div class="relative z-[11] w-full h-[208px]
+                class="w-[356px] h-[208px] absolute z-[10]" alt="">
+            <div class="relative z-[11] w-[356px] h-[208px]
                         bg-none">
                 <div class="relative h-full flex flex-col justify-between p-6 text-white">
 
