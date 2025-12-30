@@ -8,8 +8,7 @@ enum PackageTypeEnum: string
     case PRIVILEGE = 'privilege';
     case VIP = 'vip';
     case ARCHIVE = 'archive';
-    case PRESENT = 'present';
-    case STAKING = 'staking';
+    case PRESENT   = 'present';
 
     public function getName(): string
     {
@@ -17,9 +16,8 @@ enum PackageTypeEnum: string
             self::PRIVILEGE => 'Privilege',
             self::STANDARD => 'Standard',
             self::VIP => 'Vip',
-            self::PRESENT => 'Present',
-            self::ARCHIVE => 'Archive',
-            self::STAKING => 'Staking',
+            self::PRESENT   => 'Present',
+            self::ARCHIVE   => 'Archive',
         };
     }
 
@@ -29,9 +27,8 @@ enum PackageTypeEnum: string
             self::PRIVILEGE => 'PRIVILEGE',
             self::STANDARD => 'STANDARD',
             self::VIP => 'VIP',
-            self::PRESENT => 'PRESENT',
-            self::ARCHIVE => 'ARCHIVE',
-            self::STAKING => 'STAKING',
+            self::PRESENT   => 'PRESENT',
+            self::ARCHIVE   => 'ARCHIVE',
         };
     }
 
@@ -40,8 +37,8 @@ enum PackageTypeEnum: string
         return match ($this) {
             self::STANDARD => 'text-white',
             self::PRIVILEGE, self::VIP => 'text-yellow',
-            self::PRESENT => 'text-green',
-            self::ARCHIVE => 'text-black',
+            self::PRESENT   => 'text-green',
+            self::ARCHIVE   => 'text-black',
         };
     }
 
@@ -50,8 +47,8 @@ enum PackageTypeEnum: string
         return match ($this) {
             self::STANDARD => 'from-blue',
             self::PRIVILEGE, self::VIP => 'from-yellow',
-            self::PRESENT => 'from-green',
-            self::ARCHIVE => 'from-black',
+            self::PRESENT   => 'from-green',
+            self::ARCHIVE   => 'from-black',
         };
     }
 }

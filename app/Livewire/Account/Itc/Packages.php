@@ -23,34 +23,32 @@ use App\Models\Transaction;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class Packages extends Component
 {
     #[Validate(['required', 'numeric', 'min:100'])]
     public string $amount = '';
-
     public PackageTypeEnum $packageType = PackageTypeEnum::STANDARD;
-
-    public int $duration = 1;
-
-    public float $percent = 8.2;
+    public int             $duration    = 1;
+    public float           $percent     = 8.2;
 
     public string $withdrawPackageAmount = '';
 
-    public function boot(): void
-    {
+    public function boot(): void {
         Validator::extend('max_package_sum', function ($attribute, $value, $params) {
             $uuid = $params[0] ?? null;
 
@@ -78,9 +76,9 @@ class Packages extends Component
     {
         return [
             'packageType' => ['required', Rule::enum(PackageTypeEnum::class)],
-            'duration' => ['required_if:packageType,present', 'in:1,3,6,12'],
-            //            'amount'      => ['required_if:packageType,standard,privilege,vip', 'numeric', 'min:1'],
-            'percent' => ['required', 'numeric', 'min:0'],
+            'duration'    => ['required_if:packageType,present', 'in:1,3,6,12'],
+//            'amount'      => ['required_if:packageType,standard,privilege,vip', 'numeric', 'min:1'],
+            'percent'     => ['required', 'numeric', 'min:0'],
         ];
     }
 
@@ -90,24 +88,25 @@ class Packages extends Component
     public function withdrawPackageBalance(
         string $uuid,
         TransactionRepositoryContract $transactionRepo
-    ): void {
+    ): void
+    {
         $this->validateOnly('withdrawPackageAmount', [
             'withdrawPackageAmount' => 'required|numeric|min:1|max_package_sum:' . $uuid,
         ]);
 
         $transaction = $transactionRepo->commonStore(
             new CreateTransactionDto(
-                userId: Auth::id(),
-                trxType: TrxTypeEnum::WITHDRAW_PACKAGE_TO_BALANCE,
+                userId:      Auth::id(),
+                trxType:     TrxTypeEnum::WITHDRAW_PACKAGE_TO_BALANCE,
                 balanceType: BalanceTypeEnum::MAIN,
-                amount: $this->withdrawPackageAmount,
-                acceptedAt: now(),
-                prefix: 'WPB-',
+                amount:      $this->withdrawPackageAmount,
+                acceptedAt:  now(),
+                prefix:      'WPB-',
             )
         );
 
         PackageBalanceWithdraw::query()->create([
-            'uuid' => $transaction->uuid,
+            'uuid'         => $transaction->uuid,
             'package_uuid' => $uuid,
         ]);
 
@@ -164,15 +163,15 @@ class Packages extends Component
             if ($activeReinvests->isEmpty()) {
 
                 if (
-                    ! PackageProfitReinvest::query()->where('package_uuid', $package->uuid)->exists() &&
-                    ! PackageProfitWithdraw::query()->where('package_uuid', $package->uuid)->exists()
+                    !PackageProfitReinvest::query()->where('package_uuid', $package->uuid)->exists() &&
+                    !PackageProfitWithdraw::query()->where('package_uuid', $package->uuid)->exists()
                 ) {
                     $allProfitUuids = PackageProfit::query()
                         ->where('package_uuid', $package->uuid)
                         ->pluck('uuid')
                         ->all();
 
-                    if (! empty($allProfitUuids)) {
+                    if (!empty($allProfitUuids)) {
                         $sumAll = BigDecimal::of((string) PackageProfit::query()
                             ->whereIn('uuid', $allProfitUuids)
                             ->selectRaw('COALESCE(SUM(amount),0) AS total')
@@ -185,9 +184,9 @@ class Packages extends Component
                             ->delete();
 
                         ReinvestToPackageBody::create([
-                            'uuid' => (string) Str::uuid(),
+                            'uuid'         => (string) Str::uuid(),
                             'package_uuid' => $package->uuid,
-                            'amount' => (string) $sumAll,
+                            'amount'       => (string) $sumAll,
                         ]);
                     }
                 }
@@ -208,7 +207,7 @@ class Packages extends Component
 
             $activeUuids = $activeReinvests->pluck('uuid')->all();
             $totalReinvested = $activeReinvests->reduce(
-                fn ($c, $r) => BigDecimal::of((string) $c)->plus((string) $r->amount),
+                fn($c, $r) => BigDecimal::of((string)$c)->plus((string)$r->amount),
                 BigDecimal::of('0')
             );
 
@@ -227,22 +226,20 @@ class Packages extends Component
                 ->get(['t.uuid', 't.amount', 't.created_at']);
 
             $events = collect();
-
             foreach ($reinvestEvents as $e) {
                 $events->push([
-                    'type' => 'reinvest',
-                    'uuid' => $e->uuid,
-                    'at' => $e->created_at,
-                    'amount' => BigDecimal::of((string) $e->amount),
+                    'type'   => 'reinvest',
+                    'uuid'   => $e->uuid,
+                    'at'     => $e->created_at,
+                    'amount' => BigDecimal::of((string)$e->amount),
                 ]);
             }
-
             foreach ($withdrawEvents as $e) {
                 $events->push([
-                    'type' => 'withdraw',
-                    'uuid' => $e->uuid,
-                    'at' => $e->created_at,
-                    'amount' => BigDecimal::of((string) $e->amount),
+                    'type'   => 'withdraw',
+                    'uuid'   => $e->uuid,
+                    'at'     => $e->created_at,
+                    'amount' => BigDecimal::of((string)$e->amount),
                 ]);
             }
             $events = $events->sortBy([['at', 'asc'], ['uuid', 'asc']])->values();
@@ -258,13 +255,13 @@ class Packages extends Component
                 $profits = PackageProfit::query()
                     ->where('package_uuid', $package->uuid)
                     ->where('created_at', '<=', $eventAt)
-                    ->when(! empty($exclude), fn ($q) => $q->whereNotIn('uuid', $exclude))
+                    ->when(!empty($exclude), fn ($q) => $q->whereNotIn('uuid', $exclude))
                     ->orderBy('created_at', 'desc') // хвост справа-налево (ближайшие к событию)
                     ->orderBy('uuid', 'desc')
                     ->get(['uuid', 'amount', 'created_at']);
 
                 foreach ($profits as $p) {
-                    $a = BigDecimal::of((string) $p->amount);
+                    $a = BigDecimal::of((string)$p->amount);
 
                     // Непрерывный хвост: если следующий элемент перепрыгивает сумму — хвост не складывается
                     if ($sum->plus($a)->compareTo($need) > 0) {
@@ -306,17 +303,17 @@ class Packages extends Component
                 $consumed = array_merge($consumed, $picked);
             }
 
-            //            $report = [];
-            //            foreach ($profitsByActiveReinvest as $rid => $uuids) {
-            //                $report[$rid] = [
-            //                    'sum'     => PackageProfit::query()
-            //                        ->whereIn('uuid', $uuids)
-            //                        ->selectRaw('COALESCE(SUM(amount),0) AS total')
-            //                        ->value('total'),
-            //                    'profits' => $uuids,
-            //                ];
-            //            }
-            //            Log::channel('source')->debug($report);
+//            $report = [];
+//            foreach ($profitsByActiveReinvest as $rid => $uuids) {
+//                $report[$rid] = [
+//                    'sum'     => PackageProfit::query()
+//                        ->whereIn('uuid', $uuids)
+//                        ->selectRaw('COALESCE(SUM(amount),0) AS total')
+//                        ->value('total'),
+//                    'profits' => $uuids,
+//                ];
+//            }
+//            Log::channel('source')->debug($report);
 
             // 4) Удаляем ровно эти дивиденды и активные реинвесты
             if (! empty($removeProfitUuids)) {
@@ -333,10 +330,12 @@ class Packages extends Component
                     $reinvest->profitLink()->delete();
                 }
                 // затем удалить сам реинвест
-                //                Log::channel('source')->debug($reinvest);
+//                Log::channel('source')->debug($reinvest);
                 $reinvest->delete();
-                //                Log::channel('source')->debug('deleted');
+//                Log::channel('source')->debug('deleted');
             });
+
+
 
             $freeProfitUuids = PackageProfit::query()
                 ->where('package_uuid', $package->uuid)
@@ -344,13 +343,13 @@ class Packages extends Component
                 ->pluck('uuid')
                 ->all();
 
-            if (! empty($freeProfitUuids)) {
+            if (!empty($freeProfitUuids)) {
                 $freeSum = BigDecimal::of((string) PackageProfit::query()
                     ->whereIn('uuid', $freeProfitUuids)
                     ->selectRaw('COALESCE(SUM(amount),0) AS total')
                     ->value('total'));
 
-                //                Log::channel('source')->debug($freeSum);
+//                Log::channel('source')->debug($freeSum);
                 PackageProfit::query()
                     ->whereIn('uuid', $freeProfitUuids)
                     ->get()
@@ -361,12 +360,12 @@ class Packages extends Component
                 $totalReinvested = $totalReinvested->plus($freeSum);
             }
 
-            //            // 5) Фиксируем пополнение тела пакета на сумму активных реинвестов (модель без транзакций)
+//            // 5) Фиксируем пополнение тела пакета на сумму активных реинвестов (модель без транзакций)
             if ($totalReinvested->isPositive()) {
                 ReinvestToPackageBody::create([
-                    'uuid' => (string) Str::uuid(),
+                    'uuid'         => (string) Str::uuid(),
                     'package_uuid' => $package->uuid,
-                    'amount' => (string) $totalReinvested,
+                    'amount'       => (string) $totalReinvested,
                 ]);
             }
 
@@ -402,7 +401,7 @@ class Packages extends Component
                 'uuid' => $trx->uuid,
                 'work_to' => Carbon::now()->addWeeks(30),
                 'type' => PackageTypeEnum::STANDARD,
-                'month_profit_percent' => '8.2',
+                'month_profit_percent' => '8.2'
             ]);
 
             app(StartBonusAccrualContract::class)
@@ -411,7 +410,7 @@ class Packages extends Component
             Artisan::call('user:use-rank');
         });
 
-        $u = User::where('id', Auth::id())->first();
+        $u = User::where("id", Auth::id())->first();
 
         Notify::packageBought($u, 'STANDARD', $this->amount);
 
@@ -425,19 +424,19 @@ class Packages extends Component
         if ($this->packageType === PackageTypeEnum::PRESENT) {
             $transactionRepo->store(
                 new CreateTransactionDto(
-                    userId: Auth::id(),
-                    trxType: TrxTypeEnum::PRESENT_PACKAGE,
+                    userId:      Auth::id(),
+                    trxType:     TrxTypeEnum::PRESENT_PACKAGE,
                     balanceType: BalanceTypeEnum::MAIN,
-                    amount: $this->amount,
-                    acceptedAt: now(),
-                    prefix: 'ITC-',
+                    amount:      $this->amount,
+                    acceptedAt:  now(),
+                    prefix:      'ITC-',
                 ),
                 function (Transaction $trx) {
                     return ItcPackage::query()->create([
-                        'uuid' => $trx->uuid,
-                        'work_to' => now()->addMonths($this->duration),
-                        'duration_months' => $this->duration,
-                        'type' => PackageTypeEnum::PRESENT,
+                        'uuid'                 => $trx->uuid,
+                        'work_to'              => now()->addMonths($this->duration),
+                        'duration_months'      => $this->duration,
+                        'type'                 => PackageTypeEnum::PRESENT,
                         'month_profit_percent' => $this->percent,
                     ]);
                 }
@@ -445,18 +444,18 @@ class Packages extends Component
         } else {
             $transactionRepo->checkBalanceAndStore(
                 new CreateTransactionDto(
-                    userId: Auth::id(),
-                    trxType: TrxTypeEnum::BUY_PACKAGE,
+                    userId:      Auth::id(),
+                    trxType:     TrxTypeEnum::BUY_PACKAGE,
                     balanceType: BalanceTypeEnum::MAIN,
-                    amount: $this->amount,
-                    acceptedAt: now(),
-                    prefix: 'ITC-',
+                    amount:      $this->amount,
+                    acceptedAt:  now(),
+                    prefix:      'ITC-',
                 ),
                 function (Transaction $trx) {
                     return ItcPackage::query()->create([
-                        'uuid' => $trx->uuid,
-                        'work_to' => now()->addWeeks(30),
-                        'type' => $this->packageType,
+                        'uuid'                 => $trx->uuid,
+                        'work_to'              => now()->addWeeks(30),
+                        'type'                 => $this->packageType,
                         'month_profit_percent' => $this->percent,
                     ]);
                 }
@@ -472,7 +471,6 @@ class Packages extends Component
         if ($e instanceof ValidationException) {
             return;
         }
-
         if ($e instanceof InvalidAmountException) {
             $this->dispatch(
                 'new-system-notification',
@@ -495,7 +493,7 @@ class Packages extends Component
             'uuid' => 'PPR-' . Str::random(10),
             'package_uuid' => $uuid,
             'amount' => $toReinvestAmount,
-            'matured_at' => Carbon::now()->addDays(180),
+            'matured_at'    => Carbon::now()->addDays(180),
         ]);
 
         Artisan::call('user:use-rank');
@@ -513,7 +511,8 @@ class Packages extends Component
             ->where('uuid', $packageUuid)
             ->first();
 
-        if (! $package || ! $package->transaction) {
+
+        if (!$package || !$package->transaction) {
             return;
         }
 
@@ -522,7 +521,6 @@ class Packages extends Component
 
         // 2) Все profit_uuid, принадлежащие ТОЛЬКО этому пакету
         $profitUuids = $package->profits()->pluck('uuid')->all();
-
         if (empty($profitUuids)) {
             return;
         }
@@ -530,6 +528,7 @@ class Packages extends Component
         // Берём ВСЕ уведомления пользователя, где action.type=call и action.name=reinvest
         // Столбец notifications.data — JSON; в Eloquent доступ к полям через синтаксис ->.
         /** @var \Illuminate\Support\Collection<int, \Illuminate\Notifications\DatabaseNotification> $notifications */
+
         $notifications = DB::table('notifications as n')
             ->leftJoin('notification_profit_readeds as npr', 'npr.notification_id', '=', 'n.id')
             ->whereNull('npr.notification_id') // ещё не отмечены
@@ -553,8 +552,7 @@ class Packages extends Component
 
         foreach ($notifications as $row) {
             $profitUuid = $row->profit_uuid;
-
-            if (! $profitUuid) {
+            if (!$profitUuid) {
                 continue;
             }
 
@@ -590,15 +588,15 @@ class Packages extends Component
             }
 
             $reinvest = PackageProfitReinvest::query()->create([
-                'uuid' => 'PPR-' . Str::random(10),
+                'uuid'         => 'PPR-' . Str::random(10),
                 'package_uuid' => $profit->package_uuid,
-                'amount' => $profit->amount,
-                'matured_at' => now()->addDays(180),
+                'amount'       => $profit->amount,
+                'matured_at'   => now()->addDays(180),
             ]);
 
             PackageProfitWithReinvestLink::query()->create([
                 'reinvest_uuid' => $reinvest->uuid,
-                'profit_uuid' => $profit->uuid,
+                'profit_uuid'   => $profit->uuid,
             ]);
         });
 
@@ -614,7 +612,6 @@ class Packages extends Component
 
             if ($toWithdrawAmount->isNegativeOrZero()) {
                 throw new InvalidAmountException(__('livewire_itc_packages_insufficient_dividends_withdraw'));
-
                 return;
             }
 
@@ -629,7 +626,7 @@ class Packages extends Component
 
             PackageProfitWithdraw::query()->create([
                 'uuid' => $transaction->uuid,
-                'package_uuid' => $uuid,
+                'package_uuid' => $uuid
             ]);
         });
         $this->markReinvestNotificationsAsRead($uuid);
@@ -641,10 +638,19 @@ class Packages extends Component
 
         return view('livewire.account.itc.packages', [
             'packages' => ItcPackage::query()
-                ->notActive()
-                ->userPackagesWithFinancials(auth()->user()->id)
+                ->whereHas('transaction', fn ($q) => $q->where('user_id', Auth::id()))
+                ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
+                ->with(['transaction', 'zeroing'])
+                ->withSum(['profits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['reinvestProfitsAll' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['withdrawProfitsTransactions' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['reinvestProfitWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
                 ->get(),
-            'logRows' => $trxRepo->packageLog(),
+            'logRows'  => $trxRepo->packageLog(),
         ]);
     }
 }

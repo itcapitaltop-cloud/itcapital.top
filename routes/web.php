@@ -6,7 +6,6 @@ use App\Http\Controllers\AdminLogActionController;
 use App\Http\Controllers\CommonFundController;
 use App\Http\Controllers\EmailChangeController;
 use App\Http\Controllers\MainPageModalsController;
-use App\Http\Controllers\Packages\ItcStakingController;
 use App\Http\Controllers\WalletQrController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -91,7 +90,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('/account/finance', 'pages.account.finance.finance')->name('finance');
     Route::view('/account/partners', 'pages.account.partners.partners')->name('partners');
     Route::view('/account/itc', 'pages.account.itc.itc-packages')->name('itc-packages');
-    Route::view('/account/itc-staking', 'pages.account.itc-staking.index')->name('itc-staking');
     Route::view('/account/wallet/deposit', 'pages.account.wallet.deposit')->name('deposit');
     Route::view('/account/wallet/withdraw', 'pages.account.wallet.withdraw')->name('withdraw');
     Route::view('/account/my-business', 'pages.account.my-business.index')->name('my-business');
@@ -112,8 +110,6 @@ Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])
 Route::controller(AdminController::class)->middleware(Authenticate::class)->prefix('itcapitalmoonshineadminpanel')->group(function () {
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
     Route::post('itc-packages/profits/recalculate', 'recalculate');
-    Route::post('itc-staking/change/percentage', [ItcStakingController::class, 'changePercentage']);
-    Route::post('itc-staking/package/close/staking/{uuid}', [ItcStakingController::class, 'close']);
     Route::post('reinvest-profit/{uuid}/withdraw', 'withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
     Route::delete('reinvest-profit/{uuid}/delete', 'deleteProfitReinvest')->name('reinvest-profit-delete');
     Route::post('reinvest-profit/{uuid}/extend', 'extendProfitReinvest')->name('reinvest-profit-extend');

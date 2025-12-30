@@ -160,7 +160,7 @@
 
                 {{-- инструкции для криптовалюты --}}
                 <template x-if="depositSource !== 'fiat'">
-                    <div class="flex flex-col justify-between">
+                    <div class="flex flex-col flex-1 justify-between">
                         <div>
                             {{ __('livewire_finance_deposit_help_crypto_title') }}
                             <ul class="list-decimal list-inside mt-2">
@@ -177,16 +177,9 @@
                                 </li>
                             </ul>
                         </div>
-                        <div class="flex justify-start mt-4">
-                            <div
-                                class="bg-white p-4 w-[220px] h-[220px] max-w-[220px]
-                           rounded-[16px] shadow-lg"
-                            >
-                                <img
-                                    src="{{ route('wallet.qr', $depositAddress) }}"
-                                    alt="Deposit QR"
-                                    class="w-full h-auto block"
-                                >
+                        <div class="mt-auto flex items-end justify-end">
+                            <div class="bg-white p-[10px] w-[124px] rounded-[13px]">
+                                <img src="{{ route('wallet.qr', $depositAddress) }}" alt="">
                             </div>
                         </div>
                     </div>

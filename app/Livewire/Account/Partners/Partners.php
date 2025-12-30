@@ -464,7 +464,7 @@ class Partners extends Component
     {
         return ItcPackage::query()
             ->whereHas('transaction', fn ($q) => $q->where('user_id', Auth::id()))
-            ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::PRESENT, PackageTypeEnum::STAKING])
+            ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::PRESENT])
             ->with(['transaction', 'zeroing'])
             ->withSum(['profits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestProfitsAll' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')

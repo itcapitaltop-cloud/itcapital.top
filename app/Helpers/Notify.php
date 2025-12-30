@@ -143,20 +143,6 @@ class Notify
         ));
     }
 
-    public static function packageStakingBought(User $user, string $amount): void
-    {
-        $icon      = vite()->icon('currency/itc-staking.svg');
-        $amountEsc = e($amount);
-
-        $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Куплен пакет ITC коинов на сумму <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
-
-        $user->notify(new InAppNotification(
-            title: $title,
-            message: "",
-            icon: 'notifications/package-bought.svg',
-        ));
-    }
-
     public static function bonusStart(User $user, string $amount): void
     {
         $icon      = vite()->icon('currency/itc-partners.svg');
@@ -177,30 +163,6 @@ class Notify
         $amountEsc = e($amount);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Начислена регулярная премия в размере <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
-
-        $user->notify(new InAppNotification(
-            title: $title,
-            message: "",
-            icon: 'notifications/bonus-start.svg',
-        ));
-    }
-
-    public static function bonusStaking(User $user, float $amount): void
-    {
-        $icon      = vite()->icon('currency/itc-staking.svg');
-        $amountEsc = e($amount);
-
-        $title = "
-            <div class='flex flex-col leading-snug'>
-                <span class='text-[13px] text-white/90'>
-                    Начислена доходность на пакет коинов в размере
-                </span>
-                <span class='inline-flex items-center gap-1 text-[13px] font-semibold text-white'>
-                    <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' />
-                    {$amountEsc}
-                </span>
-            </div>
-            ";
 
         $user->notify(new InAppNotification(
             title: $title,

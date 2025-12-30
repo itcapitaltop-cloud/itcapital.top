@@ -138,6 +138,5 @@ return [
         'email'           => 'email',
         'password'        => 'password',
         'passwordConfirm' => 'password confirmation',
-        'amount' => 'Insufficient balance'
     ],
 ];

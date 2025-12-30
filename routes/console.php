@@ -24,8 +24,3 @@ Schedule::command('quotes:cache-alphavantage')
 Schedule::command('regular-premium:accrual')
     ->weeklyOn(1, '23:58')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
-
-Schedule::command('profit-accrual:itc-staking')
-    ->monthlyOn(1, '00:00')
-    ->withoutOverlapping()
-    ->onOneServer();

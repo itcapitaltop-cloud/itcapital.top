@@ -1,9 +1,4 @@
-@props([
-    'size' => null,
-])
-
 @php($action = $action ?? 'submit')
-
 
 <button
     wire:target="{{ $action }}"

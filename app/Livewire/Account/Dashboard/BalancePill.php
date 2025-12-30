@@ -4,7 +4,6 @@ namespace App\Livewire\Account\Dashboard;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Transactions\BalanceTypeEnum;
-use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -24,7 +23,6 @@ class BalancePill extends Component
             return view('livewire.account.dashboard.balance-pill', [
                 'mainBalanceAmount' => 0,
                 'partnerBalanceAmount' => 0,
-                'balanceStaking' => 0,
             ]);
         }
 
@@ -33,7 +31,6 @@ class BalancePill extends Component
         return view('livewire.account.dashboard.balance-pill', [
             'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
             'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
-            'balanceStaking' => Transaction::query()->packageStaking(Auth::id())->sum('amount'),
         ]);
     }
 }

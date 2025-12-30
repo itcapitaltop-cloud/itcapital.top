@@ -138,6 +138,5 @@ return [
         'email'           => '邮箱',
         'password'        => '密码',
         'passwordConfirm' => '确认密码',
-        'amount' => '余额不足'
     ],
 ];

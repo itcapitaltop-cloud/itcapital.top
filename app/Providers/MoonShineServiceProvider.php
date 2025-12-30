@@ -8,7 +8,6 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
-use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
@@ -61,7 +60,6 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             MenuItem::make('Выводы', new WithdrawResource()),
             MenuItem::make('Пакеты', new ItcPackageResource()),
             MenuItem::make('Верификация', new VerifyingUserResource()),
-            MenuItem::make('Cтейкинг', new ItcStakingResource()),
         ];
     }
 

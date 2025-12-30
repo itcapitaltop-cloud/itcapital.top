@@ -1,5 +1,0 @@
-@extends('layouts.account')
-
-@section('main')
-    <livewire:account.itc-staking.index />
-@endsection

@@ -22,7 +22,6 @@ enum LogActionTypeEnum: string
     case WITHDRAW_PACKAGE_REINVEST_PROFIT    = 'withdraw_package_reinvest_profit';
     case EXTEND_PACKAGE_REINVEST_PROFIT      = 'extend_package_reinvest_profit';
     case CLOSE_ITC_PACKAGE = 'close_itc_package';
-    case UPDATE_REGULAR_BONUS = 'update_regular_bonus';
 
     public function label(): string
     {
@@ -45,7 +44,6 @@ enum LogActionTypeEnum: string
             self::WITHDRAW_PACKAGE_REINVEST_PROFIT  => 'Вывод реинвеста профита на баланс',
             self::EXTEND_PACKAGE_REINVEST_PROFIT    => 'Продление срока реинвеста профита',
             self::CLOSE_ITC_PACKAGE    => 'Закрытие пакета',
-            self::UPDATE_REGULAR_BONUS => 'Изменение регулярной премии',
         };
     }
 }

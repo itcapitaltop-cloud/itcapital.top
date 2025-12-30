@@ -8,7 +8,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.4",
+        "php": "^8.2",
         "ext-pdo": "*",
         "anhskohbo/no-captcha": "^3.7",
         "brick/money": "^0.9.0",
@@ -25,7 +25,6 @@
         "phpoffice/phpspreadsheet": "^4.2",
         "simplesoftwareio/simple-qrcode": "*",
         "spatie/db-dumper": "^3.7",
-        "spatie/laravel-activitylog": "^4.10",
         "spatie/sheets": "^1.12"
     },
     "require-dev": {

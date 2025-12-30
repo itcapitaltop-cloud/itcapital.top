@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -45,17 +44,5 @@ class PackageProfit extends Model
     public function isReinvested(): bool
     {
         return $this->reinvestLink()->exists();
-    }
-
-    public function withdraw(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            Withdraw::class,
-            Transaction::class,
-            'uuid', // foreign key у Transaction
-            'uuid', // foreign key у Withdraw
-            'uuid', // local key PackageProfit
-            'uuid'  // local key Transaction
-        );
     }
 }

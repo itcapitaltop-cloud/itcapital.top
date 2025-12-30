@@ -3,7 +3,6 @@
     "passive_income": "Passive Income",
     "academy": "Academy",
     "home": "Home",
-    "itc_staking": "ITC staking",
     "email_confirmation": "Email Confirmation",
     "email_confirmation_new": "New Email Confirmation",
     "packages": "Packages",
@@ -231,13 +230,11 @@
     "landing_modal_thanks_error": "An error occurred while submitting. Please try again.",
     "components_account_common_header_your_balance": "Your Balance",
     "components_account_common_header_buy_package": "Buy Package",
-    "components_account_common_header_buy_package_itc_staging": "Buy ITC coins",
     "components_account_common_header_your_packages": "Your Packages",
     "components_account_dashboard_widget_balance_main_balance": "Main Balance",
     "components_account_dashboard_widget_balance_partners_balance": "Partner Balance",
     "components_account_dashboard_widget_balance_pill_main": "main",
     "components_account_dashboard_widget_balance__pill_partners": "partner",
-    "components_account_dashboard_widget_balance__pill_staking": "tokens",
     "components_account_dashboard_widget_deposit_modal_title": "Wallet Top-Up",
     "components_account_dashboard_widget_deposit_modal_subtitle": "1. Enter top-up amount",
     "components_account_dashboard_widget_deposit_modal_qr_subtitle": "2. Scan QR code or copy address",
@@ -323,7 +320,7 @@
     "email_button": "Confirm Email",
     "email_fallback": "If the button doesn’t work, copy the link into your browser:",
     "livewire_index_main_hero_label": "Over 340 satisfied clients",
-    "livewire_index_main_hero_title": "Comfortable Investment Strategies",
+    "livewire_index_main_hero_title": "Stress-Free Investment Strategies",
     "livewire_index_main_hero_description_1": "that build capital to help every club member achieve their goals.",
     "livewire_index_main_hero_description_2": "Build an income stream with us starting from",
     "livewire_index_main_hero_description_2_1": "100% annual returns",
@@ -765,6 +762,5 @@
     "admin_controller_package_closed_success": "Package successfully closed.",
     "admin_controller_withdraw_updated": "Withdrawal successfully updated",
     "admin_controller_withdraw_referer": "Referrer changed for user",
-    "admin_controller_matching_failed": "Error: failed to match dividends with reinvestment. Nothing deleted.",
-    "component_livewire_account_itc_staking_no_packages": "You don't have any ITC coin packages. Buy your first one"
+    "admin_controller_matching_failed": "Error: failed to match dividends with reinvestment. Nothing deleted."
 }
