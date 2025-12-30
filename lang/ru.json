@@ -3,6 +3,7 @@
     "passive_income": "Пассивный доход",
     "academy": "Академия",
     "home": "Главная",
+    "itc_staking": "ITC стейкинг",
     "email_confirmation": "Подтверждение электронной почты",
     "email_confirmation_new": "Подтверждение новой электронной почты",
     "packages": "Пакеты",
@@ -230,11 +231,13 @@
     "landing_modal_thanks_error": "Произошла ошибка при отправке. Попробуйте еще раз.",
     "components_account_common_header_your_balance": "Ваш баланс",
     "components_account_common_header_buy_package": "Купить пакет",
+    "components_account_common_header_buy_package_itc_staging": "Купить ITC коины",
     "components_account_common_header_your_packages": "Ваши пакеты",
     "components_account_dashboard_widget_balance_main_balance": "Основной баланс",
     "components_account_dashboard_widget_balance_partners_balance": "Партнерский баланс",
     "components_account_dashboard_widget_balance_pill_main": "основной",
     "components_account_dashboard_widget_balance__pill_partners": "партнёрский",
+    "components_account_dashboard_widget_balance__pill_staking": "токены",
     "components_account_dashboard_widget_deposit_modal_title": "Пополнение кошелька",
     "components_account_dashboard_widget_deposit_modal_subtitle": "1. Введите сумму пополнения",
     "components_account_dashboard_widget_deposit_modal_qr_subtitle": "2. Отсканируйте QR‑код или скопируйте адрес",
@@ -320,7 +323,7 @@
     "email_button": "Подтвердить E‑mail",
     "email_fallback": "Если кнопка не работает, скопируйте ссылку в адресную строку браузера:",
     "livewire_index_main_hero_label": "Более 340 довольных клиентов",
-    "livewire_index_main_hero_title": "Инвестиционные стратегии без стресса",
+    "livewire_index_main_hero_title": "Инвестиционные стратегии с комфортом",
     "livewire_index_main_hero_description_1": "которые создают капитал для достижения целей каждого участника клуба.",
     "livewire_index_main_hero_description_2": "Создавай вместе с нами источник дохода от ",
     "livewire_index_main_hero_description_2_1": "100% годовых",
@@ -762,5 +765,6 @@
     "admin_controller_package_closed_success": "Пакет успешно закрыт.",
     "admin_controller_withdraw_updated": "Вывод успешно обновлен",
     "admin_controller_withdraw_referer": "Реферер для пользователя изменен",
-    "admin_controller_matching_failed": "Ошибка: не удалось сопоставить дивиденды с реинвестом. Ничего не удалено."
+    "admin_controller_matching_failed": "Ошибка: не удалось сопоставить дивиденды с реинвестом. Ничего не удалено.",
+    "component_livewire_account_itc_staking_no_packages": "У вас нет пакетов ITC коинов. Купите ваш первый"
 }

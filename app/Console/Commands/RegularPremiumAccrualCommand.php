@@ -159,7 +159,10 @@ class RegularPremiumAccrualCommand extends Command
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
             ->select('itc_packages.uuid', 'transactions.user_id')
             ->whereNotIn('transactions.trx_type', [TrxTypeEnum::PRESENT_PACKAGE])
-            ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
+            ->whereNotIn('itc_packages.type', [
+                PackageTypeEnum::ARCHIVE,
+                PackageTypeEnum::STAKING,
+            ])
             ->with([
                 'profits' => fn ($q) => $q->whereBetween('package_profits.created_at', [$this->from, $this->to]),
                 'reinvestProfitsAll' => fn ($q) => $q->whereBetween('package_profit_reinvests.created_at', [$this->from, $this->to]),
@@ -221,6 +224,9 @@ class RegularPremiumAccrualCommand extends Command
         ])->value('percent');
     }
 
+    /**
+     * @throws \Throwable
+     */
     private function wipeUserData(int $userId): void
     {
         DB::transaction(function () use ($userId) {
@@ -244,6 +250,9 @@ class RegularPremiumAccrualCommand extends Command
         $this->warn("Previous regular‑premium accruals for user {$userId} have been rolled back.");
     }
 
+    /**
+     * @throws \Throwable
+     */
     private function wipeAllData(): void
     {
         DB::transaction(function () {

@@ -749,4 +749,43 @@ class AdminController extends Controller
             ->toast(__('admin_controller_withdraw_updated'), ToastType::SUCCESS)
             ->redirect($request->headers->get('referer'));
     }
+
+    public function recalculate(MoonShineRequest $request): RedirectResponse
+    {
+        $uuids = (array) $request->input('uuid');
+        $amount = BigDecimal::of($request->input('amount', '0'));
+
+        if ($amount->isLessThanOrEqualTo('0') || empty($uuids)) {
+            return back()->with('error', 'Введите корректную сумму и выберите пакеты');
+        }
+
+        ItcPackage::query()
+            ->with('transaction')
+            ->whereIn('uuid', $uuids)
+            ->chunkById(50, function (Collection $packages) use ($amount) {
+                $packages->each(function (ItcPackage $package) use ($amount) {
+                    $profit = PackageProfit::query()->create([
+                        'uuid' => 'PP-' . Str::random(10),
+                        'package_uuid' => $package->uuid,
+                        'amount' => $amount,
+                    ]);
+
+                    $user = User::withoutGlobalScope('notBanned')
+                        ->where('id', $package->transaction?->user_id)
+                        ->first();
+
+                    if ($user) {
+                        Notify::recalculateDividends(
+                            $user,
+                            $amount->toScale(2, RoundingMode::HALF_EVEN),
+                            $package->created_at?->format('d/m/y'),
+                            $package->type->getCAPSName(),
+                            $profit->uuid
+                        );
+                    }
+                });
+            });
+
+        return back();
+    }
 }
