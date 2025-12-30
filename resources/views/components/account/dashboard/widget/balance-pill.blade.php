@@ -17,6 +17,14 @@
         <p class="text-[10px] text-white/40 leading-[0.5]">{{ __('components_account_dashboard_widget_balance__pill_partners') }}</p>
     </div>
 
+    <div class="px-4 flex flex-col">
+        <p class="flex items-center gap-1">
+            <img src="{{ vite()->icon('currency/itc-staking.svg') }}" class="w-[12px]" alt="">
+            <span class="text-white text-[14px] font-black">{{ scale($balanceStaking) }}</span>
+        </p>
+        <p class="text-[10px] text-white/40 leading-[0.5]">{{ __('components_account_dashboard_widget_balance__pill_staking') }}</p>
+    </div>
+
 {{--    <div class="pl-4 flex flex-col">--}}
 
 {{--        <p class="flex items-center gap-1">--}}

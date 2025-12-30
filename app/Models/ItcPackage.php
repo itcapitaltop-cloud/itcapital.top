@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,10 @@ use Illuminate\Support\Facades\DB;
  *
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereWorkTo($value)
+ *
+ * @method static Builder|ItcPackage notActive()
+ * @method static Builder|ItcPackage active(PackageTypeEnum ...$enum)
+ * @method static Builder|ItcPackage userPackagesWithFinancials(int $userId)
  *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PackageProfit> $profits
  * @property-read int|null $profits_count
@@ -121,8 +126,9 @@ class ItcPackage extends Model
             return $this->currentProfitAmount;
         }
 
-        $this->currentProfitAmount = BigDecimal::of($this->profits_sum_amount)
-            ->minus($this->reinvest_profits_all_sum_amount)->minus($this->withdraw_profits_transactions_sum_amount);
+        $this->currentProfitAmount = BigDecimal::of($this->profits_sum_amount ?? 0)
+            ->minus($this->reinvest_profits_all_sum_amount ?? 0)
+            ->minus($this->withdraw_profits_transactions_sum_amount ?? 0);
 
         return $this->currentProfitAmount;
     }
@@ -186,4 +192,46 @@ class ItcPackage extends Model
         'prolonged_to' => 'datetime',
         'type' => PackageTypeEnum::class,
     ];
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     */
+    #[Scope]
+    public function notActive(Builder $query): Builder
+    {
+        return $query->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING]);
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
+     * @param \App\Enums\Itc\PackageTypeEnum ...$enum
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     */
+    #[Scope]
+    public function active(Builder $query, PackageTypeEnum ...$enum): Builder
+    {
+        return $query->whereIn('type', $enum);
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
+     * @param int $userId
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     */
+    #[Scope]
+    public function userPackagesWithFinancials(Builder $query, int $userId): Builder
+    {
+        return $query
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', $userId))
+            ->with(['transaction', 'zeroing'])
+            ->withSum(['profits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfitsAll' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['withdrawProfitsTransactions' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfitWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount');
+    }
 }

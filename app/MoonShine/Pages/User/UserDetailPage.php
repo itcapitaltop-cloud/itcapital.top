@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
 use App\MoonShine\Resources\UserResource;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
@@ -273,6 +274,14 @@ class UserDetailPage extends DetailPage
                 'reinvest_total_all' => (float) PackageProfitReinvest::withTrashed()
                     ->where('package_uuid', $pkg->uuid)
                     ->sum('amount'),
+                'unwithdrawn_profits' => function ($item) {
+                    $package = ItcPackage::whereUuid($item->uuid)
+                        ->withSum('profits', 'amount')
+                        ->withSum('reinvestProfitsAll', 'amount')
+                        ->withSum('withdrawProfitsTransactions', 'amount');
+
+                    return $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString();
+                },
                 // все дивиденды по пакету (включая soft-deleted)
                 'profits_total_all' => (float) PackageProfit::withTrashed()
                     ->where('package_uuid', $pkg->uuid)
@@ -289,6 +298,19 @@ class UserDetailPage extends DetailPage
                     ->toArray(),
             ])
             ->toArray();
+
+        $unwithdrawnProfits = ItcPackage::query()
+            ->withSum('profits', 'amount')
+            ->withSum('reinvestProfitsAll', 'amount')
+            ->withSum('withdrawProfitsTransactions', 'amount')
+            ->whereHas('transaction', fn($q) => $q->where('user_id', $item->id))
+            ->get()
+            ->mapWithKeys(fn(ItcPackage $pkg) => [
+                $pkg->uuid => [
+                    'unwithdrawn_profits' => $pkg->getCurrentProfitAmount()
+                        ->toFloat(),
+                ]
+            ]);
 
         $reinvests = collect($packages)
             ->pluck('reinvest_profits')
@@ -475,6 +497,11 @@ class UserDetailPage extends DetailPage
             Number::make('Партнёрский баланс', 'partner_balance')
                 ->fill(number_format((float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($item->id, BalanceTypeEnum::PARTNER), 2, '.', ''))
                 ->step(0.01),
+
+            Number::make('Регулярная премия', 'regular_bonus')
+                ->fill(number_format((float) app(TransactionRepositoryContract::class)->getRegularBonus($item->id), 2, '.', ''))
+                ->step(0.01),
+
             Hidden::make('user_id')->fill($item->id),
         ]);
 
@@ -639,6 +666,7 @@ class UserDetailPage extends DetailPage
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)
                                 ),
+                                Number::make('Неснятые дивиденды', 'unwithdrawn_profits', formatted: fn($item) => round((float) $unwithdrawnProfits->get($item['uuid'])['unwithdrawn_profits'], 2)),
                                 Enum::make('Тип пакета', 'type')->attach(PackageTypeEnum::class),
                             ])
                             ->buttons([

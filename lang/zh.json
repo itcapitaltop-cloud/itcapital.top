@@ -3,6 +3,7 @@
     "passive_income": "被动收入",
     "academy": "学院",
     "home": "首页",
+    "itc_staking": "ITC 质押现已上线",
     "email_confirmation": "邮箱验证",
     "email_confirmation_new": "新邮箱验证",
     "packages": "套餐",
@@ -230,11 +231,13 @@
     "landing_modal_thanks_error": "提交时出错，请重试。",
     "components_account_common_header_your_balance": "您的余额",
     "components_account_common_header_buy_package": "购买套餐",
+    "components_account_common_header_buy_package_itc_staging": "购买 ITC 代币",
     "components_account_common_header_your_packages": "您的套餐",
     "components_account_dashboard_widget_balance_main_balance": "主账户余额",
     "components_account_dashboard_widget_balance_partners_balance": "合伙人余额",
     "components_account_dashboard_widget_balance_pill_main": "主账户",
     "components_account_dashboard_widget_balance__pill_partners": "合伙人",
+    "components_account_dashboard_widget_balance__pill_staking": "代币",
     "components_account_dashboard_widget_deposit_modal_title": "钱包充值",
     "components_account_dashboard_widget_deposit_modal_subtitle": "1. 输入充值金额",
     "components_account_dashboard_widget_deposit_modal_qr_subtitle": "2. 扫描二维码或复制地址",
@@ -320,7 +323,7 @@
     "email_button": "确认邮箱",
     "email_fallback": "如果按钮无效，请将链接复制到浏览器地址栏：",
     "livewire_index_main_hero_label": "340 多位满意客户",
-    "livewire_index_main_hero_title": "无压力投资策略",
+    "livewire_index_main_hero_title": "舒适的投资策略",
     "livewire_index_main_hero_description_1": "为每位俱乐部成员实现目标而构建资本。",
     "livewire_index_main_hero_description_2": "与我们一起打造年化",
     "livewire_index_main_hero_description_2_1": "100% 以上",
@@ -762,5 +765,6 @@
     "admin_controller_package_closed_success": "套餐已成功关闭。",
     "admin_controller_withdraw_updated": "提现已成功更新",
     "admin_controller_withdraw_referer": "用户推荐人已更改",
-    "admin_controller_matching_failed": "错误：未能匹配股息与再投资。未删除任何内容。"
+    "admin_controller_matching_failed": "错误：未能匹配股息与再投资。未删除任何内容。",
+    "component_livewire_account_itc_staking_no_packages": "您还没有ITC币包。购买您的第一个"
 }

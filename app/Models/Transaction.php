@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TransactionStatusEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,18 +15,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- *
- *
  * @property int $id
  * @property string $uuid
  * @property string $amount
  * @property int $user_id
  * @property string $balance_type
  * @property string $trx_type
+ * @property float
  * @property \Illuminate\Support\Carbon|null $accepted_at
  * @property \Illuminate\Support\Carbon|null $rejected_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction query()
@@ -37,8 +40,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction whereUserId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Transaction whereUuid($value)
+ *
  * @property-read mixed $status
  * @property-read \App\Models\User|null $user
+ *
  * @mixin \Eloquent
  */
 class Transaction extends Model
@@ -46,7 +51,7 @@ class Transaction extends Model
     use HasFactory;
 
     protected $fillable = [
-        'uuid', 'user_id', 'amount', 'balance_type', 'trx_type', 'accepted_at', 'rejected_at'
+        'uuid', 'user_id', 'amount', 'balance_type', 'trx_type', 'accepted_at', 'rejected_at',
     ];
 
     protected $casts = [
@@ -82,5 +87,18 @@ class Transaction extends Model
     public function partnerReward(): HasOne
     {
         return $this->hasOne(PartnerReward::class, 'uuid', 'uuid');
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    #[Scope]
+    public function packageStaking(Builder $query, int $userId): Builder
+    {
+        return $query->where('user_id', $userId)
+            ->whereHas('itcPackage', function ($query) {
+                $query->where('type', PackageTypeEnum::STAKING);
+            });
     }
 }

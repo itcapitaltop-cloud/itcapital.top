@@ -234,4 +234,19 @@ class TransactionRepository implements TransactionRepositoryContract
                 'event' => $row['event'],
             ]);
     }
+
+    public function getRegularBonus(int $userId): float
+    {
+        $debit = Transaction::where('user_id', $userId)
+            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
+            ->whereIn('trx_type', TrxTypeEnum::getDebits())
+            ->sum('amount');
+
+        $credit = Transaction::where('user_id', $userId)
+            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
+            ->whereIn('trx_type', TrxTypeEnum::getCredits())
+            ->sum('amount');
+
+        return $debit - $credit;
+    }
 }

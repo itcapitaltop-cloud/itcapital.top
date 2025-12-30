@@ -33,7 +33,7 @@
             <p class="text-white">{{ __('components_account_itc_partners_package_select_package') }}</p>
         </div>
 
-        <div class="overflow-y-auto flex-shrink min-h-0 mb-8 -mx-6 px-6">
+        <div class="overflow-y-auto flex-shrink min-h-0 mb-8 px-6 w-full">
             <div class="flex items-center flex-col gap-3" x-data="{ sel: @entangle('selectedPackageUuid') }">
                 @foreach ($this->packagesForTopup as $pkg)
                     <label class="relative block cursor-pointer mb-[20px] w-full"
