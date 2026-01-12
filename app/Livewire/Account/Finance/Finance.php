@@ -22,36 +22,33 @@ class Finance extends Component
 
     public function createDeposit()
     {
-        $this->depositForm->store();
+        $deposit = $this->depositForm->store();
 
-        $this->dispatch(
-            'new-system-notification',
-            type: 'success',
-            message: __('livewire_finance_deposit_request_created')
-        );
+        if ($deposit !== null) {
+            $this->dispatch('deposit-created-success', 'deposit', $deposit);
+        }
 
         $this->dispatch('deposit-created');
+
     }
 
     public function createWithdraw()
     {
-        if (! Carbon::now()->isSunday()) {
-            $this->dispatch(
-                'new-system-notification',
-                type: 'warning',
-                message: __('livewire_finance_withdrawal_only_on_sunday')
-            );
+         if (! Carbon::now()->isSunday()) {
+             $this->dispatch(
+                 'new-system-notification',
+                 type: 'warning',
+                 message: __('livewire_finance_withdrawal_only_on_sunday')
+             );
 
-            return;
+             return;
+         }
+
+        $withdraw = $this->withdrawForm->store(app(TransactionRepositoryContract::class));
+
+        if ($withdraw !== null) {
+            $this->dispatch('deposit-created-success', 'withdraw', $withdraw);
         }
-
-        $this->withdrawForm->store(app(TransactionRepositoryContract::class));
-
-        $this->dispatch(
-            'new-system-notification',
-            type: 'success',
-            message: __('livewire_finance_withdrawal_request_created')
-        );
 
         $this->withdrawForm->reset();
 

@@ -38,6 +38,7 @@ class TransactionRepository implements TransactionRepositoryContract
 
     public function getBalanceAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
     {
+
         $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
         $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
 

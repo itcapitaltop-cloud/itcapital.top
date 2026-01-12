@@ -11,6 +11,7 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
+use App\Models\Transaction;
 use App\Tasks\Package\CreateItcStakingTask;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -32,18 +33,7 @@ final class Index extends Component
 
     public function buyPackage(): void
     {
-        $this->validate([
-            'amount' => [
-                'required',
-                'numeric',
-                'min:1',
-                function ($attribute, $value, $fail) {
-                    if ($value > $this->mainBalance) {
-                        $fail('Недостаточно средств на балансе.');
-                    }
-                },
-            ],
-        ]);
+        $this->validate();
 
         $package = new CreateItcStakingTask()->run($this->amount, auth()->user()->id);
 
@@ -64,6 +54,47 @@ final class Index extends Component
         $this->js('window.location.reload()');
     }
 
+    public function buyPackageMore(): void
+    {
+        $this->validate();
+
+        $package = Transaction::query()
+            ->select(['id', 'uuid', 'amount', 'user_id'])
+            ->where('user_id', auth()->user()->id)
+            ->with([
+                'itcPackage' => function ($query) {
+                    $query->select(['id', 'uuid', 'month_profit_percent']);
+                },
+                'user' => function ($query) {
+                    $query->select(['id']);
+                },
+            ])
+            ->whereHas('itcPackage', function ($query) {
+                $query->where('type', PackageTypeEnum::STAKING);
+            })
+            ->first();
+
+        $package->increment('amount', $this->amount);
+
+        $this->js('window.location.reload()');
+    }
+
+    protected function rules(): mixed
+    {
+        return [
+            'amount' => [
+                'required',
+                'numeric',
+                'min:1',
+                function ($attribute, $value, $fail) {
+                    if ($value > $this->mainBalance) {
+                        $fail('Недостаточно средств на балансе.');
+                    }
+                },
+            ],
+        ];
+    }
+
     public function render(): Factory|View
     {
         $start = now()->subMonth()->startOfMonth();
@@ -80,9 +111,9 @@ final class Index extends Component
                 ->latest()
                 ->get()
                 ->each(function (Activity $activity) {
-                      $activity->text =  new ActivityManager()->resolver($activity);
+                    $activity->text = new ActivityManager()->resolver($activity);
 
-                      return $activity;
+                    return $activity;
                 }),
         ]);
     }

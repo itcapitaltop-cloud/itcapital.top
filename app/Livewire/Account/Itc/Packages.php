@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -41,6 +42,9 @@ class Packages extends Component
     #[Validate(['required', 'numeric', 'min:100'])]
     public string $amount = '';
 
+    #[Locked]
+    public string $mainBalance = '1000';
+
     public PackageTypeEnum $packageType = PackageTypeEnum::STANDARD;
 
     public int $duration = 1;
@@ -49,7 +53,7 @@ class Packages extends Component
 
     public string $withdrawPackageAmount = '';
 
-    public function boot(): void
+    public function boot(TransactionRepositoryContract $transactionRepositoryContract): void
     {
         Validator::extend('max_package_sum', function ($attribute, $value, $params) {
             $uuid = $params[0] ?? null;
@@ -72,6 +76,8 @@ class Packages extends Component
 
             return $val <= $maxAvailable;
         });
+
+        $this->mainBalance = $transactionRepositoryContract->getBalanceAmountByUserIdAndType(auth()->user()->id, BalanceTypeEnum::MAIN);
     }
 
     protected function rules(): array
@@ -136,8 +142,50 @@ class Packages extends Component
         $this->dispatch(
             'new-system-notification',
             type   : 'success',
-            message: __('livewire_itc_packages_withdraw_success')
+            message: __('admin_controller_package_updated')
         );
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    public function topUpNeeded(
+        string $uuid,
+    ) {
+        $this->validateOnly('withdrawPackageAmount', [
+            'withdrawPackageAmount' => [
+                'required',
+                'numeric',
+                'min:1',
+                function ($attribute, $value, $fail) {
+                    if ($value > $this->mainBalance) {
+                        $fail('Недостаточно средств на балансе.');
+                    }
+                },
+            ],
+        ]);
+
+        $package = Transaction::query()
+            ->select(['id', 'uuid', 'amount', 'user_id'])
+            ->with([
+                'itcPackage' => function ($query) {
+                    $query->select(['id', 'uuid', 'month_profit_percent']);
+                },
+                'user' => function ($query) {
+                    $query->select(['id']);
+                },
+            ])
+            ->whereHas('itcPackage', function ($query) use ($uuid) {
+                $query->where('uuid', $uuid);
+            })
+            ->first();
+
+        $package->increment('amount', $this->withdrawPackageAmount);
+
+        $this->reset('withdrawPackageAmount');
+        $this->dispatch('balance-edited');
+
+        return redirect(request()->header('Referer'));
     }
 
     public function continuePackageWork(string $uuid): void

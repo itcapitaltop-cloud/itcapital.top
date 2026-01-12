@@ -27,12 +27,16 @@
             <div class="space-y-6 flex flex-col gap-[16px]">
 
                 {{-- Источник --}}
-                <x-ui.select label="{{ __('livewire_finance_deposit_source_label') }}" name="depositForm.depositSource"
-                    x-model="depositSource" :options="[
+                <x-ui.select
+                    label="{{ __('livewire_finance_deposit_source_label') }}"
+                    name="depositForm.depositSource"
+                    x-model="depositSource"
+                    :options="array_filter([
                         'crypto' => __('livewire_finance_deposit_source_crypto'),
-                        'fiat' => __('livewire_finance_deposit_source_fiat'),
-                    ]"
-                    placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" class="" />
+                        'fiat' => session('locale') === 'ru' ? __('livewire_finance_deposit_source_fiat') : null,
+                    ])"
+                    placeholder="{{ __('livewire_finance_deposit_source_crypto') }}"
+                />
 
                 {{-- Сумма --}}
                 <x-ui.input name="depositForm.depositAmount" type="text" step="0.01"
@@ -127,8 +131,7 @@
                                     <li>{{ __('livewire_finance_deposit_help_crypto_step_4') }}</li>
                                     <li>
                                         {{ __('livewire_finance_deposit_help_crypto_step_5') }}
-                                        <a href="https://t.me/ITCAPITALTOP"
-                                           class="text-white font-semibold">
+                                        <a href="https://t.me/ITCAPITALTOP" class="text-white font-semibold">
                                             @ITCAPITALTOP
                                         </a>
                                     </li>
@@ -170,8 +173,7 @@
                                 <li>{{ __('livewire_finance_deposit_help_crypto_step_4') }}</li>
                                 <li>
                                     {{ __('livewire_finance_deposit_help_crypto_step_5') }}
-                                    <a href="https://t.me/ITCAPITALTOP"
-                                       class="text-white font-semibold">
+                                    <a href="https://t.me/ITCAPITALTOP" class="text-white font-semibold">
                                         @ITCAPITALTOP
                                     </a>
                                 </li>
@@ -180,13 +182,9 @@
                         <div class="flex justify-start mt-4">
                             <div
                                 class="bg-white p-4 w-[220px] h-[220px] max-w-[220px]
-                           rounded-[16px] shadow-lg"
-                            >
-                                <img
-                                    src="{{ route('wallet.qr', $depositAddress) }}"
-                                    alt="Deposit QR"
-                                    class="w-full h-auto block"
-                                >
+                           rounded-[16px] shadow-lg">
+                                <img src="{{ route('wallet.qr', $depositAddress) }}" alt="Deposit QR"
+                                    class="w-full h-auto block">
                             </div>
                         </div>
                     </div>
@@ -220,11 +218,14 @@
             </div>
 
             <div class="flex flex-col gap-[40px]">
+
                 <x-ui.select label="{{ __('livewire_finance_withdraw_format_label') }}"
-                    name="withdrawForm.withdrawSource" x-model="withdrawSource" :options="[
+                    name="withdrawForm.withdrawSource"
+                    x-model="withdrawSource"
+                    :options="array_filter([
                         'crypto' => __('livewire_finance_deposit_source_crypto'),
-                        'fiat' => __('livewire_finance_deposit_source_fiat'),
-                    ]"
+                        'fiat' => session('locale') === 'ru' ? __('livewire_finance_deposit_source_fiat') : null,
+                    ])"
                     placeholder="{{ __('livewire_finance_deposit_source_crypto') }}" />
                 <div>
                     <x-ui.input name="withdrawForm.withdrawAmount" type="text" step="0.01"
@@ -323,7 +324,9 @@
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_3') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_fiat_step_4') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_5') }}</li>
                                 <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_6') }}</li>
                             </ul>
                         </div>
                     </template>
@@ -356,11 +359,13 @@
                     <div>
                         {{ __('livewire_finance_withdraw_help_crypto_title_1') }}
                         <ul class="list-decimal list-inside mt-2">
-                            <li>{{ __('livewire_finance_withdraw_help_crypto_step_1') }}</li>
-                            <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
-                            <li>{{ __('livewire_finance_withdraw_help_fiat_step_3') }}</li>
-                            <li>{{ __('livewire_finance_withdraw_help_fiat_step_4') }}</li>
-                            <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_1') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_2') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_3') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_4') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_5') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_crypto_step_3') }}</li>
+                                <li>{{ __('livewire_finance_withdraw_help_fiat_step_6') }}</li>
                         </ul>
                     </div>
                 </template>

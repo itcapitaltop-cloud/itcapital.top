@@ -26,7 +26,7 @@
             <x-account.nav-button routeName="dashboard">{{ __('home') }}</x-account.nav-button>
             <x-account.nav-button routeName="itc-packages">{{ __('packages') }}</x-account.nav-button>
             <x-account.nav-button routeName="finance">{{ __('finance') }}</x-account.nav-button>
-            <x-account.nav-button routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
+            <x-account.nav-button :blur="!hasDeposit(auth()->user()->id)" :close="!hasDeposit(auth()->user()->id)" routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
             <x-account.nav-button routeName="itc-staking">{{ __('itc_staking') }}</x-account.nav-button>
             <x-account.nav-button routeName="academy.landing">
                 {{ __('academy') }}

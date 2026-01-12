@@ -23,13 +23,13 @@ enum TrxTypeEnum: string
     case PARTNER_TRANSFER_IN = 'partner_transfer_in';
 
     case PARTNER_TRANSFER_OUT = 'partner_transfer_out';
-    case START_BONUS_ACCRUAL              = 'start_bonus_accrual';
-    case REGULAR_PREMIUM_ACCRUAL          = 'regular_premium_accrual';
-    case REGULAR_PREMIUM_TO_PARTNER       = 'regular_premium_to_partner';
-    case PARTNER_BONUS_ROLLBACK           = 'partner_bonus_rollback';
-    case PARTNER_TO_PACKAGE           = 'partner_to_package';
+    case START_BONUS_ACCRUAL = 'start_bonus_accrual';
+    case REGULAR_PREMIUM_ACCRUAL = 'regular_premium_accrual';
+    case REGULAR_PREMIUM_TO_PARTNER = 'regular_premium_to_partner';
+    case PARTNER_BONUS_ROLLBACK = 'partner_bonus_rollback';
+    case PARTNER_TO_PACKAGE = 'partner_to_package';
 
-    case RANK_BONUS_ACCRUAL           = 'rank_bonus_accrual';
+    case RANK_BONUS_ACCRUAL = 'rank_bonus_accrual';
 
     case REGULAR_PREMIUM_TO_PARTNER_MIRROR = 'regular_premium_to_partner_mirror';
     case WITHDRAW_PACKAGE_TO_BALANCE = 'withdraw_package_to_balance';
@@ -46,17 +46,17 @@ enum TrxTypeEnum: string
             self::WITHDRAW_PACKAGE_REINVEST_PROFIT => 'Вывод реинвеста пакета на баланс',
             self::PRESENT_PACKAGE => 'Подарочный пакет',
             self::ZERO_PRESENT_PACKAGE => 'Обнуление подарочного пакета по истечении срока действия',
-            self::PARTNER_TO_MAIN_SELF        => 'Перевод с партнёрского на основной',
+            self::PARTNER_TO_MAIN_SELF => 'Перевод с партнёрского на основной',
             self::PARTNER_TO_MAIN_SELF_MIRROR => 'Списание с партнёрского (сам перевод)',
-            self::PARTNER_TRANSFER_IN         => 'Получено от партнёра',
-            self::PARTNER_TRANSFER_OUT        => 'Переведено партнёру',
+            self::PARTNER_TRANSFER_IN => 'Получено от партнёра',
+            self::PARTNER_TRANSFER_OUT => 'Переведено партнёру',
 
-            self::START_BONUS_ACCRUAL               => 'Стартовая премия',
-            self::REGULAR_PREMIUM_ACCRUAL           => 'Регулярная премия',
-            self::REGULAR_PREMIUM_TO_PARTNER        => 'Перевод регулярной премии в партнёрский',
+            self::START_BONUS_ACCRUAL => 'Стартовая премия',
+            self::REGULAR_PREMIUM_ACCRUAL => 'Регулярная премия',
+            self::REGULAR_PREMIUM_TO_PARTNER => 'Перевод регулярной премии в партнёрский',
             self::REGULAR_PREMIUM_TO_PARTNER_MIRROR => 'Списание c баланса регулярной премии',
-            self::PARTNER_BONUS_ROLLBACK            => 'Сторно партнёрской премии',
-            self::PARTNER_TO_PACKAGE            => 'Перевод партнерского баланса в пакет',
+            self::PARTNER_BONUS_ROLLBACK => 'Сторно партнёрской премии',
+            self::PARTNER_TO_PACKAGE => 'Перевод партнерского баланса в пакет',
             self::WITHDRAW_PACKAGE_TO_BALANCE => 'Вывод части пакета на основной баланс',
             self::RANK_BONUS_ACCRUAL => 'Начисление бонуса при достижении ранга',
         };
@@ -77,14 +77,14 @@ enum TrxTypeEnum: string
             self::REGULAR_PREMIUM_TO_PARTNER,
             self::WITHDRAW_PACKAGE_TO_BALANCE,
             self::RANK_BONUS_ACCRUAL,
-
         ];
     }
 
     public static function getCredits(): array
     {
         return [
-            self::BUY_PACKAGE, self::WITHDRAW,
+            self::BUY_PACKAGE,
+            self::WITHDRAW,
             self::PARTNER_TO_MAIN_SELF_MIRROR,
             self::PARTNER_TRANSFER_OUT,
             self::REGULAR_PREMIUM_TO_PARTNER_MIRROR,

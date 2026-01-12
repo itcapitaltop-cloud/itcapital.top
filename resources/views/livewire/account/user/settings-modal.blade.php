@@ -91,7 +91,7 @@
                 :icons="[
                     'ru' => vite()->icon('/flags/ru.svg'),
                     'en' => vite()->icon('/flags/en.svg'),
-                    'zh' => vite()->icon('/flags/zh_CN.svg'),
+                    'zh' => vite()->icon('/flags/zh.svg'),
                 ]"
                 :value="$locale"
                 placeholder="Русский"

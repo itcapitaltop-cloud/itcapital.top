@@ -2,14 +2,14 @@
 
 namespace App\Livewire\Account\User;
 
-use App\Models\User;
 use App\Notifications\PasswordChanged;
 use App\Notifications\VerifyNewEmail;
-use Illuminate\Support\Facades\{Auth, Hash, Lang, Log, Mail};
-use Illuminate\Validation\ValidationException;
-use Livewire\Component;
-use Livewire\Attributes\Validate;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
 
 class SettingsModal extends Component
 {
@@ -46,17 +46,17 @@ class SettingsModal extends Component
         $u = Auth::user();
 
         $this->first_name = $u->first_name;
-        $this->last_name  = $u->last_name;
-        $this->telegram   = $u->telegram ?? '';
-        $this->locale     = $u->locale   ?? 'ru';
-        $this->email      = $u->pending_email ?: $u->email;
+        $this->last_name = $u->last_name;
+        $this->telegram = $u->telegram ?? '';
+        $this->locale = $u->locale ?? session('locale') ?? 'en';
+        $this->email = $u->pending_email ?: $u->email;
         $this->originalEmail = $u->email;
     }
 
     /**
      * @throws ValidationException
      */
-    public function save(): void
+    public function save()
     {
         $u = Auth::user();
 
@@ -68,9 +68,9 @@ class SettingsModal extends Component
 
         $u->update([
             'first_name' => $this->first_name,
-            'last_name'  => $this->last_name,
-            'telegram'   => $this->telegram,
-            'locale'     => $this->locale,
+            'last_name' => $this->last_name,
+            'telegram' => $this->telegram,
+            'locale' => $this->locale,
         ]);
 
         if ($this->newPassword !== '') {
@@ -78,7 +78,7 @@ class SettingsModal extends Component
             $this->validateOnly('newPasswordConfirm');
             $u->update(['password' => Hash::make($this->newPassword)]);
 
-            $u->notify(new PasswordChanged);
+            $u->notify(new PasswordChanged());
         }
 
         if ($this->email !== $this->originalEmail) {
@@ -102,6 +102,8 @@ class SettingsModal extends Component
 
         $this->reset(['newPassword', 'newPasswordConfirm']);
         $this->originalEmail = $this->email;
+
+        return redirect(request()->header('Referer'));
     }
 
     public function resendVerification(): void

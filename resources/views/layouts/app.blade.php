@@ -7,22 +7,24 @@
     <title>
         @yield('title', 'ITCAPITAL')
     </title>
-    @vite(['resources/css/app.css','resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body :class="{ 'overflow-hidden' : $store.menu.open }"
-      x-data="{ isSettingsModal: false }">
+<body :class="{ 'overflow-hidden': $store.menu.open }" x-data="{ isSettingsModal: false }">
     <x-index.mobile-menu />
     @yield('content')
     <livewire:app.system-notification />
+    <livewire:account.finance.deposit-success-modal />
     @auth
         <livewire:notifications.dropdown class="mr-[6px]" />
-        <livewire:account.user.settings-modal :wire:key="'settings-modal'" condition-name="isSettingsModal"/>
+        <livewire:account.user.settings-modal :wire:key="'settings-modal'" condition-name="isSettingsModal" />
     @endauth
     @once
         <script>
             document.addEventListener('alpine:init', () => {
-                Alpine.store('menu', { open: false });
+                Alpine.store('menu', {
+                    open: false
+                });
 
                 Alpine.store('notifications', {
                     unread: @json(auth()?->user()?->unreadNotifications()->count() ?? 0),

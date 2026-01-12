@@ -3,6 +3,7 @@
 namespace App\Livewire\Forms\Account\Dashboard;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Finance\WithdrawDataTransferObject;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\CurrencyEnum;
@@ -13,7 +14,6 @@ use App\Models\Withdraw;
 use App\Models\WithdrawFiatDetail;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -21,6 +21,7 @@ class CreateWithdrawForm extends Form
 {
     #[Validate(['required', 'in:crypto,fiat'])]
     public string $withdrawSource = 'crypto';
+
     #[Validate(['required', 'numeric', 'min:10'])]
     public string $withdrawAmount = '';
 
@@ -52,15 +53,14 @@ class CreateWithdrawForm extends Form
     #[Validate(['nullable', 'required_without:address', 'string', 'max:255'])]
     public string $recipientName = '';
 
-
-    public function store(TransactionRepositoryContract $transactionRepo): void
+    public function store(TransactionRepositoryContract $transactionRepo): WithdrawDataTransferObject
     {
 
         $this->validate();
 
         $sourceId = PaymentSource::where('source', $this->withdrawSource)->value('id');
 
-        $network  = config('wallet.network');
+        $network = config('wallet.network');
 
         $transactionRepo->checkBalanceAndStore(new CreateTransactionDto(
             userId: Auth::id(),
@@ -74,17 +74,27 @@ class CreateWithdrawForm extends Form
                 'payment_source_id' => $sourceId,
                 'currency' => CurrencyEnum::fromNetwork($network),
                 'commission' => BigDecimal::of($this->withdrawAmount)->multipliedBy('0.02')->plus('2'),
-                'wallet_address' => $this->address ?: null
+                'wallet_address' => $this->address ?: null,
             ]);
 
             if ($this->withdrawSource === 'fiat') {
                 WithdrawFiatDetail::create([
-                    'uuid'           => $transaction->uuid,
-                    'sbp_phone'      => $this->sbpPhone,
-                    'bank_name'      => $this->bankName,
+                    'uuid' => $transaction->uuid,
+                    'sbp_phone' => $this->sbpPhone,
+                    'bank_name' => $this->bankName,
                     'recipient_name' => $this->recipientName,
                 ]);
             }
         });
+
+        return new WithdrawDataTransferObject(
+            paymentSources: $sourceId,
+            amount: $this->withdrawAmount,
+            walletAddress: $this->address,
+            commission: BigDecimal::of($this->withdrawAmount)->multipliedBy('0.02')->plus('2'),
+            phone: $this->sbpPhone,
+            nameBank: $this->bankName,
+            fullname: $this->recipientName,
+        );
     }
 }

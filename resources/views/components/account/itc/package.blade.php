@@ -1,5 +1,6 @@
 @props([
     'withButtons' => true,
+    'mainBalance' => 1000,
 ])
 
 @php
@@ -12,6 +13,7 @@
     <div x-data="{
         isModalClosePackageActive: false,
         isModalEditBalanceActive: false,
+        isTopUpNeeded: false,
         showConfirmReinvest: false,
         showConfirmWithdraw: false,
         showConfirmContinue: false,
@@ -126,6 +128,47 @@
             </x-widget.modal>
         @endif
 
+        <x-widget.modal condition-name="isTopUpNeeded" max-width="md" class="p-4 md:min-w-[350px] min-w-[250px]">
+
+            <x-bg.section-slim class="!px-1 !py-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-dela text-[18px]">
+                        {{ __('components_account_itc_package_withdraw_dividends_top_up_need') }}
+                    </h3>
+
+                    <figure class="cursor-pointer" x-on:click="isTopUpNeeded = false">
+                        <img class="icon-white w-4" src="{{ vite()->icon('/actions/cancel.svg') }}" alt="">
+                    </figure>
+                </div>
+            </x-bg.section-slim>
+
+            <x-bg.section-slim class="!px-1 !py-2">
+                <div class="flex flex-col sm:flex-row sm:items-center mb-6 md:mb-[32px] gap-2 sm:gap-0">
+                    <p class="sm:mr-[102px] block text-sm md:text-base">
+                        {{ __('components_account_dashboard_widget_balance_main_balance') }}
+                    </p>
+                    <p class="flex gap-2 items-center">
+                        <img src="{{ vite()->icon('currency/itc.svg') }}" class="w-[12px]" alt="">
+                        <span class="text-sm md:text-base">{{ number_format($mainBalance, 2, '.', '') }}</span>
+                    </p>
+                </div>
+
+                <form wire:submit="topUpNeeded('{{ $package->uuid }}')"
+                    x-on:balance-edited.window="isTopUpNeeded = false">
+
+                    <x-ui.input name="withdrawPackageAmount"
+                        placeholder="{{ __('components_account_itc_package_amount_placeholder') }}" validate="number"
+                        input-class="py-[5px] px-[12px]">
+                        {{ __('components_account_dashboard_widget_deposit_modal_title') }}
+                    </x-ui.input>
+
+                    <x-ui.submit-button action="topUpNeeded" class="w-full mt-8">
+                        {{ __('components_account_itc_package_confirm') }}
+                    </x-ui.submit-button>
+                </form>
+            </x-bg.section-slim>
+        </x-widget.modal>
+
         <div class="w-[356px] h-[208px] rounded-[28px]">
             <img src="{{ vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
                 class="w-[356px] h-[208px] absolute z-[10]" alt="">
@@ -229,6 +272,13 @@
                         class="ml-2 text-[14px] md:text-[16px]">({{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
                         ITC)</span>
                 </x-ui.button>
+
+                @if ($package->type !== PackageTypeEnum::PRESENT)
+                    <x-ui.button @click="isTopUpNeeded = true" variant="primary"
+                        class="!text-[14px] !md:text-[16px]">
+                        Добавить ITC в пакет
+                    </x-ui.button>
+                @endif
 
                 {{-- @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT) --}}
                 {{-- <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="isModalEditBalanceActive = true">

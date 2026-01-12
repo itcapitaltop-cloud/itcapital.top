@@ -90,7 +90,20 @@ class Transaction extends Model
     }
 
     /**
+     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\Transaction> $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Transaction>
+     */
+    #[Scope]
+    public function deposits(Builder $query): Builder
+    {
+        return $query
+            ->where('trx_type', TrxTypeEnum::DEPOSIT)
+            ->whereNotNull('accepted_at');
+    }
+
+    /**
      * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $userId
      * @return \Illuminate\Database\Eloquent\Builder
      */
     #[Scope]

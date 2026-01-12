@@ -44,7 +44,7 @@
                 </div>
                 <div class="flex flex-col gap-[44px] mt-[20px]">
                     @foreach ($packages as $package)
-                        <x-account.itc.package :package="$package" />
+                        <x-account.itc.package :package="$package" :mainBalance="$mainBalance" />
                     @endforeach
                 </div>
             </div>

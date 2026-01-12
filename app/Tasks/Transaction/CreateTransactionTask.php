@@ -22,10 +22,10 @@ final class CreateTransactionTask
 
     private ?Carbon $rejectedAt = null;
 
-    public function run(string $amount, int $userId): Transaction
+    public function run(string $amount, int $userId, ?string $uuid = null): Transaction
     {
         return Transaction::query()->create([
-            'uuid' => $this->prefix . Str::random(10),
+            'uuid' => $uuid ?? $this->prefix . Str::random(10),
             'amount' => $amount,
             'trx_type' => $this->trxType,
             'balance_type' => $this->balanceType,

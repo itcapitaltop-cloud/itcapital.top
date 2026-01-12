@@ -4,8 +4,6 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 final class SetLocale
@@ -13,30 +11,32 @@ final class SetLocale
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $request->cookie('locale');
+        $locale = session('locale');
 
-        if (!$locale) {
+        if (! $locale) {
             $acceptLanguage = $request->server('HTTP_ACCEPT_LANGUAGE', '');
             $browserLang = substr($acceptLanguage, 0, 2);
 
-            $locale = ($browserLang === 'zh') ? 'ru' : $browserLang;
+            $locale = $browserLang;
         }
 
-        if (auth()->check() && !is_null(auth()->user()->locale)) {
+        if (auth()->check() && ! is_null(auth()->user()->locale)) {
+
             $locale = auth()->user()->locale;
         }
 
         $available = ['ru', 'en', 'zh'];
 
-        if (!in_array($locale, $available, true)) {
-            $locale = 'ru';
+        if (! in_array($locale, $available, true)) {
+            $locale = 'en';
         }
 
         app()->setLocale($locale);
+        session(compact('locale'));
 
         return $next($request);
     }

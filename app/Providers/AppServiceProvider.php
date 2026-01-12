@@ -2,24 +2,12 @@
 
 namespace App\Providers;
 
-use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\ExternalServices\GoogleDriveBackupUploaderContract;
 use App\Contracts\ExternalServices\GoogleSheetsUploaderContract;
-use App\Contracts\Logs\LogRepositoryContract;
-use App\Contracts\Packages\ItcPackageRepositoryContract;
-use App\Contracts\Packages\PackageReinvestRepositoryContract;
-use App\Contracts\Packages\PackageRepositoryContract;
-use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Notifications\ResetPasswordRu;
 use App\Notifications\VerifyEmailRu;
 use App\Repositories\GoogleDriveBackupUploaderRepository;
 use App\Repositories\GoogleSheetsUploaderRepository;
-use App\Repositories\ItcPackageRepository;
-use App\Repositories\LogRepository;
-use App\Repositories\PackageReinvestRepository;
-use App\Repositories\PackageRepository;
-use App\Repositories\StartBonusAccrualRepository;
-use App\Repositories\TransactionRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\App;
