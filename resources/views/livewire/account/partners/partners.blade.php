@@ -12,7 +12,7 @@
 
             <x-slot name="partners">
                 <div class="relative">
-                    <a href="{{ Storage::disk('public')->url('docs/how-works-partners-program.pdf') }}" target="_blank"
+                    <a href="{{ Storage::disk('public')->url('docs/how-works-partners-program-1.pdf') }}" target="_blank"
                         rel="noopener"
                         class="flex absolute right-0 top-0 text-[#B4FF59] font-semibold text-[14px]
                       underline underline-offset-[3px] decoration-dotted decoration-1
