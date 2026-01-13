@@ -1,7 +1,7 @@
 <div class="relative">
     <div @class([
         'transition duration-200',
-        'blur-sm pointer-events-none select-none' => !hasDeposit(
+        'blur-sm pointer-events-none select-none' => !hasPackage(
             auth()->user()->id),
     ]) x-data="{ isModalSentToPartner: false }">
 
@@ -347,7 +347,7 @@
 
     </div>
 
-    @if (!hasDeposit(auth()->user()->id))
+    @if (!hasPackage(auth()->user()->id))
         <div class="absolute inset-0 z-[1000] flex items-center justify-center overflow-hidden">
             <div class="protected-sections">
                 <p class="text-white text-[16px] text-center font-semibold mb-6 leading-snug">

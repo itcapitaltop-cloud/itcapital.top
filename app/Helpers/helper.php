@@ -26,16 +26,16 @@ if (! function_exists('scale')) {
     }
 }
 
-if (! function_exists('hasDeposit')) {
-    function hasDeposit(?int $userId = null): bool
+if (! function_exists('hasPackage')) {
+    function hasPackage(?int $userId = null): bool
     {
         if (! $userId) {
             return false;
         }
 
         return Transaction::query()
-            ->deposits()
             ->where('user_id', $userId)
+            ->whereHas('itcPackage')
             ->exists();
     }
 }
