@@ -1,11 +1,12 @@
 <?php
 
 use App\Http\Middleware\SetLocale;
-use     Illuminate\Foundation\Application;
+use App\Http\Middleware\StoreUserSessionId;
+use App\Http\Middleware\ValidateSessionVersion;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use MoonShine\Http\Middleware\Authenticate;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,15 +15,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-//        $middleware->redirectUsersTo(fn(Request $request) => route('index'));
+        //        $middleware->redirectUsersTo(fn(Request $request) => route('index'));
     })
-    ->withMiddleware(function(Middleware $middleware) {
+    ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
+            ValidateSessionVersion::class,
             SetLocale::class,
         ]);
 
         $middleware->trustProxies(
-        // доверять всем прокси (ngrok может иметь динамический IP)
+            // доверять всем прокси (ngrok может иметь динамический IP)
             at: '*',
             // доверять именно этим заголовкам
             headers: Request::HEADER_X_FORWARDED_FOR
@@ -35,6 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withBroadcasting(
-        channels: __DIR__.'/../routes/channels.php',
+        channels: __DIR__ . '/../routes/channels.php',
     )
     ->create();

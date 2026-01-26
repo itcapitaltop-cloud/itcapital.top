@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Account\User;
 
+use App\Actions\User\InvalidateSessionUserAction;
 use App\Notifications\PasswordChanged;
 use App\Notifications\VerifyNewEmail;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -55,16 +58,19 @@ class SettingsModal extends Component
 
     /**
      * @throws ValidationException
+     * @throws \Illuminate\Auth\AuthenticationException
      */
     public function save()
     {
         $u = Auth::user();
+        $passwordChanged = false;
 
         $this->validateOnly('first_name');
         $this->validateOnly('last_name');
         $this->validateOnly('telegram');
         $this->validateOnly('locale');
         $this->validateOnly('email');
+
 
         $u->update([
             'first_name' => $this->first_name,
@@ -73,12 +79,17 @@ class SettingsModal extends Component
             'locale' => $this->locale,
         ]);
 
+
         if ($this->newPassword !== '') {
             $this->validateOnly('newPassword');
             $this->validateOnly('newPasswordConfirm');
             $u->update(['password' => Hash::make($this->newPassword)]);
 
+            new InvalidateSessionUserAction($u)->execute();
+
             $u->notify(new PasswordChanged());
+
+            $passwordChanged = true;
         }
 
         if ($this->email !== $this->originalEmail) {
@@ -102,6 +113,15 @@ class SettingsModal extends Component
 
         $this->reset(['newPassword', 'newPasswordConfirm']);
         $this->originalEmail = $this->email;
+
+
+        if ($passwordChanged) {
+            Auth::logout();
+            session()?->invalidate();
+            session()?->regenerateToken();
+
+            return redirect()->route('login');
+        }
 
         return redirect(request()->header('Referer'));
     }

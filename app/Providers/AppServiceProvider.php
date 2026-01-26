@@ -11,6 +11,7 @@ use App\Repositories\GoogleSheetsUploaderRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -38,6 +39,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
+        if (! app()->environment('production')) {
+            Mail::alwaysTo(config('mail.staging.address'));
+        }
+
         if (! App::hasDebugModeEnabled()) {
             $this->app['request']->server->set('HTTPS', 'on');
             URL::forceScheme('https');

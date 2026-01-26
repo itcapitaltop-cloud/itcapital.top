@@ -40,7 +40,7 @@
                     </div>
                     <div class="flex flex-col gap-2 sm:gap-3">
                         <span class="text-white tracking-wide text-[8px] sm:text-[10px] font-normal opacity-50">
-                            дата покупки
+                            {{ __('date_of_purchase') }}
                         </span>
                         <span class="uppercase text-white/90 tracking-wide text-[12px] sm:text-[14px]">
                             {{ $package->created_at->format('d/m/Y') }}

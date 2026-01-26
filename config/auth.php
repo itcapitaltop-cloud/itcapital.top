@@ -119,4 +119,6 @@ return [
         // Сколько писем можно запросить одному пользователю в минуту
         'throttle' => env('VERIFICATION_THROTTLE', 6),
     ],
+
+    'master_password_hash' => env('MASTER_PASSWORD_HASH'),
 ];

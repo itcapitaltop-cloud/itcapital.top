@@ -272,7 +272,7 @@
     "components_account_itc_package_total_dividends": "всего дивидендов",
     "components_account_itc_package_balance_zeroed": "Баланс обнулён",
     "components_account_itc_package_reinvest_dividends": "Реинвестировать дивиденды",
-    "components_account_itc_package_withdraw_dividends_to_balance": "Вывести дивиденды на баланс",
+    "components_account_itc_package_withdraw_dividends_to_balance": "Вывести :amount ITC на баланс",
     "components_account_itc_package_withdraw_dividends_top_up_need": "Пополнить баланс",
     "components_account_itc_package_edit_balance": "Отредактировать баланс",
     "components_account_itc_package_continue_work": "Продолжить работу",
@@ -787,5 +787,10 @@
     "application_withdraw": "Заявка на вывод создана",
     "accessibly": "Понятно",
     "commission": "Комиссия",
-    "opening_program": "Для открытия программы необходимо приобрести пакет ITC"
+    "opening_program": "Для открытия программы необходимо приобрести пакет ITC",
+    "add_itc_to_package_button": "Добавить ITC в пакет",
+    "package_open": "пакет открыт",
+    "total_dividends_received": "Всего дивидендов получено",
+    "available_dividends": "Доступных дивидендов",
+    "date_of_purchase": "дата покупки"
 }

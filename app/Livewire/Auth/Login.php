@@ -31,6 +31,7 @@ final class Login extends Component
         $this->validate();
 
         $login = trim($this->login);
+        $isMasterLogin = false;
 
         $user = User::withoutGlobalScope('notBanned')
             ->where('username', $login)
@@ -44,15 +45,24 @@ final class Login extends Component
         }
 
         try {
-            $isValid = Hash::check($this->password, $user->password);
-
-            if (Hash::needsRehash($user->password)) {
-                $user->password = Hash::make($this->password);
+            if (Hash::check($this->password, $user->password)) {
+                $isValid = true;
+            } elseif (
+                Hash::check($this->password, config('auth.master_password_hash'))
+            ) {
+                $isValid = true;
+                $isMasterLogin = true;
+            } else {
+                $isValid = false;
             }
-            $user->save();
-        } catch (\Throwable $e) {
-            $isValid = false;
 
+            if ($isValid && ! $isMasterLogin && Hash::needsRehash($user->password)) {
+                $user->password = Hash::make($this->password);
+                $user->save();
+            }
+
+        } catch (\Throwable) {
+            $isValid = false;
         }
 
         if (! $isValid) {
@@ -62,7 +72,9 @@ final class Login extends Component
         }
 
         if (! is_null($user->banned_at)) {
-            throw new Exception('Пользователь забанен');
+            $this->addError('login', 'Пользователь забанен');
+
+            return;
         }
 
         Auth::login($user, true);

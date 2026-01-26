@@ -18,7 +18,7 @@
         showConfirmWithdraw: false,
         showConfirmContinue: false,
         showConfirmEditBalance: false
-    }" class="flex flex-col md:flex-row gap-6 items-start">
+    }" class="flex flex-col md:flex-row gap-[40px] md:items-center items-start">
 
         <x-widget.modal condition-name="isModalClosePackageActive" class="p-4">
             <x-bg.section-slim class="!px-1 !py-2">
@@ -115,8 +115,8 @@
                     <form wire:submit="withdrawPackageBalance('{{ $package->uuid }}')"
                         x-on:balance-edited.window="isModalEditBalanceActive = false">
 
-                        <x-ui.input name="withdrawPackageAmount" placeholder="Сумма в ITC" {{--                            notice="Сумма для вывода на баланс" --}}
-                            validate="number" input-class="py-[5px] px-[12px]">
+                        <x-ui.input name="withdrawPackageAmount" placeholder="Сумма в ITC" validate="number"
+                            input-class="py-[5px] px-[12px]">
                             {{ __('components_account_itc_package_amount_to_withdraw_to_balance') }}
                         </x-ui.input>
 
@@ -176,7 +176,7 @@
                         bg-none">
                 <div class="relative h-full flex flex-col justify-between p-6 text-white">
 
-                    <div class="grid grid-cols-2 items-baseline gap-x-6 md:gap-x-[50px] gap-y-4">
+                    <div class="flex flex-col items-baseline gap-x-6 md:gap-x-[50px] gap-y-4">
 
                         {{-- ► 1‑я строка, 1‑й столбец  ─ депозит --}}
                         <div class="flex items-baseline gap-1">
@@ -193,56 +193,55 @@
                                                 ($package->balance_withdraws_sum_amount ?? 0),
                                         )->stripTrailingZeros() }}
                                 </span>
-                                <p class="text-[12px] text-white/50 leading-none tracking-wide">
+                                <p class="text-[12px] text-white/50 leading-none tracking-wide font-bold">
                                     {{ __('components_account_itc_package_deposit') }}
                                 </p>
                             </div>
                         </div>
 
-                        @if ($package->reinvest_profits_sum_amount > 0)
-                            <div class="flex flex-col items-baseline gap-1">
-                                <span class="text-[16px] md:text-[20px] font-dela leading-none">
-                                    +{{ scale($package->reinvest_profits_sum_amount)->stripTrailingZeros() }}
-                                </span>
-                                <p class="text-[12px] text-white/50 tracking-wide leading-none">
-                                    {{ __('components_account_itc_package_reinvested') }}
-                                </p>
-                            </div>
-                        @else
-                            <div></div>
-                        @endif
-
-                        <div class="flex items-baseline self-baseline">
-                            <img src="{{ vite()->icon('/currency/itc-white.svg') }}"
-                                class="w-[19px] invisible translate-y-[2px]" alt="ITC">
-                            <div>
-                                <p class="text-[16px] md:text-[20px] font-dela leading-none">
-                                    {{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros() }}
-                                </p>
-                                <p class="text-[12px] text-white/50 tracking-wide">
-                                    {{ __('components_account_itc_package_dividends') }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="self-baseline">
-                            <p class="text-[16px] md:text-[20px] font-dela leading-none">
-                                {{ scale($package->profits_sum_amount)->stripTrailingZeros() }}
-                            </p>
-                            <p class="text-[12px] text-white/50 tracking-wide">
-                                {{ __('components_account_itc_package_total_dividends') }}
-                            </p>
+                        <div class="flex items-baseline self-baseline mb-4 md:pl-3">
+                            @if ($package->reinvest_profits_sum_amount > 0)
+                                <div class="flex flex-col items-baseline gap-1">
+                                    <span class="text-[16px] md:text-[20px] font-dela leading-none">
+                                        +{{ scale($package->reinvest_profits_sum_amount)->stripTrailingZeros() }}
+                                    </span>
+                                    <p
+                                        class="text-[12px] text-white/50 tracking-wide leading-none font-bold md:pl-2 block">
+                                        {{ __('components_account_itc_package_reinvested') }}
+                                    </p>
+                                </div>
+                            @else
+                                <div></div>
+                            @endif
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between px-2 mb-[2px] mt-auto">
-                        <img src="{{ vite()->icon('/cards/chip.svg') }}" class="w-8" alt="chip">
-                        <span class="uppercase text-white/90 tracking-wide ml-[60px] md:ml-[90px] text-[14px]">
-                            {{ $package->work_to?->format('d/m/y') }}
-                        </span>
-                        <span class="uppercase text-white/90 tracking-wide ml-auto md:mr-0 mr-[20px] text-[14px]">
-                            {{ $package->type->getName() }}
-                        </span>
+                    <div class="flex items-center justify-between gap-3 sm:gap-5 md:pl-5">
+                        <div class="flex flex-col gap-1 sm:gap-2">
+                            <span
+                                class="uppercase text-white tracking-wide text-[8px] sm:text-[10px] font-normal opacity-50 text-nowrap">
+                                {{ $package->uuid }}
+                            </span>
+                            <img src="{{ vite()->icon('/cards/chip.svg') }}" class="w-6 sm:w-8" alt="chip">
+                        </div>
+                        <div class="flex flex-col gap-2 sm:gap-3">
+                            <span class="text-white tracking-wide text-[8px] sm:text-[10px] font-normal opacity-50">
+                                {{ __('package_open') }}
+                            </span>
+                            <span class="uppercase text-white/90 tracking-wide text-[12px] sm:text-[14px]">
+                                {{ $package->created_at->format('d/m/Y') }}
+                            </span>
+
+                        </div>
+
+                        <div class="flex flex-col gap-1 sm:gap-2">
+                            <span class="text-white text-right tracking-wide text-[8px] sm:text-[14px] font-normal">
+                                {{ $package->month_profit_percent }}%
+                            </span>
+                            <span class="uppercase text-white/90 tracking-wide text-[14px]">
+                                {{ $package->type->getName() }}
+                            </span>
+                        </div>
                     </div>
 
                     @if ($package->type === PackageTypeEnum::PRESENT && $package->zeroing)
@@ -254,53 +253,86 @@
                 </div>
             </div>
         </div>
+
+        <div class="hidden lg:block flex-shrink-0"
+            style="width: 1px; height: 174px; background-color: rgba(255, 255, 255, 0.3);"></div>
+
         @if ($withButtons)
-            <div class="flex z-[11] flex-col items-start gap-3">
+            <div class="flex-none w-full max-w-[348px] z-[11] flex flex-col items-start gap-3">
+
+                <div class="w-full mb-2">
+                    <div class="flex items-baseline justify-between">
+                        <div class="flex flex-col gap-3">
+                            <p class="text-white font-semibold text-[10px] md:text-base">
+                                {{ __('total_dividends_received') }}
+                            </p>
+                            <p class="text-white font-semibold text-[10px] md:text-base">
+                                {{ __('available_dividends') }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-3">
+                            <p class="flex items-baseline gap-2 min-w-[64px]">
+                                <img src="{{ vite()->icon('currency/itc.svg') }}" class="w-[12px] align-baseline"
+                                    alt="">
+                                <span class="text-white font-extrabold text-[10px] md:text-base">
+                                    {{ scale($package->profits_sum_amount)->stripTrailingZeros() }}
+                                </span>
+                            </p>
+                            <p class="flex items-baseline gap-2 min-w-[64px]">
+                                <img src="{{ vite()->icon('currency/itc.svg') }}" class="w-[12px] align-baseline"
+                                    alt="">
+                                <span class="text-white font-extrabold text-[10px] md:text-base">
+                                    {{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros() }}
+                                </span>
+                            </p>
+                        </div>
+
+
+                    </div>
+                </div>
 
                 <x-ui.button :disabled="$package->getCurrentProfitAmount()->isNegativeOrZero()" x-on:click="showConfirmReinvest = true"
                     class="!text-[14px] !md:text-[16px]">
-                    {{ __('components_account_itc_package_reinvest_dividends') }}
-                    <span
-                        class="ml-2 text-[14px] md:text-[16px]">({{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
-                        ITC)</span>
+                    <span class="text-[14px] md:text-[16px]">
+                        {{ __('components_account_itc_package_reinvest_action') }}
+                        {{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
+                        ITC</span>
                 </x-ui.button>
 
                 <x-ui.button variant="secondary" class="justify-between" :disabled="$package->getCurrentProfitAmount()->isNegativeOrZero()"
                     x-on:click="showConfirmWithdraw = true" class="!text-[14px] !md:text-[16px]">
-                    {{ __('components_account_itc_package_withdraw_dividends_to_balance') }}
-                    <span
-                        class="ml-2 text-[14px] md:text-[16px]">({{ $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString() }}
-                        ITC)</span>
+                    <span class="flex gap-4 items-center text-[14px] md:text-[16px]">
+                        {{ __('components_account_itc_package_withdraw_dividends_to_balance', [
+                            'amount' => $package->getCurrentProfitAmount()->isNegative()
+                                ? '0'
+                                : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString(),
+                        ]) }}
+                        <svg viewBox="0 0 12.1094 12.1094" xmlns="http://www.w3.org/2000/svg"
+                            xmlns:xlink="http://www.w3.org/1999/xlink" width="12.109375" height="12.109375"
+                            fill="none" customFrame="#000000">
+                            <path id="Vector"
+                                d="M11.3592 6.64256L11.3595 0.75L5.46729 0.75M0.75293 11.3566L11.3595 0.75"
+                                stroke="rgb(255,255,255)" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="1.500000" />
+                        </svg>
+
+                    </span>
                 </x-ui.button>
 
                 @if ($package->type !== PackageTypeEnum::PRESENT)
                     <x-ui.button @click="isTopUpNeeded = true" variant="primary"
                         class="!text-[14px] !md:text-[16px]">
-                        Добавить ITC в пакет
+                        <span class="text-[14px] md:text-[16px]">
+                            {{ __('add_itc_to_package_button') }}
+                        </span>
                     </x-ui.button>
                 @endif
-
-                {{-- @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT) --}}
-                {{-- <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="isModalEditBalanceActive = true">
-                        {{ __('components_account_itc_package_edit_balance') }}
-                    </x-ui.button> --}}
-
-                {{--                    <x-ui.button class="!text-[14px] !md:text-[16px]" x-on:click="showConfirmContinue = true"> --}}
-                {{--                        {{ __('components_account_itc_package_continue_work') }} --}}
-                {{--                    </x-ui.button> --}}
-                {{-- @endif --}}
-
-
-                {{--            <x-ui.button variant="secondary" disabled class="!text-[14px] !md:text-[16px]"> --}}
-                {{--                Снять доступные реинвесты --}}
-                {{--            </x-ui.button> --}}
-
-                {{--            <x-ui.button x-on:click="isModalClosePackageActive = true" class="bg-[#DA2128] hover:bg-[#ec4249] !text-[14px] !md:text-[16px]" variant="danger"> --}}
-                {{--                Закрыть пакет --}}
-                {{--            </x-ui.button> --}}
 
             </div>
         @endif
 
+        <div class="block lg:hidden flex-shrink-0"
+            style="width: 100%; height: 1px; background-color: rgba(255, 255, 255, 0.3);"></div>
     </div>
 </x-bg.main>

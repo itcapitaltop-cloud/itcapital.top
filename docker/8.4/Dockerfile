@@ -32,7 +32,9 @@ RUN apt-get update \
     && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt jammy-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get -y autoremove \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && apt-get update \
+    && apt-get install -y postgresql-client
 
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 

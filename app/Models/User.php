@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Models\User\Session;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -23,12 +24,14 @@ use Illuminate\Notifications\Notifiable;
  * @property string $last_name
  * @property string $username
  * @property string $email
+ * @property int $session_version
  * @property \Illuminate\Support\Carbon|null $email_verified_at
  * @property mixed $password
  * @property string|null $remember_token
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
+ * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int,
+ *     \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  *
  * @method static \Database\Factories\UserFactory factory($count = null, $state = [])
@@ -73,6 +76,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'rank',
         'password',
         'banned_at',
+        'session_version',
         'email_verified_at',
         'locale',
         'pending_email',
@@ -239,6 +243,14 @@ final class User extends Authenticatable implements MustVerifyEmail
             'id',
             'partner_id'
         );
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\User\Session, $this>
+     */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(Session::class);
     }
 
     public function deposits(): HasManyThrough

@@ -7,7 +7,6 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class BackupProcessingCommand extends Command
@@ -18,6 +17,7 @@ class BackupProcessingCommand extends Command
      * @var string
      */
     protected $signature = 'app:backup-processing-command';
+
     protected $description = 'Создание ежедневного бэкапа базы Postgres и загрузка на Google диск, хранится 5 последних';
 
     protected GoogleDriveBackupUploaderContract $drive;
@@ -35,7 +35,7 @@ class BackupProcessingCommand extends Command
 
         $anchor = CarbonImmutable::create(1970, 1, 5);
 
-        $nowW   = now()->startOfWeek(CarbonInterface::MONDAY);
+        $nowW = now()->startOfWeek(CarbonInterface::MONDAY);
 
         $q = $anchor->diffInWeeks($nowW) % 2 === 0;
 
@@ -50,30 +50,33 @@ class BackupProcessingCommand extends Command
         $host = config('database.connections.pgsql.host');
         $port = config('database.connections.pgsql.port', 5432);
 
-        $cmd = 'PGPASSWORD=' . escapeshellarg($pass)
-            . ' pg_dump'
-            . ' -h ' . escapeshellarg($host)
-            . ' -U ' . escapeshellarg($user)
-            . ' -p ' . escapeshellarg($port)
-            . ' ' . escapeshellarg($db)
-            . ' > ' . escapeshellarg($absolutePath);
-
+        $cmd = sprintf(
+            'PGPASSWORD=%s pg_dump -h %s -U %s -p %d %s > %s 2>&1',
+            escapeshellarg($pass),
+            escapeshellarg($host),
+            escapeshellarg($user),
+            $port,
+            escapeshellarg($db),
+            escapeshellarg($absolutePath)
+        );
         $result = null;
 
         exec($cmd, $output, $result);
+
         if ($result !== 0) {
-            $this->error("Ошибка при выполнении pg_dump");
+            $this->error('Ошибка при выполнении pg_dump');
 
             Storage::disk('local')->delete($relativePath);
+
             return;
         }
-
 
         // 3. Загрузка на Google Drive
         $this->drive->uploadBackup($relativePath, $filename);
 
         // 4. Ротация: хранить только 5 последних
         $files = $this->drive->getBackupFiles();
+
         if (count($files) > 14) {
             foreach (array_slice($files, 0, count($files) - 14) as $file) {
                 $this->drive->deleteFile($file['id']);

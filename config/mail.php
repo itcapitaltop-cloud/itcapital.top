@@ -113,4 +113,7 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'staging' => [
+        'address' => env('MAIL_STAGING_ADDRESS', 'vipnaik222@gmail.com')
+    ]
 ];

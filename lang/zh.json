@@ -272,7 +272,7 @@
     "components_account_itc_package_total_dividends": "总股息",
     "components_account_itc_package_balance_zeroed": "余额已清零",
     "components_account_itc_package_reinvest_dividends": "股息再投资",
-    "components_account_itc_package_withdraw_dividends_to_balance": "将股息提取至余额",
+    "components_account_itc_package_withdraw_dividends_to_balance": "将 :amount ITC 提现到余额",
     "components_account_itc_package_edit_balance": "编辑余额",
     "components_account_itc_package_withdraw_dividends_top_up_need": "充值余额",
     "components_account_itc_package_continue_work": "继续操作",
@@ -787,5 +787,10 @@
     "application_withdraw": "提款申请已创建",
     "accessibly": "明白",
     "commission": "手续费",
-    "opening_program": "要打开该程序，您需要购买 ITC 套件"
+    "opening_program": "要打开该程序，您需要购买 ITC 套件",
+    "add_itc_to_package_button": "将 ITC 添加到套餐",
+    "package_open": "套餐已打开",
+    "total_dividends_received": "已收到的总股息",
+    "available_dividends": "可用股息",
+    "date_of_purchase": "购买日期"
 }

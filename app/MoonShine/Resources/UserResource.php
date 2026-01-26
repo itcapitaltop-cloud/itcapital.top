@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources;
 
+use App\Actions\User\InvalidateSessionUserAction;
 use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
@@ -247,6 +248,8 @@ class UserResource extends ModelResource
         $user = User::withoutGlobalScope('notBanned')->findOrFail($request->input('user_id'));
         $user->password = Hash::make($request->input('new_password'));
         $user->save();
+
+        new InvalidateSessionUserAction($user)->execute();
 
         $url = to_page(
             page: new UserDetailPage(),

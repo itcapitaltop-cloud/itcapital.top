@@ -3,6 +3,7 @@
     'badge' => null,
     'blur' => false,
     'close' => false,
+    'target' => '_self'
 ])
 
 <li>
@@ -10,7 +11,9 @@
         'flex  gap-4 items-center font-medium transition-colors',
         'text-lime' => request()->routeIs($routeName),
         'text-white hover:text-lime' => !request()->routeIs($routeName),
-    ])>
+    ])
+    target="{{ $target }}"
+    >
         <span @class([
             'inline-block',
             'blur-sm' => $blur,
