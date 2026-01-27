@@ -236,14 +236,20 @@ class TransactionRepository implements TransactionRepositoryContract
             ]);
     }
 
-    public function getRegularBonus(int $userId): float
+    public function getRegularBonus(?int $userId = null): float
     {
-        $debit = Transaction::where('user_id', $userId)
+        $debit = Transaction::query()
+            ->when(! is_null($userId), function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
             ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
             ->whereIn('trx_type', TrxTypeEnum::getDebits())
             ->sum('amount');
 
-        $credit = Transaction::where('user_id', $userId)
+        $credit = Transaction::query()
+            ->when(! is_null($userId), function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
             ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
             ->whereIn('trx_type', TrxTypeEnum::getCredits())
             ->sum('amount');

@@ -9,6 +9,7 @@ use App\Models\PartnerLevelPercent;
 use App\Models\PartnerRankRequirement;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Repositories\TransactionRepository;
 use App\Services\Admin\SummaryMetricsService;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\Components\FormBuilder;
@@ -378,7 +379,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(2),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->regularPremiumBalance())
+                    ->value(fn () => new TransactionRepository()->getRegularBonus())
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Регулярная премия</div>
                          <div class="flex justify-between text-lg">
                             <div class="block">
