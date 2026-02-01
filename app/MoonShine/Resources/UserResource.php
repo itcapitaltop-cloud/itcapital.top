@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
+use MoonShine\Enums\ToastType;
 use MoonShine\Fields\Checkbox;
 use MoonShine\Fields\Email;
 use MoonShine\Fields\Range;
@@ -694,5 +695,39 @@ class UserResource extends ModelResource
             ->disk('public')
             ->filename('users-' . now()->format('Ymd-His'))
             ->withConfirm();
+    }
+
+    public function enableTest(MoonShineRequest $request): MoonShineJsonResponse
+    {
+        $user = User::findOrFail($request->get('resourceItem'));
+
+        $url = to_page(
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $user->id],
+        );
+
+        $user->update(['is_test' => true]);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Пользователь стал тестовым', ToastType::SUCCESS)
+            ->redirect($url);
+    }
+
+    public function disableTest(MoonShineRequest $request): MoonShineJsonResponse
+    {
+        $user = User::findOrFail($request->get('resourceItem'));
+
+        $url = to_page(
+            page: new UserDetailPage(),
+            resource: new UserResource(),
+            params: ['resourceItem' => $user->id],
+        );
+
+        $user->update(['is_test' => false]);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Пользователь больше не тестовый', ToastType::SUCCESS)
+            ->redirect($url);
     }
 }

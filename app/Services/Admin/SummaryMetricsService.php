@@ -17,6 +17,7 @@ final class SummaryMetricsService
     public function totalPackagesAmount(): array
     {
         return ItcPackage::query()
+            ->withoutTestUsers()
             ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
             ->select('type')
             ->withSum(['transaction as deposit_sum'], 'amount')
@@ -39,6 +40,7 @@ final class SummaryMetricsService
     public function mainBalance(): string
     {
         return Transaction::query()
+            ->withoutTestUsers()
             ->where('balance_type', BalanceTypeEnum::MAIN)
             ->whereNotNull('accepted_at')
             ->sum(DB::raw("
@@ -52,12 +54,17 @@ final class SummaryMetricsService
 
     public function packageDividends(): string
     {
-        return PackageProfit::query()->sum('amount');
+        return PackageProfit::query()
+            ->withoutTestUsers()
+            ->whereDoesntHave('reinvestLink')
+            ->whereDoesntHave('withdraw')
+            ->sum('amount');
     }
 
     public function partnerBalance(): string
     {
         return Transaction::query()
+            ->withoutTestUsers()
             ->where('balance_type', BalanceTypeEnum::PARTNER)
             ->whereNotNull('accepted_at')
             ->whereIn('trx_type', [
@@ -88,11 +95,13 @@ final class SummaryMetricsService
     public function regularPremiumBalance(): float|int
     {
         return Transaction::query()
+            ->withoutTestUsers()
             ->where('trx_type', TrxTypeEnum::REGULAR_PREMIUM_ACCRUAL)
             ->whereNotNull('accepted_at')
             ->sum('amount')
     -
     Transaction::query()
+        ->withoutTestUsers()
         ->whereIn('trx_type', [
             TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER,
             TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER_MIRROR,
@@ -103,6 +112,7 @@ final class SummaryMetricsService
     public function tokenBalance(): string
     {
         return Transaction::query()
+            ->withoutTestUsers()
             ->whereNotNull('accepted_at')
             ->whereHas('itcPackage', fn ($q) => $q->where('type', PackageTypeEnum::STAKING)
             )
@@ -124,6 +134,7 @@ final class SummaryMetricsService
     public function sumByPeriod(TrxTypeEnum $type, string $period): int|float|string
     {
         return Transaction::query()
+            ->withoutTestUsers()
             ->where('trx_type', $type)
             ->whereNotNull('accepted_at')
             ->where('accepted_at', '>=', now()->sub($period))
@@ -132,12 +143,12 @@ final class SummaryMetricsService
 
     public function dividendsMonth(): string
     {
-        return PackageProfit::where('created_at', '>=', now()->subMonth())->sum('amount');
+        return PackageProfit::query()->withoutTestUsers()->where('created_at', '>=', now()->subMonth())->sum('amount');
     }
 
     public function dividendsWeek(): string
     {
-        return PackageProfit::where('created_at', '>=', now()->subWeek())->sum('amount');
+        return PackageProfit::query()->withoutTestUsers()->where('created_at', '>=', now()->subWeek())->sum('amount');
     }
 
     public function startBonusMonth(): int|float|string
@@ -173,6 +184,7 @@ final class SummaryMetricsService
     public function stakingProfitsMonth(): int|float|string
     {
         return PackageProfit::query()
+            ->withoutTestUsers()
             ->whereHas('package', fn ($q) => $q->where('type', PackageTypeEnum::STAKING)
             )
             ->where('created_at', '>=', now()->subMonth())
@@ -182,6 +194,7 @@ final class SummaryMetricsService
     public function stakingProfitsWeek(): int|float|string
     {
         return PackageProfit::query()
+            ->withoutTestUsers()
             ->whereHas('package', fn ($q) => $q->where('type', PackageTypeEnum::STAKING)
             )
             ->where('created_at', '>=', now()->subWeek())

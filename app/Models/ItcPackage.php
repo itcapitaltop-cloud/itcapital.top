@@ -35,7 +35,6 @@ use Illuminate\Support\Facades\DB;
  *
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereWorkTo($value)
- *
  * @method static Builder|ItcPackage notActive()
  * @method static Builder|ItcPackage active(PackageTypeEnum ...$enum)
  * @method static Builder|ItcPackage userPackagesWithFinancials(int $userId)
@@ -233,5 +232,13 @@ class ItcPackage extends Model
             ->withSum(['reinvestProfitWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount');
+    }
+
+    #[Scope]
+    public function withoutTestUsers(Builder $query): Builder
+    {
+        return $query->whereHas('transaction.user', function ($q) {
+            $q->where('is_test', false);
+        });
     }
 }

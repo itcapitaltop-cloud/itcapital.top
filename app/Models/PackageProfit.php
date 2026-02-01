@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -65,5 +67,13 @@ class PackageProfit extends Model
     public function package(): BelongsTo
     {
         return $this->belongsTo(ItcPackage::class, 'package_uuid', 'uuid');
+    }
+
+    #[Scope]
+    public function withoutTestUsers(Builder $query): Builder
+    {
+        return $query->whereHas('package.transaction.user', function ($q) {
+            $q->where('is_test', false);
+        });
     }
 }

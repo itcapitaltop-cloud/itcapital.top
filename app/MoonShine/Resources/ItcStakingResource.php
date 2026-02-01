@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\MoonShine\Resources;
 
 use App\Enums\Itc\PackageTypeEnum;
-use App\Helpers\Notify;
-use App\Models\User;
+use App\Models\ItcPackage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingDetailPage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingIndexPage;
 use App\Tasks\Package\CreateItcStakingTask;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
@@ -27,9 +27,11 @@ use MoonShine\Resources\ModelResource;
  */
 class ItcStakingResource extends ModelResource
 {
-    protected string $model = User::class;
+    protected string $model = ItcPackage::class;
 
     protected string $title = 'Cтейкинг';
+
+    protected array $with = ['transaction.user'];
 
     /**
      * @return list<Page>
@@ -40,6 +42,13 @@ class ItcStakingResource extends ModelResource
             ItcStakingIndexPage::make($this->title()),
             ItcStakingDetailPage::make(__('moonshine::ui.show')),
         ];
+    }
+
+    public function query(): Builder
+    {
+        return parent::query()
+            ->where('type', PackageTypeEnum::STAKING)
+            ->latest('created_at');
     }
 
     public function actions(): array
@@ -70,7 +79,7 @@ class ItcStakingResource extends ModelResource
 
     public function trAttributes(): Closure
     {
-        return function (User $item, int $row, ComponentAttributeBag $attr): ComponentAttributeBag {
+        return function (ItcPackage $item, int $row, ComponentAttributeBag $attr): ComponentAttributeBag {
             $url = to_page(
                 page: new ItcStakingDetailPage(),
                 resource: new ItcStakingResource(),
@@ -101,7 +110,7 @@ class ItcStakingResource extends ModelResource
      */
     public function search(): array
     {
-        return ['email', 'first_name', 'last_name', 'username', 'created_at'];
+        return ['uuid'];
     }
 
     /**
@@ -122,6 +131,7 @@ class ItcStakingResource extends ModelResource
         $userId = (int) $request->input('user_id');
         $percent = (float) $request->input('percent');
         $amount = $request->input('amount');
+        $packageId = $request->input('package_id');
 
         $package = new CreateItcStakingTask()
             ->setMothProfitPercent($percent)
@@ -140,7 +150,7 @@ class ItcStakingResource extends ModelResource
         $url = to_page(
             page: new ItcStakingDetailPage(),
             resource: new self(),
-            params: ['resourceItem' => $userId],
+            params: ['resourceItem' => $packageId],
         );
 
         return MoonShineJsonResponse::make()

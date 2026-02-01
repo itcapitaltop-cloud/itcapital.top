@@ -45,19 +45,15 @@ class ItcStakingDetailPage extends DetailPage
         /**
          * @var \App\Models\|null $user
          */
-        $user = $this->getResource()->getItem();
-
-        if (is_null($user)) {
-            return [];
-        }
+        $package = $this->getResource()->getItem();
 
         $packages = ItcPackage::query()
             ->active(PackageTypeEnum::STAKING)
-            ->userPackagesWithFinancials($user->id)
+            ->userPackagesWithFinancials($package->transaction->user->id)
             ->get();
 
         $adminLogs = BusinessActivity::query()
-            ->packagesStakingWithAdmin($user->id)
+            ->packagesStakingWithAdmin($package->transaction->user->id)
             ->latest()
             ->get()
             ->each(function (Activity $activity) {
@@ -68,7 +64,7 @@ class ItcStakingDetailPage extends DetailPage
             ->toArray();
 
         $userLogs = BusinessActivity::query()
-            ->packagesStaking($user->id)
+            ->packagesStaking($package->transaction->user->id)
             ->latest()
             ->get()
             ->each(function (Activity $activity) {
@@ -84,7 +80,7 @@ class ItcStakingDetailPage extends DetailPage
             }),
             Tabs::make([
                 Tab::make('Пакеты стейкинг', [
-                    Heading::make("Пакеты {$user->username}")->h(2),
+                    Heading::make("Пакеты {$package->transaction->user->username}")->h(2),
                     TableBuilder::make()
                         ->withNotFound()
                         ->items($packages->toArray())
@@ -166,9 +162,9 @@ class ItcStakingDetailPage extends DetailPage
         /**
          * @var \App\Models\|null $user
          */
-        $user = $this->getResource()->getItem();
+        $package = $this->getResource()->getItem();
 
-        if (is_null($user)) {
+        if (is_null($package->transaction->user->id)) {
             return Modal::make(
                 title: 'Создание пакета',
                 content: fn () => 'Что-то пошло не так',
@@ -179,7 +175,9 @@ class ItcStakingDetailPage extends DetailPage
         $createPackageForm = FormBuilder::make()
             ->asyncMethod('createPackage')
             ->fields([
-                Hidden::make('user_id')->fill($user->id),
+                Hidden::make('user_id')->fill($package->transaction->user->id),
+
+                Hidden::make('package_id')->fill($package->id),
 
                 Number::make('Доходность,%', 'percent')
                     ->fill(2)
@@ -250,7 +248,7 @@ class ItcStakingDetailPage extends DetailPage
 
     public function breadcrumbs(): array
     {
-        $user = $this->getResource()->getItem();
+        $package = $this->getResource()->getItem();
 
         return [
             to_page(
@@ -258,7 +256,7 @@ class ItcStakingDetailPage extends DetailPage
                 resource: new ItcStakingResource()
             ) => __('Стейкинг'),
 
-            '#' => $user?->username,
+            '#' => $package->transaction?->user->id,
         ];
     }
 

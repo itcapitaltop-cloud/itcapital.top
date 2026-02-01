@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
+use App\MoonShine\Resources\ActivityLogResource;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
@@ -35,7 +36,9 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
      */
     protected function resources(): array
     {
-        return [];
+        return [
+            new ActivityLogResource(),
+        ];
     }
 
     /**

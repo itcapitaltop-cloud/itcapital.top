@@ -22,7 +22,6 @@ use App\Models\User;
 use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
 use App\MoonShine\Resources\UserResource;
-use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
@@ -131,6 +130,22 @@ class UserDetailPage extends DetailPage
                 'form-reset-balance-form',
             ])
             ->submit('Отредактировать');
+
+        $testModeButton = $item->is_test
+            ? ActionButton::make('Убрать тестовый')
+                ->icon('heroicons.beaker')
+                ->method(
+                    'disableTest',
+                    params: fn () => ['resourceItem' => $item->id]
+                )
+                ->secondary()
+            : ActionButton::make('Сделать тестовым')
+                ->icon('heroicons.beaker')
+                ->method(
+                    'enableTest',
+                    params: fn () => ['resourceItem' => $item->id]
+                )
+                ->success();
 
         $trigger = ActionButton::make('Редактировать')
             ->toggleModal('edit-balance-modal')
@@ -303,13 +318,13 @@ class UserDetailPage extends DetailPage
             ->withSum('profits', 'amount')
             ->withSum('reinvestProfitsAll', 'amount')
             ->withSum('withdrawProfitsTransactions', 'amount')
-            ->whereHas('transaction', fn($q) => $q->where('user_id', $item->id))
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
             ->get()
-            ->mapWithKeys(fn(ItcPackage $pkg) => [
+            ->mapWithKeys(fn (ItcPackage $pkg) => [
                 $pkg->uuid => [
                     'unwithdrawn_profits' => $pkg->getCurrentProfitAmount()
                         ->toFloat(),
-                ]
+                ],
             ]);
 
         $reinvests = collect($packages)
@@ -434,6 +449,8 @@ class UserDetailPage extends DetailPage
         $lastAuth = $authLog->first();
 
         $fields = [];
+
+        $fields[] = Date::make('Дата регистрации', formatted: fn () => $item->created_at);
 
         $fields[] = $lastAuth
             ? Text::make(
@@ -621,6 +638,7 @@ class UserDetailPage extends DetailPage
                         ' . $actionButton . '
                         ' . $createPackageModal . '
                         ' . $passwordModal . '
+                        ' . $testModeButton . '
                     </div>
                 '
             ),
@@ -666,7 +684,7 @@ class UserDetailPage extends DetailPage
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)
                                 ),
-                                Number::make('Неснятые дивиденды', 'unwithdrawn_profits', formatted: fn($item) => round((float) $unwithdrawnProfits->get($item['uuid'])['unwithdrawn_profits'], 2)),
+                                Number::make('Неснятые дивиденды', 'unwithdrawn_profits', formatted: fn ($item) => round((float) $unwithdrawnProfits->get($item['uuid'])['unwithdrawn_profits'], 2)),
                                 Enum::make('Тип пакета', 'type')->attach(PackageTypeEnum::class),
                             ])
                             ->buttons([

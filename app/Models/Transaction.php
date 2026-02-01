@@ -114,4 +114,18 @@ class Transaction extends Model
                 $query->where('type', PackageTypeEnum::STAKING);
             });
     }
+
+    /**
+     * Исключить транзакции пользователей с is_true = true
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\Transaction> $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Transaction>
+     */
+    #[Scope]
+    public function withoutTestUsers(Builder $query): Builder
+    {
+        return $query->whereHas('user', function ($q) {
+            $q->where('is_test', false);
+        });
+    }
 }

@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources;
 
+use App\Enums\Itc\PackageTypeEnum;
 use App\Models\ItcPackage;
 use App\MoonShine\Handlers\GoogleSheetsExportIndexDataHandler;
+use App\MoonShine\Pages\ActivityLog\ActivityLogIndexPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDetailPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageIndexPage;
 use App\MoonShine\Pages\User\UserDetailPage;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\View\ComponentAttributeBag;
@@ -63,6 +66,13 @@ class ItcPackageResource extends ModelResource
     public function actions(): array
     {
         return [
+            ActionButton::make(
+                'Журнал начислений',
+                to_page(
+                    page: ActivityLogIndexPage::class,
+                    resource: ActivityLogResource::class
+                )
+            ),
             ActionButton::make('Начислить прибыль', to_page(new ItcPackageDepositProfitPage())),
             ActionButton::make('Начислить прибыль пакету')->inModal(
                 title: fn () => 'Перечислите пакеты каким добавить прибыль',
@@ -99,6 +109,13 @@ class ItcPackageResource extends ModelResource
                 ->success()
                 ->showInDropdown(),
         ];
+    }
+
+    public function query(): Builder
+    {
+        return parent::query()
+            ->whereNotIn('type', [PackageTypeEnum::STAKING])
+            ->latest('created_at');
     }
 
     /**

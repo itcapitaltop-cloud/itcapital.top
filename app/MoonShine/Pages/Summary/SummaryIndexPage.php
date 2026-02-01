@@ -99,6 +99,7 @@ class SummaryIndexPage extends IndexPage
                 )
                     // primary value (количество депозитов)
                     ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
                         ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                         ->whereNotNull('accepted_at')
                         ->count()
@@ -117,6 +118,7 @@ class SummaryIndexPage extends IndexPage
                                 '
                                     . round(
                                         (float) Transaction::query()
+                                            ->withoutTestUsers()
                                             ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                                             ->whereNotNull('accepted_at')
                                             ->sum('amount'),
@@ -131,7 +133,9 @@ class SummaryIndexPage extends IndexPage
 
                 // Новых за неделю
                 ValueMetric::make('')
-                    ->value(fn () => Transaction::where('trx_type', TrxTypeEnum::DEPOSIT->value)
+                    ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
+                        ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                         ->whereNotNull('accepted_at')
                         ->where('accepted_at', '>=', now()->startOfWeek())
                         ->count()
@@ -146,7 +150,9 @@ class SummaryIndexPage extends IndexPage
                             <div>
                         '
                         . round(
-                            (float) Transaction::where('trx_type', TrxTypeEnum::DEPOSIT->value)
+                            (float) Transaction::query()
+                                ->withoutTestUsers()
+                                ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                                 ->whereNotNull('accepted_at')
                                 ->where('accepted_at', '>=', now()->startOfWeek())
                                 ->sum('amount'),
@@ -160,7 +166,9 @@ class SummaryIndexPage extends IndexPage
 
                 // Новых за месяц
                 ValueMetric::make('')
-                    ->value(fn () => Transaction::where('trx_type', TrxTypeEnum::DEPOSIT->value)
+                    ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
+                        ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                         ->whereNotNull('accepted_at')
                         ->where('accepted_at', '>=', now()->startOfMonth())
                         ->count()
@@ -175,7 +183,9 @@ class SummaryIndexPage extends IndexPage
                             <div>
                         '
                         . round(
-                            (float) Transaction::where('trx_type', TrxTypeEnum::DEPOSIT->value)
+                            (float) Transaction::query()
+                                ->withoutTestUsers()
+                                ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
                                 ->whereNotNull('accepted_at')
                                 ->where('accepted_at', '>=', now()->startOfMonth())
                                 ->sum('amount'),
@@ -196,6 +206,7 @@ class SummaryIndexPage extends IndexPage
                 ValueMetric::make('')
                     // количество всех выводов
                     ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
                         ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                         ->count()
                     )
@@ -209,6 +220,7 @@ class SummaryIndexPage extends IndexPage
                <div class="block">
                  <div>' . round(
                         (float) Transaction::query()
+                            ->withoutTestUsers()
                             ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                             ->sum('amount'),
                         2
@@ -222,6 +234,7 @@ class SummaryIndexPage extends IndexPage
                 ValueMetric::make('')
                     // count за неделю
                     ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
                         ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                         ->where('created_at', '>=', now()->startOfWeek())
                         ->count()
@@ -235,6 +248,7 @@ class SummaryIndexPage extends IndexPage
                <div class="block">
                  <div>' . round(
                         (float) Transaction::query()
+                            ->withoutTestUsers()
                             ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                             ->where('created_at', '>=', now()->startOfWeek())
                             ->sum('amount'),
@@ -249,6 +263,7 @@ class SummaryIndexPage extends IndexPage
                 ValueMetric::make('')
                     // count за месяц
                     ->value(fn () => Transaction::query()
+                        ->withoutTestUsers()
                         ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                         ->where('created_at', '>=', now()->startOfMonth())
                         ->count()
@@ -262,6 +277,7 @@ class SummaryIndexPage extends IndexPage
                <div class="block">
                  <div>' . round(
                         (float) Transaction::query()
+                            ->withoutTestUsers()
                             ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
                             ->where('created_at', '>=', now()->startOfMonth())
                             ->sum('amount'),
