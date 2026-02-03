@@ -23,6 +23,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -151,7 +152,7 @@ class Packages extends Component
      */
     public function topUpNeeded(
         string $uuid,
-    ) {
+    ): \Illuminate\Routing\Redirector|RedirectResponse {
         $this->validateOnly('withdrawPackageAmount', [
             'withdrawPackageAmount' => [
                 'required',
@@ -181,6 +182,8 @@ class Packages extends Component
             ->first();
 
         $package->increment('amount', $this->withdrawPackageAmount);
+
+        app(StartBonusAccrualContract::class)->accrue(auth()->id(), (float) $this->withdrawPackageAmount);
 
         $this->reset('withdrawPackageAmount');
         $this->dispatch('balance-edited');

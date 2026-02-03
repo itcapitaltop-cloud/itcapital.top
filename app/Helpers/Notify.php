@@ -157,7 +157,7 @@ class Notify
         ));
     }
 
-    public static function bonusStart(User $user, string $amount): void
+    public static function bonusStart(User $user, string|float $amount): void
     {
         $icon      = vite()->icon('currency/itc-partners.svg');
         $amountEsc = e($amount);

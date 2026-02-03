@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Account\Partners;
 
+use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
@@ -494,7 +495,6 @@ class Partners extends Component
         TransactionRepositoryContract $trxRepo,
         ItcPackageRepositoryContract $pkgRepo
     ): void {
-
         $this->validateOnly('toPackageAmount');
         $this->validateOnly('selectedPackageUuid');
 
@@ -506,6 +506,8 @@ class Partners extends Component
             $amount,
             $trxRepo
         );
+
+        app(StartBonusAccrualContract::class)->accrue(auth()->id(), $amount);
 
         $this->reset('toPackageAmount', 'selectedPackageUuid');
         $this->dispatch('isPackageModal', false);

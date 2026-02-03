@@ -16,6 +16,7 @@ use App\Repositories\PackageRepository;
 use App\Repositories\PartnersRepository;
 use App\Repositories\StartBonusAccrualRepository;
 use App\Repositories\TransactionRepository;
+use App\Services\User\StartBonusAccrualService;
 use Illuminate\Support\ServiceProvider;
 
 class RepositoryProvider extends ServiceProvider
@@ -30,7 +31,7 @@ class RepositoryProvider extends ServiceProvider
         $this->app->bind(PackageReinvestRepositoryContract::class, PackageReinvestRepository::class);
         $this->app->bind(ItcPackageRepositoryContract::class, ItcPackageRepository::class);
         $this->app->bind(LogRepositoryContract::class, LogRepository::class);
-        $this->app->bind(StartBonusAccrualContract::class, StartBonusAccrualRepository::class);
+        $this->app->bind(StartBonusAccrualContract::class, StartBonusAccrualService::class);
         $this->app->bind(PartnerRepositoryContract::class, PartnersRepository::class);
     }
 }
