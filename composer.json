@@ -26,6 +26,7 @@
         "simplesoftwareio/simple-qrcode": "*",
         "spatie/db-dumper": "^3.7",
         "spatie/laravel-activitylog": "^4.10",
+        "spatie/laravel-settings": "^3.6",
         "spatie/sheets": "^1.12"
     },
     "require-dev": {

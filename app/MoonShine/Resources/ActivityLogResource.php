@@ -42,24 +42,26 @@ class ActivityLogResource extends ModelResource
     public function filters(): array
     {
         return [
-            DateRange::make('Дата начисления', 'created_at')
-                ->default([
-                    now()->subWeek()->toDateString(),
-                    now()->toDateString(),
-                ]),
+            DateRange::make('Дата начисления', 'package_profits.created_at')
+                ->fromTo('package_profits.created_at', 'package_profits.created_at'),
         ];
     }
 
     public function query(): Builder
     {
-        return parent::query()
+        $query = parent::query()
+            ->select('package_profits.*')
+            ->leftJoin('itc_packages as pkg', 'package_profits.package_uuid', '=', 'pkg.uuid')
+            ->leftJoin('transactions as tr', 'pkg.uuid', '=', 'tr.uuid')
+            ->leftJoin('users as u', 'tr.user_id', '=', 'u.id')
             ->with(['package.transaction.user'])
-            ->where('created_at', '>=', now()->subMonth())
-            ->when(
-                ! request()->filled('filters.created_at'),
-                fn ($q) => $q->where('created_at', '>=', now()->subWeek())
-            )
-            ->latest('created_at');
+            ->where('package_profits.created_at', '>=', now()->subMonth());
+
+        if (! request()->filled('filters.created_at')) {
+            $query->where('package_profits.created_at', '>=', now()->subWeek(2));
+        }
+
+        return $query->latest('package_profits.created_at');
     }
 
     /**

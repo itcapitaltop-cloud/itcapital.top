@@ -9,7 +9,7 @@ use Spatie\Activitylog\Contracts\Activity;
 
 final class PackageStagingPurchasedStrategy implements ActivityStrategyContract
 {
-    public function run(Activity $activity): string
+    public function handle(Activity $activity): string
     {
         return __('activity/user.package_purchased', [
             'amount' => $activity->getExtraProperty('amount', 0),

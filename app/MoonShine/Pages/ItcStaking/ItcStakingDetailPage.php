@@ -8,7 +8,10 @@ use App\ActivityLog\ActivityManager;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
+use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
+use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Resources\ItcStakingResource;
+use App\Settings\GeneralSetting;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FlexibleRender;
 use MoonShine\Components\FormBuilder;
@@ -42,9 +45,6 @@ class ItcStakingDetailPage extends DetailPage
 
     public function components(): array
     {
-        /**
-         * @var \App\Models\|null $user
-         */
         $package = $this->getResource()->getItem();
 
         $packages = ItcPackage::query()
@@ -57,7 +57,7 @@ class ItcStakingDetailPage extends DetailPage
             ->latest()
             ->get()
             ->each(function (Activity $activity) {
-                $activity->text = new ActivityManager()->resolver($activity);
+                $activity->text = new ActivityManager()->resolve($activity);
 
                 return $activity;
             })
@@ -68,15 +68,22 @@ class ItcStakingDetailPage extends DetailPage
             ->latest()
             ->get()
             ->each(function (Activity $activity) {
-                $activity->text = new ActivityManager()->resolver($activity);
+                $activity->text = new ActivityManager()->resolve($activity);
 
                 return $activity;
             })
             ->toArray();
 
+        $stakingChangedStartBonusPercent = new ChangedStartBonusPercentComponent()->handle($package);
+        $stakingChangedSRegularPercent = new ChangedRegularPercentComponent()->handle($package);
+
         return [
-            FlexibleRender::make(function (): string {
-                return "<div class='flex flex-wrap gap-2 items-center'>{$this->buyPackage()}</div>";
+            FlexibleRender::make(function () use ($stakingChangedStartBonusPercent, $stakingChangedSRegularPercent): string {
+                return "<div class='flex flex-wrap gap-2 items-center'>
+                    {$this->buyPackage()}
+                    {$stakingChangedStartBonusPercent}
+                    {$stakingChangedSRegularPercent}
+                </div>";
             }),
             Tabs::make([
                 Tab::make('Пакеты стейкинг', [
@@ -177,8 +184,6 @@ class ItcStakingDetailPage extends DetailPage
             ->fields([
                 Hidden::make('user_id')->fill($package->transaction->user->id),
 
-                Hidden::make('package_id')->fill($package->id),
-
                 Number::make('Доходность,%', 'percent')
                     ->fill(2)
                     ->customAttributes(
@@ -273,6 +278,24 @@ class ItcStakingDetailPage extends DetailPage
 
                 Number::make('Процент прибыли', 'profit_percent')
                     ->fill($package->month_profit_percent)
+                    ->customAttributes(
+                        [
+                            'wire:model.defer' => 'percent',
+                            'step' => 'any',
+                        ])
+                    ->required(),
+
+                Number::make('Процент прибыли', 'profit_percent')
+                    ->fill($package->month_profit_percent)
+                    ->customAttributes(
+                        [
+                            'wire:model.defer' => 'percent',
+                            'step' => 'any',
+                        ])
+                    ->required(),
+
+                Number::make('Процент стартовой премии', 'start_bonus_staking_percent')
+                    ->fill($package->transaction->user->setting('start_bonus_staking_percent', app(GeneralSetting::class)->start_bonus_staking_percent))
                     ->customAttributes(
                         [
                             'wire:model.defer' => 'percent',

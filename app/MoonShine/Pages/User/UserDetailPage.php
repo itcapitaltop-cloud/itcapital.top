@@ -21,6 +21,8 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
+use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
+use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Resources\UserResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -346,6 +348,7 @@ class UserDetailPage extends DetailPage
         $transactions = Transaction::query()
             ->where('user_id', $item->id)
             ->whereNot('trx_type', TrxTypeEnum::HIDDEN_DEPOSIT)
+            ->whereDoesntHave('partnerReward')
             ->orderByDesc('created_at')
             ->get()
             ->map(function (Transaction $tx) {
@@ -370,6 +373,8 @@ class UserDetailPage extends DetailPage
                 $typeName = match ($reward->reward_type) {
                     PartnerRewardTypeEnum::START => 'Стартовая премия',
                     PartnerRewardTypeEnum::REGULAR => 'Регулярная премия',
+                    PartnerRewardTypeEnum::STAKING_START => 'Стартовая премия стейкинг',
+                    PartnerRewardTypeEnum::STAKING_REGULAR => 'Стейкинг регулярная премия',
                 };
 
                 return [
@@ -382,6 +387,7 @@ class UserDetailPage extends DetailPage
                     'date' => $reward->created_at->format('d.m.Y'),
                 ];
             })
+            ->values()
             ->toArray();
 
         // Объединяем и сортируем по дате
@@ -631,16 +637,28 @@ class UserDetailPage extends DetailPage
             : null;
         $line = 0;
 
+        $staking = ItcPackage::with([
+            'transaction',
+            'transaction.user' => fn ($query) => $query->where('id', $item->id),
+        ])
+            ->where('type', PackageTypeEnum::STAKING)
+            ->first();
+
+        $stakingChangedStartBonusPercent = new ChangedStartBonusPercentComponent()->handle($staking);
+        $stakingChangedSRegularPercent = new ChangedRegularPercentComponent()->handle($staking);
+
         return [
             FlexibleRender::make(
-                fn () => '
-                    <div class="flex flex-wrap gap-2 items-center">
-                        ' . $actionButton . '
-                        ' . $createPackageModal . '
-                        ' . $passwordModal . '
-                        ' . $testModeButton . '
+                fn () => "
+                   <div class='flex flex-wrap gap-2 items-center'>
+                        {$stakingChangedStartBonusPercent}
+                        {$stakingChangedSRegularPercent}
+                        {$actionButton}
+                        {$createPackageModal}
+                        {$passwordModal}
+                        {$testModeButton}
                     </div>
-                '
+                "
             ),
             Tabs::make([
                 Tab::make(
@@ -925,14 +943,6 @@ class UserDetailPage extends DetailPage
                                                     'style' => 'min-width:120px;max-width:120px;width:120px;',
                                                 ]);
                                             }
-
-                                            //                                            if ($cell >= 0) {
-                                            //                                                $existing = $attr->get('class', '');
-                                            //                                                $attr->setAttributes([
-                                            //                                                    'class' => trim($existing),
-                                            //                                                    'style' => 'height: 40px;line-height: 40px;',
-                                            //                                                ]);
-                                            //                                            }
                                             return $attr;
                                         }
                                     )

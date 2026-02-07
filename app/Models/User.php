@@ -8,6 +8,7 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\User\Session;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\AsCollection;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -110,6 +111,7 @@ final class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'banned_at' => 'datetime',
             'overridden_rank_from' => 'datetime',
+            'settings' => AsCollection::class,
         ];
     }
 
@@ -312,5 +314,43 @@ final class User extends Authenticatable implements MustVerifyEmail
     public function partnerRewards()
     {
         return $this->hasMany(PartnerReward::class, 'from_user_id', 'id');
+    }
+
+    /**
+     * Retrieve a setting with a given name or fall back to the default.
+     */
+    public function setting(string $name, $default = null): mixed
+    {
+        $settings = $this->settings;
+
+        if (empty($settings)) {
+            return $default;
+        }
+
+        if ($settings instanceof \Illuminate\Support\Collection) {
+            return $settings->get($name, $default);
+        }
+
+        if (is_array($settings)) {
+            return $settings[$name] ?? $default;
+        }
+
+        return $default;
+    }
+
+    /**
+     * Update one or more settings and then optionally save the model.
+     */
+    public function setSettings(array $revisions): self
+    {
+        $current = $this->settings instanceof \Illuminate\Support\Collection
+            ? $this->settings->toArray()
+            : ($this->settings ?? []);
+
+        $this->settings = array_merge($current, $revisions);
+
+        $this->save();
+
+        return $this;
     }
 }

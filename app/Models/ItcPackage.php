@@ -61,6 +61,8 @@ class ItcPackage extends Model
         'work_to',
         'duration_months',
         'created_at',
+        'regular_percent',
+        'start_bonus_percent',
     ];
 
     public function transaction(): HasOne

@@ -24,7 +24,9 @@ enum TrxTypeEnum: string
 
     case PARTNER_TRANSFER_OUT = 'partner_transfer_out';
     case START_BONUS_ACCRUAL = 'start_bonus_accrual';
+    case STAKING_START_BONUS_ACCRUAL = 'staking_start_bonus_accrual';
     case REGULAR_PREMIUM_ACCRUAL = 'regular_premium_accrual';
+    case STAKING_REGULAR_PREMIUM_ACCRUAL = 'staking_regular_premium_accrual';
     case REGULAR_PREMIUM_TO_PARTNER = 'regular_premium_to_partner';
     case PARTNER_BONUS_ROLLBACK = 'partner_bonus_rollback';
     case PARTNER_TO_PACKAGE = 'partner_to_package';
@@ -52,7 +54,9 @@ enum TrxTypeEnum: string
             self::PARTNER_TRANSFER_OUT => 'Переведено партнёру',
 
             self::START_BONUS_ACCRUAL => 'Стартовая премия',
+            self::STAKING_START_BONUS_ACCRUAL => 'Стартовая премия стейкинг',
             self::REGULAR_PREMIUM_ACCRUAL => 'Регулярная премия',
+            self::STAKING_REGULAR_PREMIUM_ACCRUAL => 'Стейкинг регулярная премия',
             self::REGULAR_PREMIUM_TO_PARTNER => 'Перевод регулярной премии в партнёрский',
             self::REGULAR_PREMIUM_TO_PARTNER_MIRROR => 'Списание c баланса регулярной премии',
             self::PARTNER_BONUS_ROLLBACK => 'Сторно партнёрской премии',
@@ -73,7 +77,9 @@ enum TrxTypeEnum: string
             self::PARTNER_TO_MAIN_SELF,
             self::PARTNER_TRANSFER_IN,
             self::START_BONUS_ACCRUAL,
+            self::STAKING_START_BONUS_ACCRUAL,
             self::REGULAR_PREMIUM_ACCRUAL,
+            self::STAKING_REGULAR_PREMIUM_ACCRUAL,
             self::REGULAR_PREMIUM_TO_PARTNER,
             self::WITHDRAW_PACKAGE_TO_BALANCE,
             self::RANK_BONUS_ACCRUAL,

@@ -6,5 +6,5 @@ use Spatie\Activitylog\Contracts\Activity;
 
 interface ActivityStrategyContract
 {
-    public function run(Activity $activity): string;
+    public function handle(Activity $activity): string;
 }

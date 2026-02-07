@@ -22,8 +22,12 @@ Schedule::command('quotes:cache-alphavantage')
     ->dailyAt('08:00');
 
 Schedule::command('regular-premium:accrual')
-    ->weeklyOn(1, '23:58')
+    ->weeklyOn(1, '23:50')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command('staking-regular-premium:accrual')
+    ->weeklyOn(1, '23:50')
+    ->sendOutputTo(storage_path('logs/staking-scheduler.log'));
 
 Schedule::command('profit-accrual:itc-staking')
     ->monthlyOn(1, '00:00')

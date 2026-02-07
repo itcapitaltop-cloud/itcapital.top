@@ -113,7 +113,9 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
     Route::post('itc-packages/profits/recalculate', 'recalculate');
     Route::post('itc-staking/change/percentage', [ItcStakingController::class, 'changePercentage']);
-    Route::post('itc-staking/package/close/staking/{uuid}', [ItcStakingController::class, 'close']);
+    Route::post('itc-staking/change/start-bonus-percentage', [ItcStakingController::class, 'changeStartBonusPercentage'])->name('admin.itc-staking.change-start-bonus-percentage');
+    Route::post('itc-staking/change/regular-percentage', [ItcStakingController::class, 'changeRegularPercentage'])->name('admin.itc-staking.change-regular-percentage');
+    Route::post('itc-staking/package/staking/{uuid}', [ItcStakingController::class, 'editStaking']);
     Route::post('reinvest-profit/{uuid}/withdraw', 'withdrawOneProfitReinvest')->name('reinvest-profit-withdraw');
     Route::delete('reinvest-profit/{uuid}/delete', 'deleteProfitReinvest')->name('reinvest-profit-delete');
     Route::post('reinvest-profit/{uuid}/extend', 'extendProfitReinvest')->name('reinvest-profit-extend');

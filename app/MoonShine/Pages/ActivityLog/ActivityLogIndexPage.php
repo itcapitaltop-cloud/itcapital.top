@@ -1,7 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
 namespace App\MoonShine\Pages\ActivityLog;
 
 use MoonShine\Components\MoonShineComponent;
@@ -21,39 +19,38 @@ class ActivityLogIndexPage extends IndexPage
         return [
             Text::make('Ник', 'package.transaction.user.username')
                 ->sortable(function ($query, string $column, string $direction) {
-                    return $query
-                        ->where('package_profits.created_at', '>=', now()->subMonth())
-                        ->join('itc_packages as pkg', 'package_profits.package_uuid', '=', 'pkg.uuid')
-                        ->join('transactions as tr', 'pkg.uuid', '=', 'tr.uuid')
-                        ->join('users as u', 'tr.user_id', '=', 'u.id')
-                        ->orderBy('u.username', $direction)
-                        ->select('package_profits.*');
+                    return $query->orderBy('u.username', $direction);
                 }),
 
-            Text::make('Пакет', 'package.uuid'),
+            Text::make('Пакет', 'package.uuid')
+                ->sortable(function ($query, string $column, string $direction) {
+                    return $query->orderBy('pkg.uuid', $direction);
+                }),
 
             Number::make('Сумма пакета с реинвестами', 'package.total_amount')
                 ->sortable(function ($query, string $column, string $direction) {
-                    return $query
-                        ->where('package_profits.created_at', '>=', now()->subMonth())
-                        ->join('itc_packages as pkg2', 'package_profits.package_uuid', '=', 'pkg2.uuid')
-                        ->join('transactions as tr2', 'pkg2.uuid', '=', 'tr2.uuid')
-                        ->orderBy('tr2.amount', $direction)
-                        ->select('package_profits.*');
+                    return $query->orderBy('tr.amount', $direction);
                 }),
 
-            Number::make('Процент прибыли', 'package.month_profit_percent'),
+            Number::make('Процент прибыли', 'package.month_profit_percent')
+                ->sortable(function ($query, string $column, string $direction) {
+                    return $query->orderBy('pkg.month_profit_percent', $direction);
+                }),
 
-            Number::make('Начислено', 'amount')
-                ->sortable(),
+            Number::make('Начислено', formatted: fn ($item) => round((float) $item->amount, 2))
+                ->sortable(function ($query, string $column, string $direction) {
+                    return $query->orderBy('package_profits.amount', $direction);
+                }),
 
-            Text::make('Дата начисления', 'created_at'),
+            Text::make('Дата начисления', 'created_at')
+                ->sortable(function ($query, string $column, string $direction) {
+                    return $query->orderBy('package_profits.created_at', $direction);
+                }),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
-     *
      * @throws Throwable
      */
     protected function topLayer(): array
@@ -65,7 +62,6 @@ class ActivityLogIndexPage extends IndexPage
 
     /**
      * @return list<MoonShineComponent>
-     *
      * @throws Throwable
      */
     protected function mainLayer(): array
@@ -77,7 +73,6 @@ class ActivityLogIndexPage extends IndexPage
 
     /**
      * @return list<MoonShineComponent>
-     *
      * @throws Throwable
      */
     protected function bottomLayer(): array

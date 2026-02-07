@@ -9,7 +9,7 @@ use Spatie\Activitylog\Contracts\Activity;
 
 final class AdminPackageChangedAmount implements ActivityStrategyContract
 {
-    public function run(Activity $activity): string
+    public function handle(Activity $activity): string
     {
         return __('activity/admin.admin_package_changed_amount', [
             'uuid' => $activity->getExtraProperty('package_uuid', ''),

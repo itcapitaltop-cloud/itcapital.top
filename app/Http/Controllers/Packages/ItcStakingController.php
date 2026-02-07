@@ -8,6 +8,8 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Http\Controllers\Controller;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
+use App\Models\User;
+use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use MoonShine\Enums\ToastType;
@@ -44,10 +46,89 @@ final class ItcStakingController extends Controller
 
     /**
      * @param \MoonShine\MoonShineRequest $request
+     * @param \App\Settings\GeneralSetting $generalSetting
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function changeStartBonusPercentage(MoonShineRequest $request, GeneralSetting $generalSetting): RedirectResponse
+    {
+        if ($request->has('user_id')) {
+            $package = ItcPackage::query()->findOrFail($request->input('package_id'));
+
+            User::query()->findOrFail($request->input('user_id'))->setSettings([
+                'start_bonus_staking_percent' => $request->input('percent'),
+            ]);
+
+            activity('packages')
+                ->performedOn($package)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'percent' => $request->input('percent'),
+                    'package_uuid' => $package->uuid,
+                    'package_type' => PackageTypeEnum::STAKING,
+                ])
+                ->log('admin_package_changed_staking_start_bonus_percent');
+
+            return back();
+        }
+
+        $generalSetting->start_bonus_staking_percent = $request->input('percent');
+        $generalSetting->save();
+
+        activity('admin')
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'percent' => $request->get('percent'),
+            ])
+            ->log('admin_package_staking_changed_start_bonus_percentage');
+
+        return back();
+    }
+
+    /**
+     * @param \MoonShine\MoonShineRequest $request
+     * @param \App\Settings\GeneralSetting $generalSetting
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function changeRegularPercentage(MoonShineRequest $request, GeneralSetting $generalSetting): RedirectResponse
+    {
+        if ($request->has('user_id')) {
+            $package = ItcPackage::query()->findOrFail($request->input('package_id'));
+
+            User::query()->findOrFail($request->input('user_id'))->setSettings([
+                'start_bonus_staking_percent' => $request->input('percent'),
+            ]);
+
+            activity('packages')
+                ->performedOn($package)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'percent' => $request->input('percent'),
+                    'package_uuid' => $package->uuid,
+                    'package_type' => PackageTypeEnum::STAKING,
+                ])
+                ->log('admin_package_changed_staking_regular_percent');
+
+        }
+
+        $generalSetting->regular_staking_percent = $request->input('percent');
+        $generalSetting->save();
+
+        activity('admin')
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'percent' => $request->get('percent'),
+            ])
+            ->log('admin_package_staking_changed_regular_percentage');
+
+        return back();
+    }
+
+    /**
+     * @param \MoonShine\MoonShineRequest $request
      * @param string $uuid
      * @return \MoonShine\Http\Responses\MoonShineJsonResponse
      */
-    public function close(MoonShineRequest $request, string $uuid): MoonShineJsonResponse
+    public function editStaking(MoonShineRequest $request, string $uuid): MoonShineJsonResponse
     {
         $transaction = Transaction::query()
             ->whereUuid($uuid)

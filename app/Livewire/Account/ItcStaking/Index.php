@@ -12,6 +12,8 @@ use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
+use App\Services\User\StakingStartBonusAccrualService;
+use App\Settings\GeneralSetting;
 use App\Tasks\Package\CreateItcStakingTask;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -36,8 +38,10 @@ final class Index extends Component
         $this->validate();
 
         $package = new CreateItcStakingTask()->run($this->amount, auth()->user()->id);
+        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
+        $amount = ($this->amount * $exchangeRateItc) + $this->amount;
 
-        Notify::packageStakingBought(auth()->user(), $this->amount);
+        Notify::packageStakingBought(auth()->user(), $amount);
 
         $this->dispatch('bought');
 
@@ -45,7 +49,7 @@ final class Index extends Component
             ->performedOn($package)
             ->causedBy(auth()->user())
             ->withProperties([
-                'amount' => $this->amount,
+                'amount' => $amount,
                 'package_uuid' => $package->uuid,
                 'package_type' => PackageTypeEnum::STAKING,
             ])
@@ -54,9 +58,16 @@ final class Index extends Component
         $this->js('window.location.reload()');
     }
 
+    /**
+     * @throws \Throwable
+     */
     public function buyPackageMore(): void
     {
         $this->validate();
+
+        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
+
+        $amount = ($this->amount * $exchangeRateItc / 100) + $this->amount;
 
         $package = Transaction::query()
             ->select(['id', 'uuid', 'amount', 'user_id'])
@@ -74,7 +85,9 @@ final class Index extends Component
             })
             ->first();
 
-        $package->increment('amount', $this->amount);
+        $package->increment('amount', $amount);
+
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), $amount);
 
         $this->js('window.location.reload()');
     }
@@ -111,10 +124,11 @@ final class Index extends Component
                 ->latest()
                 ->get()
                 ->each(function (Activity $activity) {
-                    $activity->text = new ActivityManager()->resolver($activity);
+                    $activity->text = new ActivityManager()->resolve($activity);
 
                     return $activity;
                 }),
+            'exchangeRateItc' => app(GeneralSetting::class)->exchange_rate_itc,
         ]);
     }
 }

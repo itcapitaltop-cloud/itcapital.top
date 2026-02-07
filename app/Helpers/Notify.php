@@ -143,7 +143,7 @@ class Notify
         ));
     }
 
-    public static function packageStakingBought(User $user, string $amount): void
+    public static function packageStakingBought(User $user, string|float $amount): void
     {
         $icon      = vite()->icon('currency/itc-staking.svg');
         $amountEsc = e($amount);

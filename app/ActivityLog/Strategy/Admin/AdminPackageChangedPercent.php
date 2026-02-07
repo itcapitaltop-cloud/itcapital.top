@@ -10,7 +10,7 @@ use Spatie\Activitylog\Contracts\Activity;
 final class AdminPackageChangedPercent implements ActivityStrategyContract
 {
 
-    public function run(Activity $activity): string
+    public function handle(Activity $activity): string
     {
         return __('activity/admin.admin_package_changed_percentage', [
             'uuid' => $activity->getExtraProperty('package_uuid', ''),

@@ -6,8 +6,10 @@ namespace App\MoonShine\Resources;
 
 use App\Enums\Itc\PackageTypeEnum;
 use App\Models\ItcPackage;
+use App\Models\User;
 use App\MoonShine\Pages\ItcStaking\ItcStakingDetailPage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingIndexPage;
+use App\Settings\GeneralSetting;
 use App\Tasks\Package\CreateItcStakingTask;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +18,7 @@ use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FormBuilder;
 use MoonShine\Decorations\Block;
+use MoonShine\Enums\ToastType;
 use MoonShine\Fields\Number;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -54,6 +57,46 @@ class ItcStakingResource extends ModelResource
     public function actions(): array
     {
         return [
+            ActionButton::make('Изменить стартовую премию')->inModal(
+                title: fn () => 'Изменение стартовой премии в процентах',
+                content: function () {
+                    return Block::make([
+                        FormBuilder::make()
+                            ->action('/itcapitalmoonshineadminpanel/itc-staking/change/start-bonus-percentage')
+                            ->fields([
+                                Number::make('Укажите новый процент премии', 'percent')
+                                    ->default(app(GeneralSetting::class)->start_bonus_staking_percent)
+                                    ->customAttributes(
+                                        [
+                                            'step' => 'any',
+                                        ])
+                                    ->required(),
+                            ])
+                            ->method('POST')
+                            ->submit('Подтвердить'),
+                    ]);
+                },
+            )->primary(),
+            ActionButton::make('Изменить регулярную премию')->inModal(
+                title: fn () => 'Изменение регулярной премии в процентах',
+                content: function () {
+                    return Block::make([
+                        FormBuilder::make()
+                            ->action('/itcapitalmoonshineadminpanel/itc-staking/change/regular-percentage')
+                            ->fields([
+                                Number::make('Укажите новый процент регулярной премии', 'percent')
+                                    ->default(app(GeneralSetting::class)->regular_staking_percent)
+                                    ->customAttributes(
+                                        [
+                                            'step' => 'any',
+                                        ])
+                                    ->required(),
+                            ])
+                            ->method('POST')
+                            ->submit('Подтвердить'),
+                    ]);
+                },
+            )->primary(),
             ActionButton::make('Доходность пакетов')->inModal(
                 title: fn () => 'Настройка общей доходности для всех',
                 content: function () {
@@ -124,6 +167,10 @@ class ItcStakingResource extends ModelResource
         return [];
     }
 
+    /**
+     * @param \MoonShine\MoonShineRequest $request
+     * @return \MoonShine\Http\Responses\MoonShineJsonResponse
+     */
     public function createPackage(
         MoonShineRequest $request,
     ): MoonShineJsonResponse {
