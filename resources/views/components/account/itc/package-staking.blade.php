@@ -20,6 +20,7 @@
                             ? 0
                             : scale(
                                 $package->transaction->amount +
+                                    ($package->profits_sum_amount ?? 0) +
                                     ($package->partner_transfers_sum_amount ?? 0) +
                                     ($package->reinvest_to_body_sum_amount ?? 0) -
                                     ($package->balance_withdraws_sum_amount ?? 0),

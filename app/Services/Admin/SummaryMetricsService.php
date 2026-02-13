@@ -141,12 +141,12 @@ final class SummaryMetricsService
             ->sum('amount');
     }
 
-    public function dividendsMonth(): string
+    public function dividendsMonth(): int|float|string
     {
         return PackageProfit::query()->withoutTestUsers()->where('created_at', '>=', now()->subMonth())->sum('amount');
     }
 
-    public function dividendsWeek(): string
+    public function dividendsWeek(): int|float|string
     {
         return PackageProfit::query()->withoutTestUsers()->where('created_at', '>=', now()->subWeek())->sum('amount');
     }

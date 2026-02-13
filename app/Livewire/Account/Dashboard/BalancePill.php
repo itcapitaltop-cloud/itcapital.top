@@ -30,10 +30,20 @@ class BalancePill extends Component
 
         $transactionRepo = app(TransactionRepositoryContract::class);
 
+        $transactions = Transaction::query()
+            ->packageStaking(Auth::id())
+            ->with('itcPackage.profits')
+            ->get();
+
+        $balanceStaking = $transactions->sum(function ($trx) {
+            $profits = $trx->itcPackage->profits->sum('amount');
+            return $trx->amount + $profits;
+        });
+
         return view('livewire.account.dashboard.balance-pill', [
             'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
             'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
-            'balanceStaking' => Transaction::query()->packageStaking(Auth::id())->sum('amount'),
+            'balanceStaking' => $balanceStaking,
         ]);
     }
 }

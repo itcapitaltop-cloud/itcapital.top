@@ -11,12 +11,14 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
+use App\Models\PackageProfit;
 use App\Models\Transaction;
 use App\Services\User\StakingStartBonusAccrualService;
 use App\Settings\GeneralSetting;
 use App\Tasks\Package\CreateItcStakingTask;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -37,11 +39,20 @@ final class Index extends Component
     {
         $this->validate();
 
-        $package = new CreateItcStakingTask()->run($this->amount, auth()->user()->id);
         $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $amount = ($this->amount * $exchangeRateItc) + $this->amount;
+        $token = $this->amount * $exchangeRateItc;
+        $profit = $token - $this->amount;
 
-        Notify::packageStakingBought(auth()->user(), $amount);
+        $package = new CreateItcStakingTask()->run($this->amount, auth()->user()->id);
+
+        PackageProfit::query()
+            ->create([
+                'uuid' => 'PP-' . Str::random(10),
+                'package_uuid' => $package->uuid,
+                'amount' => $profit,
+            ]);
+
+        Notify::packageStakingBought(auth()->user(), $token);
 
         $this->dispatch('bought');
 
@@ -49,11 +60,13 @@ final class Index extends Component
             ->performedOn($package)
             ->causedBy(auth()->user())
             ->withProperties([
-                'amount' => $amount,
+                'amount' => $token,
                 'package_uuid' => $package->uuid,
                 'package_type' => PackageTypeEnum::STAKING,
             ])
             ->log('package_purchased');
+
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
 
         $this->js('window.location.reload()');
     }
@@ -66,8 +79,8 @@ final class Index extends Component
         $this->validate();
 
         $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-
-        $amount = ($this->amount * $exchangeRateItc / 100) + $this->amount;
+        $token = $this->amount * $exchangeRateItc;
+        $profit = $token - $this->amount;
 
         $package = Transaction::query()
             ->select(['id', 'uuid', 'amount', 'user_id'])
@@ -85,9 +98,16 @@ final class Index extends Component
             })
             ->first();
 
-        $package->increment('amount', $amount);
+        $package->increment('amount', $this->amount);
 
-        new StakingStartBonusAccrualService()->accrue(auth()->id(), $amount);
+        PackageProfit::query()
+            ->create([
+                'uuid' => 'PP-' . Str::random(10),
+                'package_uuid' => $package->uuid,
+                'amount' => $profit,
+            ]);
+
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
 
         $this->js('window.location.reload()');
     }

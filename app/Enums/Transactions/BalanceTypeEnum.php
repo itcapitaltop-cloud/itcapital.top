@@ -9,6 +9,7 @@ enum BalanceTypeEnum: string
     case MAIN = 'main';
     case PARTNER = 'partner';
     case REGULAR_PREMIUM = 'regular_premium';
+    case STAKING = 'staking';
 
     public function toString(): string
     {
@@ -16,6 +17,7 @@ enum BalanceTypeEnum: string
             self::MAIN => 'Основной',
             self::PARTNER => 'Партнерский',
             self::REGULAR_PREMIUM => 'Регулярная премия',
+            self::STAKING => 'Стейкинг',
         };
     }
 }

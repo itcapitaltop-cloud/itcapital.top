@@ -79,6 +79,18 @@ class Transaction extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function profits()
+    {
+        return $this->hasManyThrough(
+            PackageProfit::class, // целевая модель
+            ItcPackage::class,    // промежуточная модель
+            'uuid',               // foreign key у ItcPackage на Transaction
+            'package_uuid',       // foreign key у PackageProfit на ItcPackage
+            'uuid',               // local key Transaction
+            'uuid'                // local key у ItcPackage
+        );
+    }
+
     public function itcPackage(): BelongsTo
     {
         return $this->belongsTo(ItcPackage::class, 'uuid', 'uuid');
@@ -111,7 +123,8 @@ class Transaction extends Model
     {
         return $query->where('user_id', $userId)
             ->whereHas('itcPackage', function ($query) {
-                $query->where('type', PackageTypeEnum::STAKING);
+                $query->where('type', PackageTypeEnum::STAKING)
+                    ->withSum(['profits as total_profit' => fn ($q) => $q->whereNull('deleted_at')], 'amount');
             });
     }
 

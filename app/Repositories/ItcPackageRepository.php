@@ -122,7 +122,7 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
 
             $profit = $this->getCurrentProfitAmountByPackageUuid($uuid);
 
-            if ($profit->isPositive()) {
+            if ($package->type !== PackageTypeEnum::STAKING && $profit->isPositive()) {
                 $trx = $transactionRepo->commonStore(new CreateTransactionDto(
                     userId: $userId,
                     trxType: TrxTypeEnum::WITHDRAW_PACKAGE_PROFIT,

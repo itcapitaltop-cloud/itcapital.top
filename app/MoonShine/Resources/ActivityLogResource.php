@@ -74,4 +74,12 @@ class ActivityLogResource extends ModelResource
     {
         return [];
     }
+
+    /**
+     * @return string[]
+     */
+    public function getActiveActions(): array
+    {
+        return ['view'];
+    }
 }

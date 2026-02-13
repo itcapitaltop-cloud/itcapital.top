@@ -46,9 +46,7 @@ final class StakingStartBonusAccrualService implements StartBonusAccrualContract
 
         $generalSettings = app(GeneralSetting::class)->exchange_rate_itc * 100;
 
-        $exchangeRateItc = ($packageAmount / 100 * $generalSettings);
-
-        $reward = round($exchangeRateItc + ($exchangeRateItc / 100 * $percent), 2);
+        $reward = ($packageAmount / 100 * $generalSettings);
 
         if ($reward <= 0) {
             return;
