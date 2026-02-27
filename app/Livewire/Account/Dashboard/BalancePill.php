@@ -4,8 +4,7 @@ namespace App\Livewire\Account\Dashboard;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Transactions\BalanceTypeEnum;
-use App\Enums\Transactions\TrxTypeEnum;
-use App\Models\Transaction;
+use App\Models\ItcPackage;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -31,36 +30,15 @@ class BalancePill extends Component
 
         $transactionRepo = app(TransactionRepositoryContract::class);
 
-        $transactions = Transaction::query()
-            ->packageStaking(Auth::id())
-<<<<<<< Updated upstream
-            ->with('itcPackage.profits')
-            ->get();
-
-        $balanceStaking = $transactions->sum(function ($trx) {
-            $profits = $trx->itcPackage->profits->sum('amount');
-            return $trx->amount + $profits;
-=======
-            ->with(['itcPackage.stakingProfits', 'itcPackage.profits'])
-            ->get();
-
-        $stakingRegular = Transaction::where('user_id', Auth::id())
-            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
-            ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
-            ->sum('amount');
-
-        $balanceStaking = $transactions->sum(function ($trx) {
-            $stakingProfits = $trx->itcPackage->stakingProfits->sum('amount');
-            $profits = $trx->itcPackage->profits->sum('amount');
-
-            return $trx->amount + $stakingProfits + $profits;
->>>>>>> Stashed changes
-        });
+        $balanceStaking = ItcPackage::query()
+            ->calculateStakingBalance(auth()->id())
+            ->get()
+            ->sum(fn ($item) => $item->transaction_sum + $item->staking_accruals_sum);
 
         return view('livewire.account.dashboard.balance-pill', [
             'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
             'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
-            'balanceStaking' => $balanceStaking + $stakingRegular,
+            'balanceStaking' => $balanceStaking,
         ]);
     }
 }

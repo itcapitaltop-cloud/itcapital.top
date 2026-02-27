@@ -21,13 +21,12 @@ final class StakingAccrualService
         ItcPackage $package,
         float $amount,
         int $userId,
-        ?int $sourceUser = null
     ): StakingTransactionAccrual {
         $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
         $token = $amount * $exchangeRateItc;
         $profit = $token - $amount;
 
-        return DB::transaction(function () use ($package, $amount, $profit, $userId, $sourceUser) {
+        return DB::transaction(function () use ($package, $amount, $profit, $userId) {
             activity('packages')
                 ->performedOn($package)
                 ->causedBy(User::query()->findOrFail($userId))
@@ -44,7 +43,35 @@ final class StakingAccrualService
                 StakingTransactionAccrualEnum::Profit,
                 $profit,
                 $userId,
-                $sourceUser,
+            );
+        });
+    }
+
+    public function accrueBuyMore(ItcPackage $package, int $amount, int $userId): StakingTransactionAccrual
+    {
+        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
+        $token = $amount * $exchangeRateItc;
+        $profit = $token - $amount;
+
+        return DB::transaction(function () use ($package, $amount, $profit, $userId) {
+            activity('package')
+                ->performedOn($package)
+                ->causedBy($userId)
+                ->withProperties([
+                    'profit' => $amount,
+                    'percent' => $package->month_profit_percent,
+                    'transaction_uuid' => $transaction->uuid,
+                    'transaction_amount' => $transaction->amount,
+                    'package_uuid' => $package->uuid,
+                    'package_type' => PackageTypeEnum::STAKING,
+                ])
+                ->log('profit_accrued');
+
+            return $this->accrue(
+                $package,
+                StakingTransactionAccrualEnum::Profit,
+                $profit,
+                $userId,
             );
         });
     }

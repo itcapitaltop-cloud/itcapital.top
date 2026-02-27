@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Account\ItcStaking;
 
-use App\Actions\Staking\CalculateUserStakingSumAction;
 use App\ActivityLog\ActivityManager;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
@@ -103,11 +102,7 @@ final class Index extends Component
 
         $package->increment('amount', $this->amount);
 
-<<<<<<< Updated upstream
-        PackageProfit::query()
-=======
         StakingProfit::query()
->>>>>>> Stashed changes
             ->create([
                 'uuid' => 'SPP-' . Str::random(10),
                 'package_uuid' => $package->uuid,
@@ -139,13 +134,9 @@ final class Index extends Component
     {
         $start = now()->subMonth()->startOfMonth();
         $end = now()->subMonth()->endOfMonth();
-        dd(CalculateUserStakingSumAction::make()->run( auth()->id()));
+
         return view('livewire.account.itc-staking.index', [
-            'packages' => ItcPackage::query()
-                ->active(PackageTypeEnum::STAKING)
-                ->userPackagesWithFinancials(auth()->user()->id)
-                ->withSum(['profits as last_month_profit' => fn ($q) => $q->whereBetween('created_at', [$start, $end])], 'amount')
-                ->get(),
+            'packages' => ItcPackage::query()->calculateStakingBalance(auth()->id())->get(),
             'regularPremium' => Transaction::where('user_id', Auth::id())
                 ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
                 ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])

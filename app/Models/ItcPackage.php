@@ -3,11 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
-<<<<<<< Updated upstream
-=======
-use App\Models\Package\Staking\StakingProfit;
 use App\Models\Package\Staking\StakingTransactionAccrual;
->>>>>>> Stashed changes
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -85,14 +81,11 @@ class ItcPackage extends Model
         return $this->hasMany(PackageProfit::class, 'package_uuid', 'uuid');
     }
 
-<<<<<<< Updated upstream
-=======
     public function stakingTransactionAccruals(): HasMany
     {
         return $this->hasMany(StakingTransactionAccrual::class);
     }
 
->>>>>>> Stashed changes
     public function reinvestProfitsAll(): HasMany
     {
         return $this->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid');
@@ -255,5 +248,21 @@ class ItcPackage extends Model
         return $query->whereHas('transaction.user', function ($q) {
             $q->where('is_test', false);
         });
+    }
+
+    #[Scope]
+    public function calculateStakingBalance(Builder $query, int $userId): Builder
+    {
+        return $query->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->withSum(['transaction as transaction_sum' => fn ($q) => $q->where('user_id', $userId)], 'amount')
+            ->withSum(
+                ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100')),
+                ],
+                'amount'
+            );
     }
 }
