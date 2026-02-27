@@ -1,4 +1,4 @@
-@props(['package'])
+@props(['package', 'regularPremium', 'regularTotal', 'regularWeek'])
 
 @php
     use App\Enums\Itc\PackageTypeEnum;
@@ -20,7 +20,13 @@
                             ? 0
                             : scale(
                                 $package->transaction->amount +
+<<<<<<< Updated upstream
                                     ($package->profits_sum_amount ?? 0) +
+=======
+                                    ($regularPremium ?? 0) +
+                                    ($package->profits_sum_amount ?? 0) +
+                                    ($package->staking_profits_sum_amount ?? 0) +
+>>>>>>> Stashed changes
                                     ($package->partner_transfers_sum_amount ?? 0) +
                                     ($package->reinvest_to_body_sum_amount ?? 0) -
                                     ($package->balance_withdraws_sum_amount ?? 0),
@@ -72,7 +78,9 @@
             <div class="flex items-baseline gap-1">
                 <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-3 sm:w-4" alt="ITC">
                 <span
-                    class="text-lg sm:text-xl font-semibold">{{ scale($package->last_month_profit ?? 0)->stripTrailingZeros() }}</span>
+                    class="text-lg sm:text-xl font-semibold">{{ scale($package->last_month_profit ?? 0)
+                        ->plus(\Brick\Math\BigDecimal::of($regularWeek))
+                        ->stripTrailingZeros() }}</span>
             </div>
         </div>
 
@@ -83,7 +91,9 @@
             <div class="flex items-baseline gap-1">
                 <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-3 sm:w-4" alt="ITC">
                 <span class="text-lg sm:text-xl font-semibold">
-                    {{ scale($package->profits_sum_amount ?? 0)->stripTrailingZeros() }}
+                    {{scale($package->profits_sum_amount ?? 0)
+                        ->plus(\Brick\Math\BigDecimal::of($regularTotal))
+                        ->stripTrailingZeros() }}
                 </span>
             </div>
         </div>

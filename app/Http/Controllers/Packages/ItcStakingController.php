@@ -7,11 +7,13 @@ namespace App\Http\Controllers\Packages;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Http\Controllers\Controller;
 use App\Models\ItcPackage;
+use App\Models\Package\Staking\StakingProfit;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -37,7 +39,7 @@ final class ItcStakingController extends Controller
         activity('admin')
             ->causedBy(auth()->user())
             ->withProperties([
-                'percent' => $request->get('percent'),
+                'percent' => $request->input('percent'),
             ])
             ->log('admin_package_staking_changed_percentage');
 
@@ -107,7 +109,6 @@ final class ItcStakingController extends Controller
                     'package_type' => PackageTypeEnum::STAKING,
                 ])
                 ->log('admin_package_changed_staking_regular_percent');
-
         }
 
         $generalSetting->regular_staking_percent = $request->input('percent');
@@ -116,7 +117,7 @@ final class ItcStakingController extends Controller
         activity('admin')
             ->causedBy(auth()->user())
             ->withProperties([
-                'percent' => $request->get('percent'),
+                'percent' => $request->input('percent'),
             ])
             ->log('admin_package_staking_changed_regular_percentage');
 
@@ -141,23 +142,34 @@ final class ItcStakingController extends Controller
         $oldAmount = $transaction->amount;
         $oldPercent = $package->month_profit_percent;
 
-        $transaction->update([
-            'amount' => $request->get('amount'),
-        ]);
+        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
+        $token = $request->input('amount') / $exchangeRateItc;
+
+        $profit = $request->input('amount') - $token;
+
+        $transaction->increment('amount', $token);
+
+        StakingProfit::query()
+            ->create([
+                'uuid' => 'SPP-' . Str::random(10),
+                'package_uuid' => $package->uuid,
+                'amount' => $profit,
+            ]);
 
         $package->update([
-            'month_profit_percent' => $request->get('profit_percent'),
+            'month_profit_percent' => $request->input('profit_percent'),
         ]);
 
         if ($transaction->wasChanged('amount')) {
+
             activity('admin')
                 ->performedOn($package)
                 ->causedBy(auth()->user())
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $oldAmount,
-                    'old_amount' => $request->get('amount'),
+                    'amount' => $request->input('amount'),
+                    'old_amount' => $oldAmount,
                 ])
                 ->log('admin_package_changed_amount');
         }
@@ -169,7 +181,7 @@ final class ItcStakingController extends Controller
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $request->get('amount'),
+                    'amount' => $request->input('amount'),
                     'percent' => $oldPercent,
                     'old_percent' => $package->month_profit_percent,
                 ])

@@ -23,17 +23,16 @@ class Index extends Component
         return view('livewire.account.dashboard.index', [
 
             'packagesCount' => ItcPackage::query()
-                ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
-                ->where('user_id', Auth::id())
-                ->where('type', '!=', PackageTypeEnum::ARCHIVE)
+                ->whereHas('transaction.user', fn ($query) => $query->whereId(auth()->id()))
+                ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING])
                 ->count(),
 
             'depositTotalAmount' => ItcPackage::query()
                 ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
                 ->where('user_id', Auth::id())
-                ->where('type', '!=', PackageTypeEnum::ARCHIVE)
+                ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING])
                 ->where(function ($q) {
-                    $q->where('type', '!=', PackageTypeEnum::PRESENT)
+                    $q->whereNotIn('type', [PackageTypeEnum::PRESENT, PackageTypeEnum::STAKING])
                         ->orWhereDoesntHave('zeroing');
                 })
                 ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
@@ -41,6 +40,9 @@ class Index extends Component
                 ->sum(fn ($p) => (float) $p->transaction->amount + (float) $p->reinvest_profits_sum_amount),
 
             'transactions' => Transaction::query()
+                ->with([
+                    'itcPackage' => fn ($query) => $query->whereNotIn('type', [PackageTypeEnum::STAKING]),
+                ])
                 ->where('user_id', Auth::id())
                 ->whereNot('trx_type', TrxTypeEnum::HIDDEN_DEPOSIT)
                 ->orderByDesc('created_at')
@@ -59,7 +61,7 @@ class Index extends Component
                 ->join('itc_packages', 'package_profits.package_uuid', '=', 'itc_packages.uuid')
                 ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
                 ->where('transactions.user_id', Auth::id())
-                ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
+                ->whereNotIn('itc_packages.type', [PackageTypeEnum::PRESENT, PackageTypeEnum::STAKING])
                 ->sum('package_profits.amount'),
 
             'yieldWeek' => PackageProfit::query()

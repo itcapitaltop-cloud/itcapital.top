@@ -15,7 +15,7 @@ final class AdminPackageChangedPercent implements ActivityStrategyContract
         return __('activity/admin.admin_package_changed_percentage', [
             'uuid' => $activity->getExtraProperty('package_uuid', ''),
             'amount' => $activity->getExtraProperty('amount', 0),
-            'percent' => $activity->getExtraProperty('old_percent', 0),
+            'old_amount' => $activity->getExtraProperty('old_amount', 0),
         ]);
     }
 }

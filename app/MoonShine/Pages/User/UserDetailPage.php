@@ -196,19 +196,29 @@ class UserDetailPage extends DetailPage
             ->asyncMethod('createPackage')
             ->customAttributes([
                 'x-data' => "( () => {
-                 const data = formBuilder(``, { whenFields: [], reactiveUrl: `` }, []);
-
-                 Object.assign(data, {
-                     packageType: '" . PackageTypeEnum::STANDARD->value . "',
-                     onChangeFieldPackageForm(event) {
-                         if (event.target.name === 'packageType') {
-                             this.packageType = event.target.value;
-                         }
-                     }
-                 });
-
-                 return data;   // отдаём объединённый объект
-            })()",
+                    const data = formBuilder(``, { whenFields: [], reactiveUrl: `` }, []);
+                    Object.assign(data, {
+                        packageType: '" . PackageTypeEnum::STANDARD->value . "',
+                        percent: 8.2,
+                        onChangeFieldPackageForm(event) {
+                            if (event.target.name === 'packageType') {
+                                this.packageType = event.target.value;
+                                if (this.packageType === '" . PackageTypeEnum::STAKING->value . "') {
+                                    this.percent = 2;
+                                } else {
+                                    this.percent = 8.2;
+                                }
+                                // Находим инпут percent и обновляем его значение напрямую
+                                const percentInput = document.querySelector('[name=\"percent\"]');
+                                if (percentInput) {
+                                    percentInput.value = this.percent;
+                                    percentInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                }
+                            }
+                        }
+                    });
+                    return data;
+                })()",
             ])
             ->fields([
                 Hidden::make('user_id')->fill($item->id),
@@ -240,7 +250,8 @@ class UserDetailPage extends DetailPage
                     ->fill(8.2)
                     ->customAttributes(
                         [
-                            'wire:model.defer' => 'percent',
+                            'x-model' => 'percent',
+                            'x-on:change' => '$wire.set("percent", $event.target.value)',
                             'step' => 'any',
                         ])
                     ->required(),

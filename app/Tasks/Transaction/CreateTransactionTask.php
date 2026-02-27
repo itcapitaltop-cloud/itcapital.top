@@ -8,6 +8,7 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\Transaction;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 
 final class CreateTransactionTask
@@ -18,11 +19,11 @@ final class CreateTransactionTask
 
     private BalanceTypeEnum $balanceType = BalanceTypeEnum::MAIN;
 
-    private ?Carbon $acceptedAt = null;
+    private ?CarbonInterface $acceptedAt = null;
 
-    private ?Carbon $rejectedAt = null;
+    private ?CarbonInterface $rejectedAt = null;
 
-    public function run(string $amount, int $userId, ?string $uuid = null): Transaction
+    public function run(string|float $amount, int $userId, ?string $uuid = null): Transaction
     {
         return Transaction::query()->create([
             'uuid' => $uuid ?? $this->prefix . Str::random(10),

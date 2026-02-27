@@ -77,10 +77,14 @@ class ItcStakingDetailPage extends DetailPage
         $stakingChangedStartBonusPercent = new ChangedStartBonusPercentComponent()->handle($package);
         $stakingChangedSRegularPercent = new ChangedRegularPercentComponent()->handle($package);
 
+        $buyButton = $packages->count() >= 1
+        ? ''
+        : $this->buyPackage();
+
         return [
-            FlexibleRender::make(function () use ($stakingChangedStartBonusPercent, $stakingChangedSRegularPercent): string {
+            FlexibleRender::make(function () use ($stakingChangedStartBonusPercent, $stakingChangedSRegularPercent, $buyButton): string {
                 return "<div class='flex flex-wrap gap-2 items-center'>
-                    {$this->buyPackage()}
+                    {$buyButton}
                     {$stakingChangedStartBonusPercent}
                     {$stakingChangedSRegularPercent}
                 </div>";
@@ -95,11 +99,12 @@ class ItcStakingDetailPage extends DetailPage
                             Text::make('ID', 'uuid')->showOnExport(),
                             Date::make('Дата открытия', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
                             Text::make('Сумма', 'amount', formatted: function (array $package): float {
-                                return round((float) $package['transaction']['amount'], 2);
+                                return round((float) $package['transaction']['amount'] + (float) $package['staking_profits_sum_amount'], 2);
                             }),
                             Number::make('Доходность за все время', formatted: function (array $package): float {
                                 return round((float) $package['profits_sum_amount'], 2);
                             }),
+
                             Number::make('Процент прибыли', 'month_profit_percent', formatted: function (array $package): string {
                                 return $package['month_profit_percent'] . '%';
                             }),
@@ -267,22 +272,28 @@ class ItcStakingDetailPage extends DetailPage
 
     private function itcPackageEditForm(ItcPackage $package, array $item): FormBuilder
     {
+        $packages = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->userPackagesWithFinancials($package->transaction->user->id)
+            ->count();
+
+        $buyPackage = $packages >= 1 ?
+            Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
+                ->fill(0)
+                ->required()
+            :
+            Number::make('Депозит', 'amount')
+                ->fill(round((float) $item['transaction']['amount'], 2))
+                ->required()
+;
+
         return FormBuilder::make()
-            ->action("/itcapitalmoonshineadminpanel/itc-staking/package/close/staking/{$package->uuid}")
+            ->action("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}")
             ->method('POST')
             ->async()
             ->fields([
                 Date::make('Дата открытия', 'created_at')
                     ->fill($package->created_at)
-                    ->required(),
-
-                Number::make('Процент прибыли', 'profit_percent')
-                    ->fill($package->month_profit_percent)
-                    ->customAttributes(
-                        [
-                            'wire:model.defer' => 'percent',
-                            'step' => 'any',
-                        ])
                     ->required(),
 
                 Number::make('Процент прибыли', 'profit_percent')
@@ -303,9 +314,8 @@ class ItcStakingDetailPage extends DetailPage
                         ])
                     ->required(),
 
-                Number::make('Депозит', 'amount')
-                    ->fill(round((float) $item['transaction']['amount'], 2))
-                    ->required(),
+                $buyPackage
+
             ])
             ->submit('Сохранить');
     }

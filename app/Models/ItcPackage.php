@@ -3,6 +3,11 @@
 namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
+<<<<<<< Updated upstream
+=======
+use App\Models\Package\Staking\StakingProfit;
+use App\Models\Package\Staking\StakingTransactionAccrual;
+>>>>>>> Stashed changes
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -80,6 +85,14 @@ class ItcPackage extends Model
         return $this->hasMany(PackageProfit::class, 'package_uuid', 'uuid');
     }
 
+<<<<<<< Updated upstream
+=======
+    public function stakingTransactionAccruals(): HasMany
+    {
+        return $this->hasMany(StakingTransactionAccrual::class);
+    }
+
+>>>>>>> Stashed changes
     public function reinvestProfitsAll(): HasMany
     {
         return $this->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid');

@@ -6,7 +6,6 @@ namespace App\MoonShine\Resources;
 
 use App\Enums\Itc\PackageTypeEnum;
 use App\Models\ItcPackage;
-use App\Models\User;
 use App\MoonShine\Pages\ItcStaking\ItcStakingDetailPage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingIndexPage;
 use App\Settings\GeneralSetting;
@@ -18,7 +17,6 @@ use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FormBuilder;
 use MoonShine\Decorations\Block;
-use MoonShine\Enums\ToastType;
 use MoonShine\Fields\Number;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -178,7 +176,6 @@ class ItcStakingResource extends ModelResource
         $userId = (int) $request->input('user_id');
         $percent = (float) $request->input('percent');
         $amount = $request->input('amount');
-        $packageId = $request->input('package_id');
 
         $package = new CreateItcStakingTask()
             ->setMothProfitPercent($percent)
@@ -197,7 +194,7 @@ class ItcStakingResource extends ModelResource
         $url = to_page(
             page: new ItcStakingDetailPage(),
             resource: new self(),
-            params: ['resourceItem' => $packageId],
+            params: ['resourceItem' => $package->id],
         );
 
         return MoonShineJsonResponse::make()

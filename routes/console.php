@@ -26,7 +26,8 @@ Schedule::command('regular-premium:accrual')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
 
 Schedule::command('staking-regular-premium:accrual')
-    ->weeklyOn(1, '23:50')
+    ->monthlyOn(1, '00:00')
+    ->withoutOverlapping()
     ->sendOutputTo(storage_path('logs/staking-scheduler.log'));
 
 Schedule::command('profit-accrual:itc-staking')

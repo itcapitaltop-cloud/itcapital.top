@@ -15,7 +15,7 @@ use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Settings\GeneralSetting;
-use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 
 final class StakingRegularPremiumAccrualCommand extends Command
@@ -36,9 +36,9 @@ final class StakingRegularPremiumAccrualCommand extends Command
      */
     protected $description = 'Начислить регулярную премию со стейкинга';
 
-    private Carbon $from;
+    private CarbonInterface $from;
 
-    private Carbon $to;
+    private CarbonInterface $to;
 
     /**
      * Execute the console command.
@@ -47,8 +47,10 @@ final class StakingRegularPremiumAccrualCommand extends Command
      */
     public function handle(): int
     {
-        $this->from = now()->startOfDay(); // @TODO - не забыть поменять на нормальное значение это для теста
-        $this->to = now();
+        $prevMonth = now();
+
+        $this->from = $prevMonth->copy()->startOfMonth();
+        $this->to = $prevMonth->copy()->endOfMonth();
 
         $onlyUser = $this->option('user') ? (int) $this->option('user') : null;
 
@@ -187,11 +189,15 @@ final class StakingRegularPremiumAccrualCommand extends Command
         $net = [];
 
         foreach ($packages as $pkg) {
+            $regularPremium = Transaction::where('user_id', $pkg->user_id)
+                ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
+                ->whereBetween('created_at', [$this->from, $this->to])
+                ->sum('amount');
 
             $userId = $pkg->user_id;
             $profit = $pkg->profits->sum('amount');
 
-            $net[$userId] = ($net[$userId]['amount'] ?? 0) + $profit;
+            $net[$userId] = ($net[$userId]['amount'] ?? 0) + $profit + $regularPremium;
 
             $this->line("USER_ID {$userId}: staking_profit={$profit}");
         }

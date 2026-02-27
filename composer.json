@@ -20,6 +20,7 @@
         "laravel/reverb": "^1.6.0",
         "laravel/tinker": "^2.9",
         "league/csv": "^9.16",
+        "lemax10/simple-actions": "^2.2",
         "livewire/livewire": "^3.5",
         "moonshine/moonshine": "^2.23.5",
         "phpoffice/phpspreadsheet": "^4.2",
@@ -35,9 +36,7 @@
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
-        "laravel/boost": "^1.3",
         "laravel/pint": "^1.13",
-        "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
         "pestphp/pest": "^4.1"

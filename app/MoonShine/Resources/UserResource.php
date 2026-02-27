@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources;
 
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\Actions\User\InvalidateSessionUserAction;
 use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
@@ -12,6 +13,7 @@ use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Models\Package\Staking\StakingProfit;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\PartnerLevel;
@@ -23,6 +25,8 @@ use App\MoonShine\Handlers\GoogleSheetsExportIndexDataHandler;
 use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
+use App\Services\Package\Staking\StakingAccrualService;
+use App\Settings\GeneralSetting;
 use Carbon\Carbon;
 use Closure;
 use Exception;
@@ -34,6 +38,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\Enums\ToastType;
 use MoonShine\Fields\Checkbox;
@@ -523,43 +528,55 @@ class UserResource extends ModelResource
             ->redirect($url);
     }
 
+    /**
+     * @throws \LeMaX10\SimpleActions\Exceptions\ActionHandlerMethodNotFoundException
+     * @throws \Throwable
+     */
     public function createPackage(
         MoonShineRequest $request,
     ): MoonShineJsonResponse {
-
         $itcRepo = app(ItcPackageRepositoryContract::class);
         $transactionRepo = app(TransactionRepositoryContract::class);
 
         $userId = (int) $request->input('user_id');
-        $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
 
-        /* DTO транзакции */
-        $dto = new CreateTransactionDto(
-            userId: $userId,
-            trxType: $isPresent ? TrxTypeEnum::PRESENT_PACKAGE : TrxTypeEnum::BUY_PACKAGE,
-            balanceType: BalanceTypeEnum::MAIN,
-            amount: $request->input('amount'),
-            acceptedAt: Carbon::now(),
-            prefix: 'ITC-',
-        );
+        if ($request->input('packageType') === PackageTypeEnum::STAKING->value) {
+            $package = CreateStakingPackageAction::make()
+                ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'));
 
-        /* Данные пакета */
-        $packageData = [
-            'type' => $request->input('packageType'),
-            'month_profit_percent' => $request->input('percent'),
-            'work_to' => $isPresent
-                ? now()->addMonths((int) $request->input('duration'))
-                : now()->addWeeks(30),
-            'duration_months' => $request->input('duration'),
-        ];
+            new StakingAccrualService()
+                ->accrueAdminProfit($package, (float) $request->input('amount'), $userId);
+        } else {
+            $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
 
-        /* Создание через репозиторий */
-        $itcRepo->createPackage(
-            dto: $dto,
-            packageData: $packageData,
-            transactionRepo: $transactionRepo,
-            skipBalance: $isPresent
-        );
+            /* DTO транзакции */
+            $dto = new CreateTransactionDto(
+                userId: $userId,
+                trxType: $isPresent ? TrxTypeEnum::PRESENT_PACKAGE : TrxTypeEnum::BUY_PACKAGE,
+                balanceType: BalanceTypeEnum::MAIN,
+                amount: $request->input('amount'),
+                acceptedAt: Carbon::now(),
+                prefix: 'ITC-',
+            );
+
+            /* Данные пакета */
+            $packageData = [
+                'type' => $request->input('packageType'),
+                'month_profit_percent' => $request->input('percent'),
+                'work_to' => $isPresent
+                    ? now()->addMonths((int) $request->input('duration'))
+                    : now()->addWeeks(30),
+                'duration_months' => $request->input('duration'),
+            ];
+
+            /* Создание через репозиторий */
+            $itcRepo->createPackage(
+                dto: $dto,
+                packageData: $packageData,
+                transactionRepo: $transactionRepo,
+                skipBalance: $isPresent
+            );
+        }
 
         $url = to_page(
             page: new UserDetailPage(),
