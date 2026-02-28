@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Packages;
 
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Models\ItcPackage;
-use App\Models\Package\Staking\StakingProfit;
 use App\Models\PackageProfit;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Settings\GeneralSetting;
-use App\Tasks\Package\CreateItcStakingTask;
+use App\Services\Package\Staking\StakingAccrualService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use MoonShine\Models\MoonshineUser;
 
 final class MigratePackageProfitToStakingProfit extends Command
 {
@@ -81,35 +79,30 @@ final class MigratePackageProfitToStakingProfit extends Command
                     return;
                 }
 
-                $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-                $token = $packages['total_amount'] * $exchangeRateItc;
-                $profit = $token - $packages['total_amount'];
+                $package = CreateStakingPackageAction::make()->run($user->id, (float) $packages['total_amount'], (float) $packages['max_month_percent']);
 
-                $package = new CreateItcStakingTask()
-                    ->setMothProfitPercent((float) $packages['max_month_percent'])
-                    ->run((string) $packages['total_amount'], $user->id);
-
-                StakingProfit::query()
-                    ->create([
-                        'uuid' => 'SPP-' . Str::random(10),
-                        'package_uuid' => $package->uuid,
-                        'amount' => $profit,
-                    ]);
-
-                activity('packages')
-                    ->performedOn($package)
-                    ->causedBy(MoonshineUser::findOrFail(1))
-                    ->withProperties([
-                        'amount' => $packages['total_amount'],
-                        'package_uuid' => $package->uuid,
-                        'package_type' => PackageTypeEnum::STAKING,
-                    ])
-                    ->log('admin_package_purchased');
+                new StakingAccrualService()->accrueAdminTopUpBonus($package, $packages['total_amount'], $user->id);
 
                 if (! empty($packages['profits'])) {
+                    $oldProfits = PackageProfit::query()
+                        ->whereIn('id', $packages['profits'])
+                        ->get();
+
+                    $stakingService = new StakingAccrualService();
+
+                    foreach ($oldProfits as $profit) {
+
+                        $stakingService->accrue(
+                            $package,
+                            StakingTransactionAccrualEnum::Profit,
+                            (float) $profit->amount,
+                            $user->id,
+                        );
+                    }
+
                     PackageProfit::query()
                         ->whereIn('id', $packages['profits'])
-                        ->update(['package_uuid' => $package->uuid]);
+                        ->delete();
                 }
 
                 if (! empty($packages['transaction_uuids'])) {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Models\Package\Staking\StakingTransactionAccrual;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -261,6 +262,39 @@ class ItcPackage extends Model
             ->withSum(['transaction as transaction_sum' => fn ($q) => $q->where('user_id', $userId)], 'amount')
             ->withSum(
                 ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100')),
+                ],
+                'amount'
+            );
+    }
+
+    #[Scope]
+    public function calculateStakingLastMonthProfitability(Builder $query, int $userId): Builder
+    {
+        $start = now()->subMonth()->startOfMonth();
+        $end = now()->subMonth()->endOfMonth();
+
+        return $query->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->withSum(
+                ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))->whereNotIn('type', [StakingTransactionAccrualEnum::TopUpBonus])->whereBetween('created_at', [$start, $end]),
+                ],
+                'amount'
+            );
+    }
+
+    #[Scope]
+    public function calculateStakingTotalProfitability(Builder $query, int $userId): Builder
+    {
+        return $query->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->withSum(
+                ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))->whereNotIn('type', [StakingTransactionAccrualEnum::TopUpBonus]),
                 ],
                 'amount'
             );

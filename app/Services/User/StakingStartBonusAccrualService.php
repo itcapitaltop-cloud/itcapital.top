@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\User;
 
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\Contracts\Accruals\StartBonusAccrualContract;
-use App\Enums\Partners\PartnerRewardTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
-use App\Enums\Transactions\TrxTypeEnum;
-use App\Helpers\Notify;
+use App\Enums\Itc\PackageTypeEnum;
 use App\Models\PartnerClosure;
-use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Package\Staking\StakingAccrualService;
 use App\Settings\GeneralSetting;
-use DB;
-use Illuminate\Support\Str;
 
 final class StakingStartBonusAccrualService implements StartBonusAccrualContract
 {
@@ -46,47 +42,34 @@ final class StakingStartBonusAccrualService implements StartBonusAccrualContract
 
         $generalSettings = app(GeneralSetting::class)->exchange_rate_itc * 100;
 
-        $reward = ($packageAmount / 100 * $generalSettings);
+        $reward = (float) ($packageAmount / 100 * $generalSettings);
 
         if ($reward <= 0) {
             return;
         }
 
-        $this->processAccrual($ancestorId, $buyerId, $reward);
-    }
+        $transaction = Transaction::query()
+            ->where('user_id', $ancestorId)
+            ->whereHas('itcPackage', function ($query) {
+                $query->where('type', PackageTypeEnum::STAKING);
+            })
+            ->with(['itcPackage'])
+            ->first();
 
-    /**
-     * @throws \Throwable
-     */
-    private function processAccrual(
-        int $ancestorId,
-        int $fromUserId,
-        float $reward
-    ): void {
-        DB::transaction(function () use ($ancestorId, $fromUserId, $reward) {
+        if (is_null($transaction)) {
+            $package = CreateStakingPackageAction::make()->run($ancestorId, 0);
 
-            $uuid = 'SSB-' . Str::random(10);
-            $now = now();
+            new StakingAccrualService()
+                ->accrueStartBonus(
+                    $package,
+                    $reward,
+                    $ancestorId,
+                    $buyerId
+                );
 
-            Transaction::create([
-                'uuid' => $uuid,
-                'user_id' => $ancestorId,
-                'amount' => $reward,
-                'trx_type' => TrxTypeEnum::STAKING_START_BONUS_ACCRUAL,
-                'balance_type' => BalanceTypeEnum::PARTNER,
-                'accepted_at' => $now,
-            ]);
+            return;
+        }
 
-            PartnerReward::create([
-                'uuid' => $uuid,
-                'from_user_id' => $fromUserId,
-                'reward_type' => PartnerRewardTypeEnum::STAKING_START->value,
-                'line' => 1,
-                'amount' => $reward,
-                'trx_uuid' => $uuid,
-            ]);
-
-            Notify::bonusStart(User::find($ancestorId), $reward);
-        });
+        new StakingAccrualService()->accrueStartBonus($transaction->itcPackage, $reward, $ancestorId, $buyerId);
     }
 }

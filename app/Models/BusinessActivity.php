@@ -19,7 +19,13 @@ final class BusinessActivity extends Activity
     public function packagesStaking(Builder $query, int $userId): Builder
     {
         return $query->where('subject_type', ItcPackage::class)
-            ->whereIn('description', ['package_purchased', 'profit_accrued'])
+            ->whereIn('description', [
+                'package_purchased',
+                'profit_accrued',
+                'top_up_package',
+                'start_bonus_package',
+                'regular_premium_package',
+            ])
             ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
             ->where('causer_id', $userId);
     }
@@ -41,6 +47,8 @@ final class BusinessActivity extends Activity
                         'profit_accrued',
                         'admin_package_changed_amount',
                         'admin_package_changed_percentage',
+                        'top_up_package',
+                        'start_bonus_package',
                     ])
                     ->whereJsonContains(
                         'properties->package_type',

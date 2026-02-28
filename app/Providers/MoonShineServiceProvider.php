@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\MoonShine\Pages\ArtisanConsole\ArtisanConsoleIndexPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\ActivityLogResource;
-use App\MoonShine\Resources\ArtisanConsoleResource;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;

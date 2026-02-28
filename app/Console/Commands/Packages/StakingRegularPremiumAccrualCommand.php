@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Packages;
 
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Partners\PartnerRewardTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
-use App\Enums\Transactions\TrxTypeEnum;
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Helpers\Notify;
 use App\Models\ItcPackage;
 use App\Models\PartnerClosure;
-use App\Models\PartnerReward;
-use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Package\Staking\StakingAccrualService;
 use App\Settings\GeneralSetting;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
@@ -25,9 +23,7 @@ final class StakingRegularPremiumAccrualCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'staking-regular-premium:accrual
-                            {--user= : ID пользователя-аплайна}
-                            {--reset : удалить начисления за последние 14 дней}';
+    protected $signature = 'staking-regular-premium:accrual';
 
     /**
      * The console command description.
@@ -52,17 +48,7 @@ final class StakingRegularPremiumAccrualCommand extends Command
         $this->from = $prevMonth->copy()->startOfMonth();
         $this->to = $prevMonth->copy()->endOfMonth();
 
-        $onlyUser = $this->option('user') ? (int) $this->option('user') : null;
-
-        if ($onlyUser && $this->option('reset')) {
-            $this->wipeUserData($onlyUser);
-        }
-
         $profits = $this->collectNetProfitPerUserFromStaking();
-
-        if ($this->option('reset')) {
-            $this->wipeAllData();
-        }
 
         foreach ($profits as $descendantId => $profit) {
 
@@ -75,11 +61,12 @@ final class StakingRegularPremiumAccrualCommand extends Command
 
             $ancestorId = $ancestors[$descendantId] ?? null;
 
-            if (! $ancestorId) {
-                continue;
-            }
+            $package = ItcPackage::query()
+                ->where('type', PackageTypeEnum::STAKING)
+                ->whereHas('transaction', fn ($q) => $q->where('user_id', $ancestorId))
+                ->first();
 
-            if ($onlyUser && $ancestorId !== $onlyUser) {
+            if (! $ancestorId) {
                 continue;
             }
 
@@ -91,34 +78,24 @@ final class StakingRegularPremiumAccrualCommand extends Command
 
             $reward = round($profit * $percent / 100, 2);
 
+            if (is_null($package)) {
+
+                $packageStaking = CreateStakingPackageAction::make()->run($ancestorId, 0);
+
+                new StakingAccrualService()->accruePartnerBonus($packageStaking, $reward, $descendantId, $ancestorId, 1);
+
+                continue;
+            }
+
             if ($reward <= 0) {
                 continue;
             }
 
-            \DB::transaction(function () use ($ancestorId, $descendantId, $reward) {
-
-                $trxUuid = 'SRP-' . \Str::random(10);
-
-                Transaction::create([
-                    'uuid' => $trxUuid,
-                    'user_id' => $ancestorId,
-                    'amount' => $reward,
-                    'trx_type' => TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL,
-                    'balance_type' => BalanceTypeEnum::REGULAR_PREMIUM,
-                    'accepted_at' => now(),
-                ]);
-
-                PartnerReward::create([
-                    'uuid' => $trxUuid,
-                    'from_user_id' => $descendantId,
-                    'reward_type' => PartnerRewardTypeEnum::STAKING_REGULAR,
-                    'line' => 1,
-                    'amount' => $reward,
-                    'trx_uuid' => $trxUuid,
-                ]);
-            });
+            new StakingAccrualService()->accruePartnerBonus($package, $reward, $descendantId, $ancestorId, 1);
 
             Notify::bonusRegular(User::find($ancestorId), (string) $reward);
+
+            $this->line("USER_ID {$descendantId}: staking_profit={$profit}");
         }
 
         $this->info('Staking regular premium accrual completed.');
@@ -126,82 +103,17 @@ final class StakingRegularPremiumAccrualCommand extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * @throws \Throwable
-     */
-    private function wipeUserData(int $userId): void
-    {
-        \DB::transaction(function () use ($userId) {
-
-            $trxUuids = Transaction::where('user_id', $userId)
-                ->where('trx_type', TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL)
-                ->whereBetween('accepted_at', [$this->from, $this->to])
-                ->pluck('uuid');
-
-            if ($trxUuids->isEmpty()) {
-                return;
-            }
-
-            PartnerReward::whereIn('uuid', $trxUuids)
-                ->where('reward_type', PartnerRewardTypeEnum::REGULAR->value)
-                ->delete();
-
-            Transaction::whereIn('uuid', $trxUuids)->delete();
-        });
-    }
-
-    /**
-     * @throws \Throwable
-     */
-    private function wipeAllData(): void
-    {
-        \DB::transaction(function () {
-
-            $trxUuids = Transaction::where('trx_type', TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL)
-                ->whereBetween('accepted_at', [$this->from, $this->to])
-                ->pluck('uuid');
-
-            if ($trxUuids->isEmpty()) {
-                return;
-            }
-
-            PartnerReward::whereIn('uuid', $trxUuids)
-                ->where('reward_type', PartnerRewardTypeEnum::REGULAR->value)
-                ->delete();
-
-            Transaction::whereIn('uuid', $trxUuids)->delete();
-        });
-    }
-
     private function collectNetProfitPerUserFromStaking(): array
     {
-        $packages = ItcPackage::query()
-            ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
-            ->select('itc_packages.uuid', 'transactions.user_id')
-            ->whereIn('itc_packages.type', [
-                PackageTypeEnum::STAKING,
-            ])
-            ->with([
-                'profits' => fn ($q) => $q->whereBetween('package_profits.created_at', [$this->from, $this->to]),
-            ])
-            ->get();
-
-        $net = [];
-
-        foreach ($packages as $pkg) {
-            $regularPremium = Transaction::where('user_id', $pkg->user_id)
-                ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
-                ->whereBetween('created_at', [$this->from, $this->to])
-                ->sum('amount');
-
-            $userId = $pkg->user_id;
-            $profit = $pkg->profits->sum('amount');
-
-            $net[$userId] = ($net[$userId]['amount'] ?? 0) + $profit + $regularPremium;
-
-            $this->line("USER_ID {$userId}: staking_profit={$profit}");
-        }
-
-        return $net;
+        return ItcPackage::query()
+            ->selectRaw('transactions.user_id as user_id, SUM(sta.amount) / 100 as amount')
+            ->join('transactions', 'transactions.uuid', '=', 'itc_packages.uuid')
+            ->join('staking_transaction_accruals as sta', 'sta.itc_package_id', '=', 'itc_packages.id')
+            ->where('itc_packages.type', PackageTypeEnum::STAKING)
+            ->whereNotIn('sta.type', [StakingTransactionAccrualEnum::TopUpBonus])
+            ->whereBetween('sta.created_at', [$this->from, $this->to])
+            ->groupBy('transactions.user_id')
+            ->pluck('amount', 'user_id')
+            ->toArray();
     }
 }

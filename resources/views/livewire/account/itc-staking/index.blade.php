@@ -20,7 +20,8 @@
     ]" class="mx-auto">
 
         <x-slot name="packages">
-            <h3 class="font-bold transition-colors text-lime">{{ __('exchange_rate_itc', ['count' => $exchangeRateItc]) }}</h3>
+            <h3 class="font-bold transition-colors text-lime">
+                {{ __('exchange_rate_itc', ['count' => $exchangeRateItc]) }}</h3>
             <div>
                 <x-widget.modal condition-name="isModalBuyPackageActive" max-width="xl"
                     class="p-4 md:min-w-[447px] w-full max-w-[447px]">
@@ -106,7 +107,7 @@
                 @if (count($packages) > 0)
                     <div class="flex flex-col gap-6 md:gap-[44px] mt-4 md:mt-[20px]">
                         @foreach ($packages as $package)
-                            <x-account.itc.package-staking :package="$package" :regularPremium="$regularPremium" :regularTotal="$regularTotal" :regularWeek="$regularWeek" />
+                            <x-account.itc.package-staking :package="$package" :lastMonthProfitability="$lastMonthProfitability" :totalProfitability="$totalProfitability" />
                         @endforeach
                     </div>
                 @else

@@ -2,19 +2,18 @@
 
 namespace App\Helpers;
 
-use App\Notifications\InAppNotification;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
+use App\Notifications\InAppNotification;
 
 class Notify
 {
     public static function dividends(User $user, string $amount, string $packageCreated, string $packageType, string $dividendsUuid): void
     {
-        $icon      = vite()->icon('currency/itc.svg');
+        $icon = vite()->icon('currency/itc.svg');
         $amountEsc = e($amount);
-        $typeEsc   = e($packageType);
-        $dateEsc   = e($packageCreated);
-        $uuidEsc   = e($dividendsUuid);
+        $typeEsc = e($packageType);
+        $dateEsc = e($packageCreated);
+        $uuidEsc = e($dividendsUuid);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Вам начислено <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' />{$amountEsc} дивидендов на пакет</span>";
 
@@ -32,11 +31,11 @@ class Notify
 
     public static function recalculateDividends(User $user, string $amount, string $packageCreated, string $packageType, string $dividendsUuid): void
     {
-        $icon      = vite()->icon('currency/itc.svg');
+        $icon = vite()->icon('currency/itc.svg');
         $amountEsc = e($amount);
-        $typeEsc   = e($packageType);
-        $dateEsc   = e($packageCreated);
-        $uuidEsc   = e($dividendsUuid);
+        $typeEsc = e($packageType);
+        $dateEsc = e($packageCreated);
+        $uuidEsc = e($dividendsUuid);
 
         $title = "
             <div class='flex flex-col leading-snug'>
@@ -78,7 +77,7 @@ class Notify
         // готовый фрагмент для вывода рядом с заголовком
         $badge = '<span class="flex text-[12px] items-center justify-center
                              bg-[#B4FF59] text-[#17162D] font-semibold
-                             rounded-[4px] w-[16px] h-[17px] leading-none ml-1">'. $rank .
+                             rounded-[4px] w-[16px] h-[17px] leading-none ml-1">' . $rank .
                   '</span>';
 
         $user->notify(new InAppNotification(
@@ -90,7 +89,7 @@ class Notify
 
     public static function referralJoined(User $user, string $refName): void
     {
-        $nameHtml = '<span class="text-[#B4FF59] font-semibold">'.e($refName).'</span>';
+        $nameHtml = '<span class="text-[#B4FF59] font-semibold">' . e($refName) . '</span>';
 
         $user->notify(new InAppNotification(
             title: 'По вашей ссылке зарегистрировался партнер',
@@ -130,64 +129,64 @@ class Notify
 
     public static function packageBought(User $user, string $packageType, string $amount): void
     {
-        $icon      = vite()->icon('currency/itc.svg');
+        $icon = vite()->icon('currency/itc.svg');
         $amountEsc = e($amount);
-        $typeEsc   = e($packageType);
+        $typeEsc = e($packageType);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Вы приобрели пакет {$typeEsc} на сумму <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
 
         $user->notify(new InAppNotification(
             title: $title,
-            message: "",
+            message: '',
             icon: 'notifications/package-bought.svg',
         ));
     }
 
     public static function packageStakingBought(User $user, string|float $amount): void
     {
-        $icon      = vite()->icon('currency/itc-staking.svg');
+        $icon = vite()->icon('currency/itc-staking.svg');
         $amountEsc = e($amount);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Куплен пакет ITC коинов на сумму <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
 
         $user->notify(new InAppNotification(
             title: $title,
-            message: "",
+            message: '',
             icon: 'notifications/package-bought.svg',
         ));
     }
 
     public static function bonusStart(User $user, string|float $amount): void
     {
-        $icon      = vite()->icon('currency/itc-partners.svg');
+        $icon = vite()->icon('currency/itc-partners.svg');
         $amountEsc = e($amount);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Начислена стартовая премия в размере <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
 
         $user->notify(new InAppNotification(
             title: $title,
-            message: "",
+            message: '',
             icon: 'notifications/bonus-start.svg',
         ));
     }
 
     public static function bonusRegular(User $user, string $amount): void
     {
-        $icon      = vite()->icon('currency/itc-partners.svg');
+        $icon = vite()->icon('currency/itc-partners.svg');
         $amountEsc = e($amount);
 
         $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Начислена регулярная премия в размере <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
 
         $user->notify(new InAppNotification(
             title: $title,
-            message: "",
+            message: '',
             icon: 'notifications/bonus-start.svg',
         ));
     }
 
     public static function bonusStaking(User $user, float $amount): void
     {
-        $icon      = vite()->icon('currency/itc-staking.svg');
+        $icon = vite()->icon('currency/itc-staking.svg');
         $amountEsc = e($amount);
 
         $title = "
@@ -204,7 +203,7 @@ class Notify
 
         $user->notify(new InAppNotification(
             title: $title,
-            message: "",
+            message: '',
             icon: 'notifications/bonus-start.svg',
         ));
     }

@@ -22,6 +22,10 @@ final class SummaryMetricsService
             ->select('type')
             ->withSum(['transaction as deposit_sum'], 'amount')
             ->withSum('partnerTransfers', 'amount')
+            ->withSum(
+                ['stakingTransactionAccruals as staking_transaction_accruals_sum_amount' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))],
+                'amount'
+            )
             ->withSum('reinvestToBody', 'amount')
             ->withSum('balanceWithdraws', 'amount')
             ->get()
@@ -30,6 +34,7 @@ final class SummaryMetricsService
                 $items->sum(fn ($p) => $p->deposit_sum
                     + $p->partner_transfers_sum_amount
                     + $p->reinvest_to_body_sum_amount
+                    + $p->staking_transaction_accruals_sum_amount
                     - $p->balance_withdraws_sum_amount
                 ),
                 2
@@ -109,26 +114,21 @@ final class SummaryMetricsService
         ->sum('amount');
     }
 
-    public function tokenBalance(): string
+    public function tokenBalance(): int|float
     {
-        return Transaction::query()
-            ->withoutTestUsers()
-            ->whereNotNull('accepted_at')
-            ->whereHas('itcPackage', fn ($q) => $q->where('type', PackageTypeEnum::STAKING)
+        return ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction.user', fn ($q) => $q->where('is_test', false))
+            ->withSum(
+                ['transaction as transaction_sum'],
+                'amount'
             )
-            ->whereIn('trx_type', [
-                TrxTypeEnum::BUY_PACKAGE,
-                TrxTypeEnum::PARTNER_TO_PACKAGE,
-                TrxTypeEnum::WITHDRAW_PACKAGE,
-                TrxTypeEnum::WITHDRAW_PACKAGE_TO_BALANCE,
-            ])
-            ->sum(DB::raw("
-        CASE
-            WHEN trx_type IN ('buy_package', 'partner_to_package')
-            THEN amount
-            ELSE -amount
-        END
-    "));
+            ->withSum(
+                ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))],
+                'amount'
+            )
+            ->get()
+            ->sum(fn ($item) => $item->transaction_sum + $item->staking_accruals_sum);
     }
 
     public function sumByPeriod(TrxTypeEnum $type, string $period): int|float|string

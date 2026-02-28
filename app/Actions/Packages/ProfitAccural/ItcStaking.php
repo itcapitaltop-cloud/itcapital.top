@@ -8,7 +8,7 @@ use App\Contracts\ActionContract;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Helpers\Notify;
 use App\Models\Transaction;
-use App\Tasks\Package\CreatePackageProfitTask;
+use App\Services\Package\Staking\StakingAccrualService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -52,25 +52,9 @@ final class ItcStaking implements ActionContract
      */
     private function profitAccrual(Transaction $transaction): void
     {
-        $package = $transaction->itcPackage;
+        $accrual = new StakingAccrualService()
+            ->accrueProfit($transaction->itcPackage, (float) $transaction->amount, $transaction->user->id);
 
-        $amount = ($transaction->amount / 100) * $transaction->itcPackage->month_profit_percent;
-
-        new CreatePackageProfitTask()->run($package->uuid, $amount);
-
-        Notify::bonusStaking($transaction->user, $amount);
-
-        activity('package')
-            ->performedOn($package)
-            ->causedBy($transaction->user)
-            ->withProperties([
-                'profit' => $amount,
-                'percent' => $package->month_profit_percent,
-                'transaction_uuid' => $transaction->uuid,
-                'transaction_amount' => $transaction->amount,
-                'package_uuid' => $package->uuid,
-                'package_type' => PackageTypeEnum::STAKING,
-            ])
-            ->log('profit_accrued');
+        Notify::bonusStaking($transaction->user, $accrual->amount);
     }
 }

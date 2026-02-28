@@ -7,14 +7,13 @@ namespace App\ActivityLog\Strategy;
 use App\Contracts\ActivityStrategyContract;
 use Spatie\Activitylog\Contracts\Activity;
 
-final class PackageProfitAccruedStrategy implements ActivityStrategyContract
+final class PackageTopUpStrategy implements ActivityStrategyContract
 {
     public function handle(Activity $activity): string
     {
-        return __('activity/user.profit_accrued', [
-            'profit' => $activity->getExtraProperty('profit', 0),
-            'uuid' => $activity->getExtraProperty('uuid', 0),
+        return __('activity/user.top_up_package', [
             'amount' => $activity->getExtraProperty('amount', 0),
+            'uuid' => $activity->getExtraProperty('uuid', 0),
         ]);
     }
 }

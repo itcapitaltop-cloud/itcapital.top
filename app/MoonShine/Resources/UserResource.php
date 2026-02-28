@@ -13,7 +13,6 @@ use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
-use App\Models\Package\Staking\StakingProfit;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\PartnerLevel;
@@ -26,7 +25,6 @@ use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
 use App\Services\Package\Staking\StakingAccrualService;
-use App\Settings\GeneralSetting;
 use Carbon\Carbon;
 use Closure;
 use Exception;
@@ -38,7 +36,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\Enums\ToastType;
 use MoonShine\Fields\Checkbox;
@@ -545,7 +542,7 @@ class UserResource extends ModelResource
                 ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'));
 
             new StakingAccrualService()
-                ->accrueAdminProfit($package, (float) $request->input('amount'), $userId);
+                ->accrueAdminTopUpBonus($package, (float) $request->input('amount'), $userId);
         } else {
             $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
 

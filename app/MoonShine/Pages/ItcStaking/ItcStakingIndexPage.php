@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\ItcStaking;
 
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Fields\Field;
 use MoonShine\Fields\Text;
@@ -23,9 +24,9 @@ class ItcStakingIndexPage extends IndexPage
                 ->showOnExport()
                 ->sortable(),
             Text::make('Пользователь', 'transaction.user.username'),
-            Text::make('Сумма', formatted: fn ($item) => round((float) $item->transaction?->amount, 2))->showOnExport(),
+            Text::make('Сумма', formatted: fn ($item) => round((float) $item->transaction?->amount + $item->stakingTransactionAccruals->sum('amount'), 2))->showOnExport(),
             Text::make('Сумма реинвеста', formatted: fn ($item) => round((float) $item->reinvestProfits->sum('amount'), 2))->showOnExport(),
-            Text::make('Дивидендов начислено всего', formatted: fn ($item) => round((float) $item->profits->sum('amount'), 2))->showOnExport(),
+            Text::make('Дивидендов начислено всего', formatted: fn ($item) => round((float) $item->stakingTransactionAccruals->reject(fn ($a) => $a->type === StakingTransactionAccrualEnum::TopUpBonus)->sum('amount'), 2))->showOnExport(),
             Text::make('Доходность пакета', formatted: fn ($item) => round((float) $item->month_profit_percent, 2))->showOnExport(),
         ];
     }

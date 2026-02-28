@@ -1,4 +1,4 @@
-@props(['package', 'regularPremium', 'regularTotal', 'regularWeek'])
+@props(['package', 'lastMonthProfitability', 'totalProfitability'])
 
 @php
     use App\Enums\Itc\PackageTypeEnum;
@@ -66,7 +66,7 @@
             <div class="flex items-baseline gap-1">
                 <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-3 sm:w-4" alt="ITC">
                 <span
-                    class="text-lg sm:text-xl font-semibold">{{ scale($package->last_month_profit ?? 0)->plus(\Brick\Math\BigDecimal::of($regularWeek))->stripTrailingZeros() }}</span>
+                    class="text-lg sm:text-xl font-semibold">{{ scale($lastMonthProfitability->staking_accruals_sum)->stripTrailingZeros() }}</span>
             </div>
         </div>
 
@@ -77,7 +77,7 @@
             <div class="flex items-baseline gap-1">
                 <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-3 sm:w-4" alt="ITC">
                 <span class="text-lg sm:text-xl font-semibold">
-                    {{ scale($package->profits_sum_amount ?? 0)->plus(\Brick\Math\BigDecimal::of($regularTotal))->stripTrailingZeros() }}
+                    {{ scale($totalProfitability->staking_accruals_sum)->stripTrailingZeros() }}
                 </span>
             </div>
         </div>

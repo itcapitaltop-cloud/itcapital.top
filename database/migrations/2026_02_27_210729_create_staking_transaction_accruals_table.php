@@ -30,9 +30,13 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::create('staking_transaction_accruals', function (Blueprint $table) {
+        Schema::table('staking_transaction_accruals', function (Blueprint $table) {
             $table->dropConstrainedForeignIdFor(ItcPackage::class);
             $table->dropConstrainedForeignIdFor(User::class);
+            $table->dropColumn('source_user_id');
+            $table->dropColumn('type');
+            $table->dropColumn('line');
+            $table->dropColumn('amount');
         });
 
         Schema::dropIfExists('staking_transaction_accruals');

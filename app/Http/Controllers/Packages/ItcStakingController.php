@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Packages;
 
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Http\Controllers\Controller;
 use App\Models\ItcPackage;
-use App\Models\Package\Staking\StakingProfit;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Package\Staking\StakingAccrualService;
 use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -136,6 +136,7 @@ final class ItcStakingController extends Controller
             ->firstOrFail();
 
         $package = ItcPackage::query()
+            ->with(['transaction'])
             ->whereUuid($uuid)
             ->firstOrFail();
 
@@ -149,12 +150,8 @@ final class ItcStakingController extends Controller
 
         $transaction->increment('amount', $token);
 
-        StakingProfit::query()
-            ->create([
-                'uuid' => 'SPP-' . Str::random(10),
-                'package_uuid' => $package->uuid,
-                'amount' => $profit,
-            ]);
+        new StakingAccrualService()
+            ->accrue($package, StakingTransactionAccrualEnum::TopUpBonus, $profit, $package->transaction->user_id);
 
         $package->update([
             'month_profit_percent' => $request->input('profit_percent'),

@@ -9,7 +9,6 @@ use App\Models\ItcPackage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingDetailPage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingIndexPage;
 use App\Settings\GeneralSetting;
-use App\Tasks\Package\CreateItcStakingTask;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -18,8 +17,6 @@ use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FormBuilder;
 use MoonShine\Decorations\Block;
 use MoonShine\Fields\Number;
-use MoonShine\Http\Responses\MoonShineJsonResponse;
-use MoonShine\MoonShineRequest;
 use MoonShine\Pages\Page;
 use MoonShine\Resources\ModelResource;
 
@@ -32,7 +29,7 @@ class ItcStakingResource extends ModelResource
 
     protected string $title = 'Cтейкинг';
 
-    protected array $with = ['transaction.user'];
+    protected array $with = ['transaction.user', 'stakingTransactionAccruals'];
 
     /**
      * @return list<Page>
@@ -163,42 +160,5 @@ class ItcStakingResource extends ModelResource
     public function rules(Model $item): array
     {
         return [];
-    }
-
-    /**
-     * @param \MoonShine\MoonShineRequest $request
-     * @return \MoonShine\Http\Responses\MoonShineJsonResponse
-     */
-    public function createPackage(
-        MoonShineRequest $request,
-    ): MoonShineJsonResponse {
-
-        $userId = (int) $request->input('user_id');
-        $percent = (float) $request->input('percent');
-        $amount = $request->input('amount');
-
-        $package = new CreateItcStakingTask()
-            ->setMothProfitPercent($percent)
-            ->run($amount, $userId);
-
-        activity('packages')
-            ->performedOn($package)
-            ->causedBy(auth()->user())
-            ->withProperties([
-                'amount' => $amount,
-                'package_uuid' => $package->uuid,
-                'package_type' => PackageTypeEnum::STAKING,
-            ])
-            ->log('admin_package_purchased');
-
-        $url = to_page(
-            page: new ItcStakingDetailPage(),
-            resource: new self(),
-            params: ['resourceItem' => $package->id],
-        );
-
-        return MoonShineJsonResponse::make()
-            ->toast('Пакет создан')
-            ->redirect($url);
     }
 }

@@ -345,7 +345,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['staking'])
+                    ->value($totalPackagesAmount['staking'] ?? 0)
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты staking</div>
              <div class="flex justify-between text-lg">
                <div class="block">

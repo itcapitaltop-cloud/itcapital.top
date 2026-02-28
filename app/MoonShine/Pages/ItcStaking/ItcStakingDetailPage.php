@@ -15,7 +15,6 @@ use App\Settings\GeneralSetting;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FlexibleRender;
 use MoonShine\Components\FormBuilder;
-use MoonShine\Components\Modal;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Components\TableBuilder;
 use MoonShine\Decorations\Block;
@@ -25,11 +24,9 @@ use MoonShine\Decorations\Tabs;
 use MoonShine\Fields\Date;
 use MoonShine\Fields\Enum;
 use MoonShine\Fields\Field;
-use MoonShine\Fields\Hidden;
 use MoonShine\Fields\Number;
 use MoonShine\Fields\Text;
 use MoonShine\Pages\Crud\DetailPage;
-use MoonShine\Pages\PageComponents;
 use Spatie\Activitylog\Models\Activity;
 use Throwable;
 
@@ -49,7 +46,8 @@ class ItcStakingDetailPage extends DetailPage
 
         $packages = ItcPackage::query()
             ->active(PackageTypeEnum::STAKING)
-            ->userPackagesWithFinancials($package->transaction->user->id)
+            ->calculateStakingTotalProfitability($package->transaction->user->id)
+            ->with('stakingTransactionAccruals')
             ->get();
 
         $adminLogs = BusinessActivity::query()
@@ -77,14 +75,9 @@ class ItcStakingDetailPage extends DetailPage
         $stakingChangedStartBonusPercent = new ChangedStartBonusPercentComponent()->handle($package);
         $stakingChangedSRegularPercent = new ChangedRegularPercentComponent()->handle($package);
 
-        $buyButton = $packages->count() >= 1
-        ? ''
-        : $this->buyPackage();
-
         return [
-            FlexibleRender::make(function () use ($stakingChangedStartBonusPercent, $stakingChangedSRegularPercent, $buyButton): string {
+            FlexibleRender::make(function () use ($stakingChangedStartBonusPercent, $stakingChangedSRegularPercent): string {
                 return "<div class='flex flex-wrap gap-2 items-center'>
-                    {$buyButton}
                     {$stakingChangedStartBonusPercent}
                     {$stakingChangedSRegularPercent}
                 </div>";
@@ -99,10 +92,10 @@ class ItcStakingDetailPage extends DetailPage
                             Text::make('ID', 'uuid')->showOnExport(),
                             Date::make('Дата открытия', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
                             Text::make('Сумма', 'amount', formatted: function (array $package): float {
-                                return round((float) $package['transaction']['amount'] + (float) $package['staking_profits_sum_amount'], 2);
+                                return round((float) $package['transaction']['amount'] + (float) collect($package['staking_transaction_accruals'])->sum('amount'), 2);
                             }),
                             Number::make('Доходность за все время', formatted: function (array $package): float {
-                                return round((float) $package['profits_sum_amount'], 2);
+                                return round((float) $package['staking_accruals_sum'], 2);
                             }),
 
                             Number::make('Процент прибыли', 'month_profit_percent', formatted: function (array $package): string {
@@ -167,60 +160,6 @@ class ItcStakingDetailPage extends DetailPage
     }
 
     /**
-     * @throws \Throwable
-     */
-    public function buyPackage(): MoonShineComponent
-    {
-        /**
-         * @var \App\Models\|null $user
-         */
-        $package = $this->getResource()->getItem();
-
-        if (is_null($package->transaction->user->id)) {
-            return Modal::make(
-                title: 'Создание пакета',
-                content: fn () => 'Что-то пошло не так',
-                asyncUrl: null,
-            );
-        }
-
-        $createPackageForm = FormBuilder::make()
-            ->asyncMethod('createPackage')
-            ->fields([
-                Hidden::make('user_id')->fill($package->transaction->user->id),
-
-                Number::make('Доходность,%', 'percent')
-                    ->fill(2)
-                    ->customAttributes(
-                        [
-                            'wire:model.defer' => 'percent',
-                            'step' => 'any',
-                        ])
-                    ->required(),
-
-                Number::make('Сумма', 'amount')
-                    ->customAttributes(['wire:model.defer' => 'amount'])
-                    ->required(),
-            ])
-            ->submit('Создать');
-
-        $packageComponents = PageComponents::make([$createPackageForm]);
-
-        $createPackageTrigger = ActionButton::make('Создать пакет')
-            ->icon('heroicons.document-plus')
-            ->toggleModal('create-package-modal')
-            ->success();
-
-        return Modal::make(
-            title: 'Создание пакета',
-            content: fn () => null,
-            outer: $createPackageTrigger,
-            asyncUrl: null,
-            components: $packageComponents
-        )->name('create-package-modal');
-    }
-
-    /**
      * @return list<MoonShineComponent>
      *
      * @throws Throwable
@@ -277,16 +216,6 @@ class ItcStakingDetailPage extends DetailPage
             ->userPackagesWithFinancials($package->transaction->user->id)
             ->count();
 
-        $buyPackage = $packages >= 1 ?
-            Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
-                ->fill(0)
-                ->required()
-            :
-            Number::make('Депозит', 'amount')
-                ->fill(round((float) $item['transaction']['amount'], 2))
-                ->required()
-;
-
         return FormBuilder::make()
             ->action("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}")
             ->method('POST')
@@ -314,7 +243,9 @@ class ItcStakingDetailPage extends DetailPage
                         ])
                     ->required(),
 
-                $buyPackage
+                Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
+                    ->fill(0)
+                    ->required(),
 
             ])
             ->submit('Сохранить');

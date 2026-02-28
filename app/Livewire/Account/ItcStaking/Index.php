@@ -4,23 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Account\ItcStaking;
 
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\ActivityLog\ActivityManager;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
-use App\Enums\Transactions\TrxTypeEnum;
 use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
-use App\Models\PackageProfit;
 use App\Models\Transaction;
+use App\Services\Package\Staking\StakingAccrualService;
 use App\Services\User\StakingStartBonusAccrualService;
 use App\Settings\GeneralSetting;
-use App\Tasks\Package\CreateItcStakingTask;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -41,32 +38,15 @@ final class Index extends Component
     {
         $this->validate();
 
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $this->amount * $exchangeRateItc;
-        $profit = $token - $this->amount;
+        $package = CreateStakingPackageAction::make()
+            ->run(auth()->id(), (float) $this->amount);
 
-        $package = new CreateItcStakingTask()->run($this->amount, auth()->user()->id);
+        $accrual = new StakingAccrualService()
+            ->accrueTopUpStaking($package, (float) $this->amount, auth()->id());
 
-        PackageProfit::query()
-            ->create([
-                'uuid' => 'SPP-' . Str::random(10),
-                'package_uuid' => $package->uuid,
-                'amount' => $profit,
-            ]);
-
-        Notify::packageStakingBought(auth()->user(), $token);
+        Notify::packageStakingBought(auth()->user(), $accrual->amount);
 
         $this->dispatch('bought');
-
-        activity('packages')
-            ->performedOn($package)
-            ->causedBy(auth()->user())
-            ->withProperties([
-                'amount' => $token,
-                'package_uuid' => $package->uuid,
-                'package_type' => PackageTypeEnum::STAKING,
-            ])
-            ->log('package_purchased');
 
         new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
 
@@ -80,34 +60,17 @@ final class Index extends Component
     {
         $this->validate();
 
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $this->amount * $exchangeRateItc;
-        $profit = $token - $this->amount;
-
-        $package = Transaction::query()
-            ->select(['id', 'uuid', 'amount', 'user_id'])
-            ->where('user_id', auth()->user()->id)
-            ->with([
-                'itcPackage' => function ($query) {
-                    $query->select(['id', 'uuid', 'month_profit_percent']);
-                },
-                'user' => function ($query) {
-                    $query->select(['id']);
-                },
-            ])
+        $transaction = Transaction::query()
+            ->where('user_id', auth()->id())
             ->whereHas('itcPackage', function ($query) {
                 $query->where('type', PackageTypeEnum::STAKING);
             })
+            ->with(['itcPackage'])
             ->first();
 
-        $package->increment('amount', $this->amount);
+        new StakingAccrualService()->accrueTopUpStaking($transaction->itcPackage, (float) $this->amount, auth()->id());
 
-        StakingProfit::query()
-            ->create([
-                'uuid' => 'SPP-' . Str::random(10),
-                'package_uuid' => $package->uuid,
-                'amount' => $profit,
-            ]);
+        $transaction->increment('amount', $this->amount);
 
         new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
 
@@ -132,22 +95,10 @@ final class Index extends Component
 
     public function render(): Factory|View
     {
-        $start = now()->subMonth()->startOfMonth();
-        $end = now()->subMonth()->endOfMonth();
-
         return view('livewire.account.itc-staking.index', [
             'packages' => ItcPackage::query()->calculateStakingBalance(auth()->id())->get(),
-            'regularPremium' => Transaction::where('user_id', Auth::id())
-                ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
-                ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
-                ->sum('amount'),
-            'regularTotal' => Transaction::where('user_id', Auth::id())
-                ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
-                ->sum('amount'),
-            'regularWeek' => Transaction::where('user_id', Auth::id())
-                ->whereIn('trx_type', [TrxTypeEnum::STAKING_START_BONUS_ACCRUAL, TrxTypeEnum::STAKING_REGULAR_PREMIUM_ACCRUAL])
-                ->whereBetween('created_at', [$start, $end])
-                ->sum('amount'),
+            'lastMonthProfitability' => ItcPackage::query()->calculateStakingLastMonthProfitability(auth()->id())->first(),
+            'totalProfitability' => ItcPackage::query()->calculateStakingTotalProfitability(auth()->id())->first(),
             'logs' => BusinessActivity::query()
                 ->packagesStaking(auth()->id())
                 ->latest()
