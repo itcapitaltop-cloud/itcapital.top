@@ -43,7 +43,7 @@ final class StakingRegularPremiumAccrualCommand extends Command
      */
     public function handle(): int
     {
-        $prevMonth = now();
+        $prevMonth = now()->subMonth();
 
         $this->from = $prevMonth->copy()->startOfMonth();
         $this->to = $prevMonth->copy()->endOfMonth();
