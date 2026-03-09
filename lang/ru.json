@@ -793,5 +793,6 @@
     "package_open": "пакет открыт",
     "total_dividends_received": "Всего дивидендов получено",
     "available_dividends": "Доступных дивидендов",
-    "date_of_purchase": "дата покупки"
+    "date_of_purchase": "дата покупки",
+    "failed_count_applications_replenishment": "⚠️ Вы создали максимальное количество заявок на ввод. Ожидайте одобрения предыдущих"
 }

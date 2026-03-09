@@ -4,10 +4,12 @@ namespace App\Livewire\Account\Finance;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Transactions\TransactionStatusEnum;
+use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Livewire\Forms\Account\Dashboard\CreateDepositForm;
 use App\Livewire\Forms\Account\Dashboard\CreateWithdrawForm;
 use App\Models\Deposit;
+use App\Models\User;
 use App\Models\Withdraw;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -34,15 +36,15 @@ class Finance extends Component
 
     public function createWithdraw()
     {
-         if (! Carbon::now()->isSunday()) {
-             $this->dispatch(
-                 'new-system-notification',
-                 type: 'warning',
-                 message: __('livewire_finance_withdrawal_only_on_sunday')
-             );
+        if (! Carbon::now()->isSunday()) {
+            $this->dispatch(
+                'new-system-notification',
+                type: 'warning',
+                message: __('livewire_finance_withdrawal_only_on_sunday')
+            );
 
-             return;
-         }
+            return;
+        }
 
         $withdraw = $this->withdrawForm->store(app(TransactionRepositoryContract::class));
 
@@ -159,6 +161,11 @@ class Finance extends Component
 
         return view('livewire.account.finance.finance', [
             'operations' => $operations,
+            'countApplicationsReplenishment' => User::query()->withCount([
+                'transactions as countApplicationsReplenishment' => fn ($query) => $query->where('trx_type', TrxTypeEnum::DEPOSIT)->whereNull('accepted_at')->whereNull('rejected_at'),
+            ])
+                ->findOrFail(auth()->id())
+                ->countApplicationsReplenishment,
         ]);
     }
 }
