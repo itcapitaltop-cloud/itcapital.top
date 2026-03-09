@@ -13,6 +13,11 @@
 
     {{-- ▸ вкладка «Пополнение счета» --}}
     <x-slot name="deposit">
+        @if ($countApplicationsReplenishment >= 2)
+            <p class="max-w-xl mx-auto mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-600 shadow-sm">
+                {{ __('failed_count_applications_replenishment') }}
+            </p>
+        @endif
         <form x-data="{ depositSource: '', helpOpen: false }" wire:submit="createDeposit" @submit.prevent class="grid md:grid-cols-2 gap-10"
             data-network="{{ config('wallet.network') }}">
 
@@ -97,7 +102,7 @@
 
                 {{-- submit --}}
                 <div>
-                    <x-ui.submit-button class="w-auto" action="createDeposit">
+                    <x-ui.submit-button class="w-auto" action="createDeposit" :disabled="$countApplicationsReplenishment >= 2">
                         {{ __('livewire_finance_deposit_submit_button') }}
                     </x-ui.submit-button>
                 </div>
