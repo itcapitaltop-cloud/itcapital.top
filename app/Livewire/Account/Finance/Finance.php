@@ -14,6 +14,7 @@ use App\Models\Withdraw;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Finance extends Component
@@ -24,6 +25,21 @@ class Finance extends Component
 
     public function createDeposit()
     {
+        $countApplicationsReplenishment = User::query()->withCount([
+            'transactions as countApplicationsReplenishment' => fn ($query) => $query
+                ->where('trx_type', TrxTypeEnum::DEPOSIT)
+                ->whereNull('accepted_at')
+                ->whereNull('rejected_at'),
+        ])
+            ->findOrFail(auth()->id())
+            ->countApplicationsReplenishment;
+
+        if ($countApplicationsReplenishment >= 2) {
+            throw ValidationException::withMessages([
+                'depositForm.depositAmount' => __('failed_count_applications_replenishment'),
+            ]);
+        }
+
         $deposit = $this->depositForm->store();
 
         if ($deposit !== null) {
