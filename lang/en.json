@@ -793,5 +793,6 @@
     "package_open": "Package opened",
     "total_dividends_received": "Total dividends received",
     "available_dividends": "Available dividends",
-    "date_of_purchase": "Date of purchase"
+    "date_of_purchase": "Date of purchase",
+    "failed_count_applications_replenishment": "⚠️ You have created the maximum number of deposit requests. Please wait for the previous ones to be approved."
 }

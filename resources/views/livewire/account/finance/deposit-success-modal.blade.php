@@ -4,7 +4,7 @@
 
 <div x-data="{ isDepositSuccessModalActive: @entangle('isDepositSuccessModalActive') }">
     <x-widget.modal condition-name="isDepositSuccessModalActive" max-width="xl"
-        class="p-4 md:min-w-[447px] w-full max-w-[447px]">
+                    class="p-4 md:min-w-[447px] w-full max-w-[447px]">
 
         @if (!empty($data))
             <x-bg.section-slim class="!px-1 !py-2">
@@ -59,7 +59,7 @@
                             {{ __('livewire_finance_deposit_wallet_address_label') }}
                         </span>
 
-                        <span class="font-medium text-white text-[10px]">
+                        <span class="font-medium text-white text-xs md:text-sm break-all text-right">
                             {{ $data['walletAddress'] }}
                         </span>
                     </div>
@@ -71,7 +71,7 @@
                             {{ PaymentSourcesEnum::Crypto->value === $data['paymentSources'] ? __('livewire_deposit_crypto_transaction_hash_label') : __('livewire_finance_deposit_bank_name_label_fiat') }}
                         </span>
 
-                        <span class="font-medium text-white text-[10px]">
+                        <span class="font-medium text-white text-xs md:text-sm">
                             {{ $data['transactionHash'] ?? '' }}
                         </span>
                     </div>

@@ -793,5 +793,6 @@
     "package_open": "套餐已打开",
     "total_dividends_received": "已收到的总股息",
     "available_dividends": "可用股息",
-    "date_of_purchase": "购买日期"
+    "date_of_purchase": "购买日期",
+    "failed_count_applications_replenishment": "⚠️ 您已创建最大数量的充值申请。请等待之前的申请审核通过。"
 }
