@@ -15,6 +15,7 @@ use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
 use App\MoonShine\Resources\WithdrawResource;
 use Closure;
+use Illuminate\Support\Facades\Vite;
 use MoonShine\Contracts\Resources\ResourceContract;
 use MoonShine\Menu\MenuElement;
 use MoonShine\Menu\MenuItem;
@@ -94,6 +95,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             '/vendor/moonshine/js/set-names-for-override-percents-fields.js',
             '/vendor/moonshine/js/set-names-for-requirements-fields.js',
             '/vendor/moonshine/js/set-names-for-common-percents-fields.js',
+            Vite::asset('resources/css/app.css'),
         ]);
     }
 }
