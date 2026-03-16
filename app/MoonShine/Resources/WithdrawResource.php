@@ -280,29 +280,30 @@ class WithdrawResource extends ModelResource
     public function tdAttributes(): Closure
     {
         return function (Withdraw $item, int $row, int $cell, ComponentAttributeBag $attr) {
-            // если это колонка с wallet_address (индекс 5)
-            if ($cell === 5) {
-                // сохраняем существующие классы и добавляем pointer
-
-                $copyValue = $item->payment_source_id === 2 && $item->fiatDetail
-                    ? collect([
-                        $item->fiatDetail->sbp_phone,
-                        $item->fiatDetail->bank_name,
-                        $item->fiatDetail->recipient_name,
-                    ])->filter()->implode(' · ')
-                    : $item->wallet_address;
+            // колонки реквизитов: Адрес / Карта / Счёт
+            if (in_array($cell, [5, 6, 7], true)) {
+                $copyValue = match ($cell) {
+                    5 => $item->payment_source_id === 2 && $item->fiatDetail
+                        ? ($item->fiatDetail->sbp_phone ?? '')
+                        : ($item->wallet_address ?? ''),
+                    6 => $item->payment_source_id === 2 && $item->fiatDetail
+                        ? ($item->fiatDetail->bank_name ?? '')
+                        : '',
+                    7 => $item->payment_source_id === 2 && $item->fiatDetail
+                        ? ($item->fiatDetail->recipient_name ?? '')
+                        : '',
+                };
 
                 $existing = $attr->get('class', '');
                 $attr->setAttributes([
-                    // чтобы можно было стилизовать псевдо-элемент
-                    'class' => trim($existing . ' has-copy-tooltip cursor-pointer'),
+                    'class' => trim($existing . ($copyValue !== '' ? ' has-copy-tooltip cursor-pointer' : '')),
                     'data-copy' => $copyValue,
-                    'data-tooltip' => 'Кликните, чтобы скопировать',
+                    'data-tooltip' => $copyValue !== '' ? 'Кликните, чтобы скопировать' : '',
                     'style' => 'max-width:250px;overflow:auto;text-overflow:ellipsis;white-space:nowrap;',
                 ]);
             }
 
-            if ($cell === 7) {
+            if ($cell === 9) {
                 $existing = $attr->get('class', '');
                 $attr->setAttributes([
                     'class' => $existing . ' flex items-center gap-2',

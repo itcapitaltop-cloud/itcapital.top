@@ -100,9 +100,15 @@
                 </x-widget.modal>
 
                 <div class="md:hidden block">
-                    <x-ui.submit-button x-on:click="isModalBuyPackageActive = true">
-                        {{ __('components_account_common_header_buy_package') }}
-                    </x-ui.submit-button>
+                    @if (count($packages) > 0)
+                        <x-ui.submit-button x-on:click="isModalBuyPackageMoreActive = true">
+                            {{ __('component_livewire_account_itc_staking_buy_more') }}
+                        </x-ui.submit-button>
+                    @else
+                        <x-ui.submit-button x-on:click="isModalBuyPackageActive = true">
+                            {{ __('components_account_common_header_buy_package_itc_staging') }}
+                        </x-ui.submit-button>
+                    @endif
                 </div>
                 @if (count($packages) > 0)
                     <div class="flex flex-col gap-6 md:gap-[44px] mt-4 md:mt-[20px]">
