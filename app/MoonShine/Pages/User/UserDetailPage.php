@@ -23,7 +23,6 @@ use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
-use App\MoonShine\Components\StatisticLinearPartner;
 use App\MoonShine\Resources\UserResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -955,7 +954,6 @@ class UserDetailPage extends DetailPage
                                                     'style' => 'min-width:120px;max-width:120px;width:120px;',
                                                 ]);
                                             }
-
                                             return $attr;
                                         }
                                     )
@@ -1016,15 +1014,8 @@ class UserDetailPage extends DetailPage
                 )
                     ->name('logs')
                     ->active(fn () => $activeTab === 'logs'),
-                Tab::make('Статистика по линиям', [
-                    Block::make([
-                        StatisticLinearPartner::make($item->id),
-                    ]),
-                ])
-                    ->name('statistic_linear_partner'),
             ]),
         ];
-
     }
 
     public function giveGift(MoonShineFormRequest $request): MoonShineJsonResponse
