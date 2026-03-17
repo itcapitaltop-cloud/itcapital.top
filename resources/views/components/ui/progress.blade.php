@@ -2,6 +2,9 @@
     'value' => 0,
     'max'   => 100,
     'class' => '',
+    'labelClass' => 'text-white/40',
+    'trackClass' => 'bg-white/10',
+    'barClass' => 'bg-[#B4FF59]',
 ])
 
 @php
@@ -10,9 +13,9 @@
 @endphp
 
 @if(trim($slot))
-    <div class="mb-[4px] text-[12px] font-semibold text-white/40">{{ $slot }}</div>
+    <div class="mb-[4px] text-[12px] font-semibold {{ $labelClass }}">{{ $slot }}</div>
 @endif
 
-<div {{ $attributes->merge(['class' => "w-full h-[6px] bg-white/10 rounded $class"]) }}>
-    <div class="h-full bg-[#B4FF59] rounded" style="width: {{ $perc }}%;"></div>
+<div {{ $attributes->merge(['class' => "w-full h-[6px] rounded $trackClass $class"]) }}>
+    <div class="h-full rounded {{ $barClass }}" style="width: {{ $perc }}%;"></div>
 </div>

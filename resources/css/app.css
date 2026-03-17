@@ -228,3 +228,35 @@
         rgba(255, 255, 255, 0) 100%
     );
 }
+
+.partner-linear-statistic__title {
+    color: #0f172a;
+}
+
+.partner-linear-statistic__meta {
+    color: #475569;
+}
+
+.partner-linear-statistic__track {
+    background-color: rgba(15, 23, 42, 0.12);
+}
+
+.partner-linear-statistic__bar {
+    background-color: #7fbf4d;
+}
+
+.dark .partner-linear-statistic__title {
+    color: #fff;
+}
+
+.dark .partner-linear-statistic__meta {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.dark .partner-linear-statistic__track {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .partner-linear-statistic__bar {
+    background-color: #b4ff59;
+}
