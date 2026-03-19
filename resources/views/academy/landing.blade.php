@@ -20,6 +20,7 @@
         <nav class="nav">
             <a href="#step1" class="nav-link">1: {{ __('landing_step1_title') }}</a>
             <a href="#step2" class="nav-link">2: {{ __('landing_step2_title') }}</a>
+            <a href="{{ route('academy.news.index') }}" class="nav-link">{{ __('academy_news_all_articles') }}</a>
         </nav>
         <div class="header-button">
             <a href="#start" class="btn-primary">{{ __('landing_btn_start_training') }}</a>

@@ -10,6 +10,7 @@ use App\MoonShine\Resources\ActivityLogResource;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
+use App\MoonShine\Resources\NewsResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
@@ -61,6 +62,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
         return [
             MenuItem::make('Сводка', new SummaryResource()),
             MenuItem::make('Пользователи', new UserResource()),
+            MenuItem::make('Новости Academy', new NewsResource()),
             MenuItem::make('Ввод', new DepositResource()),
             MenuItem::make('Выводы', new WithdrawResource()),
             MenuItem::make('Пакеты', new ItcPackageResource()),

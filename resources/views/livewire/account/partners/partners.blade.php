@@ -34,7 +34,7 @@
                             <div class="flex items-center gap-2 mb-3">
                                 @if ($nextRank)
                                     <span class="text-white font-semibold text-[16px]">
-                                        {{ __('livewire_partners_progress_for_next_rank', ['nextRank' => $nextRank]) }}
+                                    {{ __('livewire_partners_progress_for_next_rank', ['nextRank' => $nextRank]) }}
                                     </span>
                                 @endif
                             </div>

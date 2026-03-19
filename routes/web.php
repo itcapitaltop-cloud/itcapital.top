@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AcademyNewsController;
 use App\Helpers\Notify;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminLogActionController;
@@ -17,6 +18,8 @@ $domain = config('app.domain');
 
 Route::domain("academy.{$domain}")->group(function () {
     Route::view('/', 'academy.landing')->name('academy.landing');
+    Route::get('/news', [AcademyNewsController::class, 'index'])->name('academy.news.index');
+    Route::get('/news/{news}', [AcademyNewsController::class, 'show'])->name('academy.news.show');
     Route::view('/admin', 'academy.admin')->name('academy.admin');
 
     Route::fallback(function () {
