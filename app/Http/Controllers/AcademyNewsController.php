@@ -14,6 +14,7 @@ class AcademyNewsController extends Controller
     {
         return view('academy.news.index', [
             'newsItems' => News::query()
+                ->with('translations')
                 ->published()
                 ->latest('published_at')
                 ->paginate(9),
@@ -23,6 +24,8 @@ class AcademyNewsController extends Controller
     public function show(News $news): View
     {
         abort_if(is_null($news->published_at), Response::HTTP_NOT_FOUND);
+
+        $news->loadMissing('translations');
 
         return view('academy.news.show', [
             'news' => $news,

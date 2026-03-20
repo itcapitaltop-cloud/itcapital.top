@@ -794,9 +794,7 @@
     "total_dividends_received": "已收到的总股息",
     "available_dividends": "可用股息",
     "date_of_purchase": "购买日期",
-<<<<<<< Updated upstream
-    "failed_count_applications_replenishment": "⚠️ 您已创建最大数量的充值申请。请等待之前的申请审核通过。"
-=======
+    "failed_count_applications_replenishment": "⚠️ 您已创建最大数量的充值申请。请等待之前的申请审核通过。",
     "academy_news_all_articles": "新闻",
     "academy_news_back_to_academy": "返回学院",
     "academy_news_back_to_list": "返回新闻列表",
@@ -805,5 +803,4 @@
     "academy_news_empty": "暂时还没有已发布的新闻。",
     "academy_news_published_at": "发布时间",
     "academy_news_read_more": "阅读全文"
->>>>>>> Stashed changes
 }

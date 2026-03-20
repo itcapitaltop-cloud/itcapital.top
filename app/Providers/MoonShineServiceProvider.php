@@ -62,12 +62,12 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
         return [
             MenuItem::make('Сводка', new SummaryResource()),
             MenuItem::make('Пользователи', new UserResource()),
-            MenuItem::make('Новости Academy', new NewsResource()),
             MenuItem::make('Ввод', new DepositResource()),
             MenuItem::make('Выводы', new WithdrawResource()),
             MenuItem::make('Пакеты', new ItcPackageResource()),
             MenuItem::make('Верификация', new VerifyingUserResource()),
             MenuItem::make('Cтейкинг', new ItcStakingResource()),
+            MenuItem::make('Новости', new NewsResource()),
         ];
     }
 

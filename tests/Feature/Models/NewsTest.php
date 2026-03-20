@@ -21,7 +21,8 @@ it('shows only published academy news on the public index page', function () {
         ],
     ]);
 
-    $response = $this->withHeader('Host', 'academy.' . config('app.domain'))
+    $response = $this->withSession(['locale' => 'ru'])
+        ->withHeader('Host', 'academy.' . config('app.domain'))
         ->get(route('academy.news.index'));
 
     $response->assertOk();

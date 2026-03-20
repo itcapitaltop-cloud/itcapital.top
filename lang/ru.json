@@ -794,9 +794,7 @@
     "total_dividends_received": "Всего дивидендов получено",
     "available_dividends": "Доступных дивидендов",
     "date_of_purchase": "дата покупки",
-<<<<<<< Updated upstream
-    "failed_count_applications_replenishment": "⚠️ Вы создали максимальное количество заявок на ввод. Ожидайте одобрения предыдущих"
-=======
+    "failed_count_applications_replenishment": "⚠️ Вы создали максимальное количество заявок на ввод. Ожидайте одобрения предыдущих",
     "academy_news_all_articles": "Новости",
     "academy_news_back_to_academy": "К академии",
     "academy_news_back_to_list": "К списку новостей",
@@ -805,5 +803,4 @@
     "academy_news_empty": "Пока нет опубликованных новостей.",
     "academy_news_published_at": "Опубликовано",
     "academy_news_read_more": "Читать полностью"
->>>>>>> Stashed changes
 }

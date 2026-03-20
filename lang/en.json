@@ -794,9 +794,7 @@
     "total_dividends_received": "Total dividends received",
     "available_dividends": "Available dividends",
     "date_of_purchase": "Date of purchase",
-<<<<<<< Updated upstream
-    "failed_count_applications_replenishment": "⚠️ You have created the maximum number of deposit requests. Please wait for the previous ones to be approved."
-=======
+    "failed_count_applications_replenishment": "⚠️ You have created the maximum number of deposit requests. Please wait for the previous ones to be approved.",
     "academy_news_all_articles": "News",
     "academy_news_back_to_academy": "Back to academy",
     "academy_news_back_to_list": "Back to news list",
@@ -805,5 +803,4 @@
     "academy_news_empty": "No published news yet.",
     "academy_news_published_at": "Published",
     "academy_news_read_more": "Read more"
->>>>>>> Stashed changes
 }
