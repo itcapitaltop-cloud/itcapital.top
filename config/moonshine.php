@@ -1,13 +1,13 @@
 <?php
 
 use App\MoonShine\AuthPipelines\VerifyRecaptcha;
-use MoonShine\Exceptions\MoonShineNotFoundException;
 use App\MoonShine\Forms\LoginFormWithCaptcha;
+use MoonShine\Exceptions\MoonShineNotFoundException;
 use MoonShine\Http\Middleware\Authenticate;
 use MoonShine\Http\Middleware\SecurityHeadersMiddleware;
-use MoonShine\Models\MoonshineUser;
 use MoonShine\MoonShineLayout;
 use MoonShine\Pages\ProfilePage;
+use MoonShine\Permissions\Models\MoonshineUser;
 
 return [
     'dir' => 'app/MoonShine',
@@ -44,22 +44,22 @@ return [
         'js' => [
             'script_attributes' => [
                 'defer',
-            ]
+            ],
         ],
         'css' => [
             'link_attributes' => [
                 'rel' => 'stylesheet',
-            ]
-        ]
+            ],
+        ],
     ],
 
     'forms' => [
-        'login' => LoginFormWithCaptcha::class
+        'login' => LoginFormWithCaptcha::class,
     ],
 
     'pages' => [
         'dashboard' => App\MoonShine\Pages\Dashboard::class,
-        'profile' => ProfilePage::class
+        'profile' => ProfilePage::class,
     ],
 
     'model_resources' => [
@@ -93,6 +93,7 @@ return [
             VerifyRecaptcha::class,
         ],
     ],
+
     'locales' => [
         'ru',
     ],
@@ -102,7 +103,7 @@ return [
     ],
 
     'tinymce' => [
-        'file_manager' => false, // or 'laravel-filemanager' prefix for lfm
+        'file_manager' => false,
         'token' => env('MOONSHINE_TINYMCE_TOKEN', ''),
         'version' => env('MOONSHINE_TINYMCE_VERSION', '6'),
     ],

@@ -7,9 +7,16 @@
             <x-account.nav-button routeName="dashboard">{{ __('home') }}</x-account.nav-button>
             <x-account.nav-button routeName="itc-packages">{{ __('packages') }}</x-account.nav-button>
             <x-account.nav-button routeName="finance">{{ __('finance') }}</x-account.nav-button>
-            <x-account.nav-button :blur="!hasPackage(auth()->user()->id)" :close="!hasPackage(auth()->user()->id)" routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
+            <x-account.nav-button :blur="!hasPackage(auth()->user()->id)" :close="!hasPackage(auth()->user()->id)"
+                routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
             <x-account.nav-button routeName="itc-staking">{{ __('itc_staking') }}</x-account.nav-button>
             <x-account.nav-button routeName="academy.landing" target="_blank">{{ __('academy') }}</x-account.nav-button>
-    </ul>
-</nav>
+            <x-account.nav-button routeName="news.index">
+                {{ __('liveware_news') }}
+            </x-account.nav-button>
+        </ul>
+    </nav>
+
+    <livewire:news.index position="sidebar" limit="3"/>
+
 </aside>

@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\AcademyNewsController;
 use App\Helpers\Notify;
+use App\Http\Controllers\AcademyNewsController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminLogActionController;
 use App\Http\Controllers\CommonFundController;
@@ -106,6 +106,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             . '|[1-9A-HJ-NP-Za-km-z]{32,44})'
         )
         ->name('wallet.qr');
+
+    Route::view('/news', 'pages.news.index')->name('news.index');
 });
 
 Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])->group(function () {

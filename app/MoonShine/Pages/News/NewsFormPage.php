@@ -18,6 +18,7 @@ use MoonShine\Fields\ID;
 use MoonShine\Fields\Image;
 use MoonShine\Fields\Select;
 use MoonShine\Fields\Text;
+use MoonShine\Fields\Textarea;
 use MoonShine\Fields\TinyMce;
 use MoonShine\Pages\Crud\FormPage;
 use Throwable;
@@ -116,10 +117,10 @@ class NewsFormPage extends FormPage
                 ->required()
                 ->hint('Максимум 100 символов')
                 ->customAttributes(['maxlength' => 100]),
-            TinyMce::make('Описание', "mobile_preview.$locale")->required()
+            Textarea::make('Превью для мобильных', "mobile_preview.$locale")->required()
                 ->hint('Максимум 120 символов')
                 ->customAttributes(['maxlength' => 120, 'rows' => 3]),
-            TinyMce::make('Превью для веба', "web_preview.$locale")
+            Textarea::make('Превью для веба', "web_preview.$locale")
                 ->required()
                 ->hint('Максимум 300 символов')
                 ->customAttributes(['maxlength' => 300, 'rows' => 4]),

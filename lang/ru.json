@@ -802,5 +802,7 @@
     "academy_news_page_subtitle": "Публикации и аналитика",
     "academy_news_empty": "Пока нет опубликованных новостей.",
     "academy_news_published_at": "Опубликовано",
-    "academy_news_read_more": "Читать полностью"
+    "academy_news_read_more": "Читать полностью",
+    "liveware_news": "Финансовые новости",
+    "liveware_news_not_found": "Новости скоро появятся"
 }

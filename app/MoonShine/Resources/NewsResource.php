@@ -64,9 +64,30 @@ class NewsResource extends ModelResource
             'web_preview.ru' => ['required', 'string', 'max:300'],
             'web_preview.en' => ['required', 'string', 'max:300'],
             'web_preview.zh' => ['required', 'string', 'max:300'],
-            'content.ru' => ['required', 'string', 'max:2000'],
-            'content.en' => ['required', 'string', 'max:2000'],
-            'content.zh' => ['required', 'string', 'max:2000'],
+            'content.ru' => [
+                'required',
+                function ($attribute, $value, $fail) {
+                    if (mb_strlen(trim(strip_tags($value))) > 2000) {
+                        $fail('Текст новости не должен превышать 2000 символов (без HTML).');
+                    }
+                },
+            ],
+            'content.en' => [
+                'required',
+                function ($attribute, $value, $fail) {
+                    if (mb_strlen(trim(strip_tags($value))) > 2000) {
+                        $fail('Текст новости не должен превышать 2000 символов (без HTML).');
+                    }
+                },
+            ],
+            'content.zh' => [
+                'required',
+                function ($attribute, $value, $fail) {
+                    if (mb_strlen(trim(strip_tags($value))) > 2000) {
+                        $fail('Текст новости не должен превышать 2000 символов (без HTML).');
+                    }
+                },
+            ],
         ];
     }
 

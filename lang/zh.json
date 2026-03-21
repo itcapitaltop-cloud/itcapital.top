@@ -802,5 +802,7 @@
     "academy_news_page_subtitle": "发布与分析",
     "academy_news_empty": "暂时还没有已发布的新闻。",
     "academy_news_published_at": "发布时间",
-    "academy_news_read_more": "阅读全文"
+    "academy_news_read_more": "阅读全文",
+    "liveware_news": "财经新闻",
+    "liveware_news_not_found": "新闻即将推出"
 }

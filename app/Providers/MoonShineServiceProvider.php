@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\ActivityLogResource;
+use App\MoonShine\Resources\AdminUserResource;
 use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
@@ -16,12 +17,15 @@ use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
 use App\MoonShine\Resources\WithdrawResource;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Vite;
 use MoonShine\Contracts\Resources\ResourceContract;
 use MoonShine\Menu\MenuElement;
 use MoonShine\Menu\MenuItem;
 use MoonShine\Pages\Page;
+use MoonShine\Permissions\Models\MoonshineUser;
 use MoonShine\Providers\MoonShineApplicationServiceProvider;
+use MoonShine\Resources\MoonShineUserRoleResource;
 
 class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
 {
@@ -29,8 +33,47 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     {
         parent::register();
 
-        // указываем, что "домашняя" страница — это UserResource
-        moonshine()->home(SummaryResource::class);
+        moonshine()->home(function (): string {
+            $user = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+
+            if (! $user instanceof MoonshineUser) {
+                return NewsResource::class;
+            }
+
+            if ($this->hasExplicitPermissions($user)) {
+                if ($user->isHavePermission(NewsResource::class, 'viewAny') && ! $user->isHavePermission(SummaryResource::class, 'viewAny')) {
+                    return NewsResource::class;
+                }
+
+                if ($user->isHavePermission(SummaryResource::class, 'viewAny')) {
+                    return SummaryResource::class;
+                }
+            }
+
+            if ($user->isSuperUser()) {
+                return SummaryResource::class;
+            }
+
+            return NewsResource::class;
+        });
+
+        moonshine()->defineAuthorization(
+            function (ResourceContract $resource, Model $user, string $ability): bool {
+                if (! $user instanceof MoonshineUser) {
+                    return true;
+                }
+
+                if ($this->hasExplicitPermissions($user)) {
+                    return $user->isHavePermission($resource::class, $ability);
+                }
+
+                if ($user->isSuperUser()) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
     }
 
     /**
@@ -39,6 +82,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     protected function resources(): array
     {
         return [
+            new AdminUserResource(),
+            new MoonShineUserRoleResource(),
             new ActivityLogResource(),
         ];
     }
@@ -60,14 +105,26 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     protected function menu(): array
     {
         return [
-            MenuItem::make('Сводка', new SummaryResource()),
-            MenuItem::make('Пользователи', new UserResource()),
-            MenuItem::make('Ввод', new DepositResource()),
-            MenuItem::make('Выводы', new WithdrawResource()),
-            MenuItem::make('Пакеты', new ItcPackageResource()),
-            MenuItem::make('Верификация', new VerifyingUserResource()),
-            MenuItem::make('Cтейкинг', new ItcStakingResource()),
-            MenuItem::make('Новости', new NewsResource()),
+            MenuItem::make('Сводка', new SummaryResource())
+                ->canSee($this->canSeeResource(SummaryResource::class)),
+            MenuItem::make('Пользователи', new UserResource())
+                ->canSee($this->canSeeResource(UserResource::class)),
+            MenuItem::make('Ввод', new DepositResource())
+                ->canSee($this->canSeeResource(DepositResource::class)),
+            MenuItem::make('Выводы', new WithdrawResource())
+                ->canSee($this->canSeeResource(WithdrawResource::class)),
+            MenuItem::make('Пакеты', new ItcPackageResource())
+                ->canSee($this->canSeeResource(ItcPackageResource::class)),
+            MenuItem::make('Верификация', new VerifyingUserResource())
+                ->canSee($this->canSeeResource(VerifyingUserResource::class)),
+            MenuItem::make('Cтейкинг', new ItcStakingResource())
+                ->canSee($this->canSeeResource(ItcStakingResource::class)),
+            MenuItem::make('Новости', new NewsResource())
+                ->canSee($this->canSeeResource(NewsResource::class)),
+            MenuItem::make('Админы', new AdminUserResource())
+                ->canSee($this->canSeeResource(AdminUserResource::class)),
+            MenuItem::make('Роли', new MoonShineUserRoleResource())
+                ->canSee($this->canSeeResource(MoonShineUserRoleResource::class)),
         ];
     }
 
@@ -99,5 +156,27 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             '/vendor/moonshine/js/set-names-for-common-percents-fields.js',
             Vite::asset('resources/css/app.css'),
         ]);
+    }
+
+    private function canSeeResource(string $resourceClass): Closure
+    {
+        return function () use ($resourceClass): bool {
+            $user = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+
+            if (! $user instanceof MoonshineUser) {
+                return false;
+            }
+
+            if ($this->hasExplicitPermissions($user)) {
+                return $user->isHavePermission($resourceClass, 'viewAny');
+            }
+
+            return $user->isSuperUser();
+        };
+    }
+
+    private function hasExplicitPermissions(MoonshineUser $user): bool
+    {
+        return $user->moonshineUserPermission !== null;
     }
 }

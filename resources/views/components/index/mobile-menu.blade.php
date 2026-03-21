@@ -22,22 +22,34 @@
             {{ __('home_page') }}
         </a>
     @elseif ($isAccountPage)
-        <ul class="flex flex-col gap-[24px] text-lg items-end mt-[120px] px-4">
-            <x-account.nav-button routeName="dashboard">{{ __('home') }}</x-account.nav-button>
-            <x-account.nav-button routeName="itc-packages">{{ __('packages') }}</x-account.nav-button>
-            <x-account.nav-button routeName="finance">{{ __('finance') }}</x-account.nav-button>
-            <x-account.nav-button :blur="!hasPackage(auth()->user()->id)" :close="!hasPackage(auth()->user()->id)" routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
-            <x-account.nav-button routeName="itc-staking">{{ __('itc_staking') }}</x-account.nav-button>
-            <x-account.nav-button routeName="academy.landing" target="_blank">
-                {{ __('academy') }}
-            </x-account.nav-button>
-        </ul>
-        <div class="w-full flex flex-col">
-            <div class="items-end justify-center mb-[15px] px-4 py-8 gap-4 pb-[env(safe-area-inset-bottom)]">
-                @auth
-                    <livewire:account.dashboard.balance-pill />
-                @endauth
-                <x-ui.user-menu class="mt-[25px] mb-[15px] mr-[10px]"/>
+        <div class="flex h-full min-h-0 flex-1 flex-col">
+            <div class="flex-1 min-h-0 overflow-y-auto">
+                <ul class="flex flex-col gap-[24px] text-lg items-end mt-[120px] px-4">
+                    <x-account.nav-button routeName="dashboard">{{ __('home') }}</x-account.nav-button>
+                    <x-account.nav-button routeName="itc-packages">{{ __('packages') }}</x-account.nav-button>
+                    <x-account.nav-button routeName="finance">{{ __('finance') }}</x-account.nav-button>
+                    <x-account.nav-button :blur="!hasPackage(auth()->user()->id)" :close="!hasPackage(auth()->user()->id)" routeName="partners">{{ __('affiliate_program') }}</x-account.nav-button>
+                    <x-account.nav-button routeName="itc-staking">{{ __('itc_staking') }}</x-account.nav-button>
+                    <x-account.nav-button routeName="academy.landing" target="_blank">
+                        {{ __('academy') }}
+                    </x-account.nav-button>
+                    <x-account.nav-button routeName="news.index">
+                        {{ __('liveware_news') }}
+                    </x-account.nav-button>
+                </ul>
+
+                <div class="w-full">
+                    <livewire:news.index position="mobile-menu" limit="2"/>
+                </div>
+            </div>
+
+            <div class="w-full shrink-0 mt-auto">
+                <div class="items-end justify-center mb-[15px] px-4 py-8 gap-4 pb-[env(safe-area-inset-bottom)]">
+                    @auth
+                        <livewire:account.dashboard.balance-pill />
+                    @endauth
+                    <x-ui.user-menu class="mt-[25px] mb-[15px] mr-[10px]"/>
+                </div>
             </div>
         </div>
     @else
@@ -58,6 +70,7 @@
                 </a>
             </li>
         </ul>
+
         <div class="w-full flex flex-col">
             <div class="items-end justify-center mb-[15px] px-4 py-8 gap-4 pb-[env(safe-area-inset-bottom)]">
                 <x-ui.user-menu class="mt-[25px] mb-[15px] mr-[10px]"/>
