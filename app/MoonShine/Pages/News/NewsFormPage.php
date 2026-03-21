@@ -6,6 +6,7 @@ namespace App\MoonShine\Pages\News;
 
 use App\Enums\NewsCategoryEnum;
 use App\Models\News;
+use MoonShine\CKEditor\Fields\CKEditor;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Decorations\Block;
 use MoonShine\Decorations\Column;
@@ -16,10 +17,10 @@ use MoonShine\Fields\Date;
 use MoonShine\Fields\Field;
 use MoonShine\Fields\ID;
 use MoonShine\Fields\Image;
+use MoonShine\Fields\Markdown;
 use MoonShine\Fields\Select;
 use MoonShine\Fields\Text;
 use MoonShine\Fields\Textarea;
-use MoonShine\Fields\TinyMce;
 use MoonShine\Pages\Crud\FormPage;
 use Throwable;
 
@@ -124,7 +125,7 @@ class NewsFormPage extends FormPage
                 ->required()
                 ->hint('Максимум 300 символов')
                 ->customAttributes(['maxlength' => 300, 'rows' => 4]),
-            TinyMce::make('Текст новости', "content.$locale")
+            CKEditor::make('Текст новости', "content.$locale")
                 ->required()
                 ->hint('Максимум 2000 символов')
                 ->customAttributes(['maxlength' => 2000, 'rows' => 12]),

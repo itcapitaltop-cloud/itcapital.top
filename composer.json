@@ -22,6 +22,7 @@
         "league/csv": "^9.16",
         "lemax10/simple-actions": "^2.2",
         "livewire/livewire": "^3.5",
+        "moonshine/ckeditor": "^2.0",
         "moonshine/moonshine": "^2.23.5",
         "moonshine/permissions": "^1.0",
         "phpoffice/phpspreadsheet": "^4.2",

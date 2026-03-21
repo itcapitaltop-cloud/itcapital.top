@@ -23,7 +23,7 @@
                                 alt="{{ $translation->title }}"
                             />
 
-                            <div class="text-xs text-white leading-7 font-normal">
+                            <div class="text-xs text-white leading-7 font-normal [&_a]:text-[#a8ee56]">
                                 {!! $translation->content !!}
                             </div>
                         </div>
