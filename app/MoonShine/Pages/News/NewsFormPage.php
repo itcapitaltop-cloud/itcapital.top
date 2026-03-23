@@ -6,7 +6,6 @@ namespace App\MoonShine\Pages\News;
 
 use App\Enums\NewsCategoryEnum;
 use App\Models\News;
-use MoonShine\CKEditor\Fields\CKEditor;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Decorations\Block;
 use MoonShine\Decorations\Column;
@@ -67,10 +66,10 @@ class NewsFormPage extends FormPage
                         $this->makeLocaleTab('English', 'en'),
                         $this->makeLocaleTab('中文', 'zh'),
                     ]),
-                ])->columnSpan(8),
+                ])->columnSpan(8, 8),
                 Column::make([
                     $sidebar,
-                ])->columnSpan(4),
+                ])->columnSpan(4, 4),
             ]),
         ];
     }
