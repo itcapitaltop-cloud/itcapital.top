@@ -53,7 +53,7 @@
     <p class="news-article-preview preview-web">{{ $news->translation('web_preview') }}</p>
     <p class="news-article-preview preview-mobile">{{ $news->translation('mobile_preview') }}</p>
     <img class="news-article-image" src="{{ $news->imageUrl() }}" alt="{{ $news->translation('title') }}">
-    <article class="news-article-content">{!! nl2br(e($news->translation('content'))) !!}</article>
+    <article class="news-article-content">{!! str($news->translation('content'))->markdown() !!}</article>
 </main>
 </body>
 </html>

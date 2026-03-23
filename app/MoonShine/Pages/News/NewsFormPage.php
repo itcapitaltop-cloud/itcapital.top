@@ -125,7 +125,7 @@ class NewsFormPage extends FormPage
                 ->required()
                 ->hint('Максимум 300 символов')
                 ->customAttributes(['maxlength' => 300, 'rows' => 4]),
-            CKEditor::make('Текст новости', "content.$locale")
+            Markdown::make('Текст новости', "content.$locale")
                 ->required()
                 ->hint('Максимум 2000 символов')
                 ->customAttributes(['maxlength' => 2000, 'rows' => 12]),
