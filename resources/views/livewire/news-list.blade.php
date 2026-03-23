@@ -23,7 +23,7 @@
                                 alt="{{ $translation->title }}"
                             />
 
-                            <div class="text-xs text-white leading-7 font-normal [&_a]:text-[#a8ee56]">
+                            <div class="text-[14px] text-white leading-[1.45] font-normal [&_a]:text-[#a8ee56]">
                                 <x-markdown>
                                     {{ $translation->content }}
                                 </x-markdown>

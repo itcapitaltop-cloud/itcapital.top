@@ -1,7 +1,4 @@
-<header class="relative overflow-x-hidden">
-
-    <livewire:account.layout.sidebar />
+<header class="fixed inset-x-0 top-0 z-50 overflow-hidden bg-[#17162d]">
     <livewire:account.layout.topbar />
-    <livewire:quotes.marquee class="mt-0 hidden md:block"/>
-    <livewire:account.dashboard.balance-pill class="block md:hidden mx-[15px] mt-[10px]"/>
+    <livewire:account.dashboard.balance-pill class="block md:hidden mx-[15px] mt-[10px]" />
 </header>

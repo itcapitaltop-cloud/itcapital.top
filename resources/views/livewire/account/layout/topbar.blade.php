@@ -1,4 +1,4 @@
-<div class="relative bg-[#1B1939]/10 md:bg-[#1B193975] px-6 pr-4 pt-6 pb-4 space-y-6 top-0 z-50">
+<div class="relative z-30 bg-[#1B1939]/10 px-6 pr-4 pt-6 pb-4 space-y-6 md:bg-[#1B193975]">
     {{-- Баланс + кнопка кошелька --}}
     <div class="flex items-center gap-10">
         <x-ui.logo class="mr-auto"/>
