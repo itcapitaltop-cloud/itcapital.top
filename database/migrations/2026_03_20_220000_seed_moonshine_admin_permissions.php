@@ -11,6 +11,8 @@ return new class extends Migration
     {
         $timestamp = now();
 
+        $this->syncMoonshineUserRolesSequence();
+
         DB::table('moonshine_user_roles')->updateOrInsert(
             ['name' => 'News editor'],
             [
@@ -83,5 +85,20 @@ return new class extends Migration
             'restore' => true,
             'forceDelete' => true,
         ];
+    }
+
+    private function syncMoonshineUserRolesSequence(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::statement(<<<'SQL'
+            SELECT setval(
+                pg_get_serial_sequence('moonshine_user_roles', 'id'),
+                GREATEST((SELECT COALESCE(MAX(id), 0) FROM moonshine_user_roles), 1),
+                true
+            )
+        SQL);
     }
 };
