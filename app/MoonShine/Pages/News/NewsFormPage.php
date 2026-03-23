@@ -66,10 +66,10 @@ class NewsFormPage extends FormPage
                         $this->makeLocaleTab('English', 'en'),
                         $this->makeLocaleTab('中文', 'zh'),
                     ]),
-                ])->columnSpan(8, 8),
+                ])->columnSpan(8, 12),
                 Column::make([
                     $sidebar,
-                ])->columnSpan(4, 4),
+                ])->columnSpan(4, 12),
             ]),
         ];
     }

@@ -150,7 +150,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             '/vendor/moonshine/js/filters-search-preserver.js',
             '/vendor/moonshine/js/show-overflow-popup.js',
             '/vendor/moonshine/js/paginator-trim.js',
-            '/vendor/moonshine/js/flex-top-content.js',
+            // flex-top-content wraps H1 + first block into header-row and breaks custom layouts. disabled.
+            // '/vendor/moonshine/js/flex-top-content.js',
             '/vendor/moonshine/js/set-names-for-override-percents-fields.js',
             '/vendor/moonshine/js/set-names-for-requirements-fields.js',
             '/vendor/moonshine/js/set-names-for-common-percents-fields.js',
