@@ -107,7 +107,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         )
         ->name('wallet.qr');
 
-    Route::view('/news', 'pages.news.index')->name('news.index');
+    Route::view('/account/news', 'pages.news.index')->name('news.index');
 });
 
 Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])->group(function () {
