@@ -126,8 +126,8 @@ class Finance extends Component
                     'amount' => $d->amount,
                     'arrow' => 'down',
                     'type' => ($source === 'crypto'
-                        ? __('livewire_finance_crypto_withdrawal_label', ['currency' => $tail])
-                        : __('livewire_finance_fiat_withdrawal_label', ['bank' => $tail])),
+                        ? __('livewire_finance_crypto_deposit_label', ['details' => $tail])
+                        : __('livewire_finance_fiat_deposit_label', ['details' => $tail])),
                     'status' => TransactionStatusEnum::fromDates(
                         $d->accepted_at,
                         $d->rejected_at
