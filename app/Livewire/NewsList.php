@@ -13,7 +13,7 @@ class NewsList extends Component
     public function render(): View
     {
         $news = News::query()
-            ->with(['translations' => fn ($query) => $query->where('locale', auth()->user()->locale)])
+            ->with(['translations' => fn ($query) => $query->where('locale', auth()->user()->locale ?? session()->get('locale'))])
             ->published()
             ->latest('published_at')
             ->get();
