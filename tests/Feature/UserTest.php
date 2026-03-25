@@ -3,6 +3,20 @@
 use App\Models\Transaction;
 use App\Models\User;
 
+it('пользователь получает locale по умолчанию', function () {
+    $user = User::query()->create([
+        'username' => 'locale-default-user',
+        'first_name' => 'Locale',
+        'last_name' => 'Default',
+        'email' => 'locale-default@example.com',
+        'password' => 'password123',
+        'rank' => 0,
+    ]);
+
+    expect($user->locale)->toBe('ru')
+        ->and($user->fresh()->locale)->toBe('ru');
+});
+
 it('создание пользователя', function () {
     $user = User::factory()->create();
 

@@ -6,10 +6,8 @@ use App\Actions\User\InvalidateSessionUserAction;
 use App\Notifications\PasswordChanged;
 use App\Notifications\VerifyNewEmail;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -51,7 +49,7 @@ class SettingsModal extends Component
         $this->first_name = $u->first_name;
         $this->last_name = $u->last_name;
         $this->telegram = $u->telegram ?? '';
-        $this->locale = $u->locale ?? session('locale') ?? 'en';
+        $this->locale = $u->locale ?? session('locale') ?? (string) config('app.locale', 'ru');
         $this->email = $u->pending_email ?: $u->email;
         $this->originalEmail = $u->email;
     }
@@ -71,14 +69,12 @@ class SettingsModal extends Component
         $this->validateOnly('locale');
         $this->validateOnly('email');
 
-
         $u->update([
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'telegram' => $this->telegram,
             'locale' => $this->locale,
         ]);
-
 
         if ($this->newPassword !== '') {
             $this->validateOnly('newPassword');
@@ -113,7 +109,6 @@ class SettingsModal extends Component
 
         $this->reset(['newPassword', 'newPasswordConfirm']);
         $this->originalEmail = $this->email;
-
 
         if ($passwordChanged) {
             Auth::logout();

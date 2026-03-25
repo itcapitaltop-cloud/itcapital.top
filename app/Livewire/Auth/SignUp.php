@@ -99,6 +99,7 @@ class SignUp extends Component
                 'first_name' => $this->firstName,
                 'last_name' => $this->lastName,
                 'password' => $this->password,
+                'locale' => (string) (session('locale') ?? config('app.locale', 'ru')),
                 'passwordConfirm' => $this->passwordConfirm,
             ]);
 

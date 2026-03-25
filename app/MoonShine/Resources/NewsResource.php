@@ -53,7 +53,7 @@ class NewsResource extends ModelResource
                 $item->exists ? 'nullable' : 'required',
                 'image',
                 'max:3072',
-                Rule::dimensions()->maxWidth(1200)->maxHeight(1200),
+                Rule::dimensions()->maxWidth(3000)->maxHeight(3000),
             ],
             'title.ru' => ['required', 'string', 'max:100'],
             'title.en' => ['required', 'string', 'max:100'],

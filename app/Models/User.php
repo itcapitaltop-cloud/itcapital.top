@@ -127,6 +127,12 @@ final class User extends Authenticatable implements MustVerifyEmail
         self::addGlobalScope('notBanned', function (Builder $builder) {
             $builder->whereNull('banned_at');
         });
+
+        self::creating(function (self $user): void {
+            if (blank($user->locale)) {
+                $user->locale = (string) config('app.locale', 'ru');
+            }
+        });
     }
 
     /**
