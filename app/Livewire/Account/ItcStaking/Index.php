@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Account\ItcStaking;
 
-use App\Actions\Staking\CreateStakingPackageAction;
 use App\ActivityLog\ActivityManager;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
@@ -13,9 +12,9 @@ use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
-use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\Package\Staking\StakingPerformanceService;
+use App\Services\Package\Staking\StakingPurchaseService;
 use App\Services\User\StakingStartBonusAccrualService;
-use App\Settings\GeneralSetting;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
@@ -38,13 +37,12 @@ final class Index extends Component
     {
         $this->validate();
 
-        $package = CreateStakingPackageAction::make()
-            ->run(auth()->id(), (float) $this->amount);
+        $package = app(StakingPurchaseService::class)
+            ->createPackage(auth()->id(), (float) $this->amount);
 
-        $accrual = new StakingAccrualService()
-            ->accrueTopUpStaking($package, (float) $this->amount, auth()->id());
+        $purchase = $package->stakingPurchases()->latest('id')->firstOrFail();
 
-        Notify::packageStakingBought(auth()->user(), $accrual->amount);
+        Notify::packageStakingBought(auth()->user(), $purchase->token_amount);
 
         $this->dispatch('bought');
 
@@ -68,9 +66,7 @@ final class Index extends Component
             ->with(['itcPackage'])
             ->first();
 
-        new StakingAccrualService()->accrueTopUpStaking($transaction->itcPackage, (float) $this->amount, auth()->id());
-
-        $transaction->increment('amount', $this->amount);
+        app(StakingPurchaseService::class)->addPurchase($transaction->itcPackage, (float) $this->amount, auth()->id());
 
         new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
 
@@ -95,10 +91,22 @@ final class Index extends Component
 
     public function render(): Factory|View
     {
+        $packages = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', fn ($query) => $query->where('user_id', auth()->id()))
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
+            ->get();
+
+        $performanceService = app(StakingPerformanceService::class);
+        $packagePerformances = $packages
+            ->mapWithKeys(fn (ItcPackage $package): array => [$package->id => $performanceService->forPackage($package)]);
+        $summaryPerformance = $performanceService->forPackages($packages);
+
         return view('livewire.account.itc-staking.index', [
-            'packages' => ItcPackage::query()->calculateStakingBalance(auth()->id())->get(),
+            'packages' => $packages,
+            'packagePerformances' => $packagePerformances,
+            'summaryPerformance' => $summaryPerformance,
             'lastMonthProfitability' => ItcPackage::query()->calculateStakingLastMonthProfitability(auth()->id())->first(),
-            'totalProfitability' => ItcPackage::query()->calculateStakingTotalProfitability(auth()->id())->first(),
             'logs' => BusinessActivity::query()
                 ->packagesStaking(auth()->id())
                 ->latest()
@@ -108,7 +116,7 @@ final class Index extends Component
 
                     return $activity;
                 }),
-            'exchangeRateItc' => app(GeneralSetting::class)->exchange_rate_itc,
+            'exchangeRateItc' => $summaryPerformance['current_rate'],
         ]);
     }
 }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\ItcStaking;
 
-use App\Enums\Itc\StakingTransactionAccrualEnum;
+use App\Models\ItcPackage;
+use App\Services\Package\Staking\StakingPerformanceService;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Fields\Field;
 use MoonShine\Fields\Text;
@@ -18,15 +19,17 @@ class ItcStakingIndexPage extends IndexPage
      */
     public function fields(): array
     {
+        $performanceService = app(StakingPerformanceService::class);
+
         return [
             Text::make('ID', 'uuid')->sortable(),
             Text::make('Дата покупки пакета', 'created_at')
                 ->showOnExport()
                 ->sortable(),
             Text::make('Пользователь', 'transaction.user.username'),
-            Text::make('Сумма', formatted: fn ($item) => round((float) $item->transaction?->amount + $item->stakingTransactionAccruals->sum('amount'), 2))->showOnExport(),
+            Text::make('Сумма', formatted: fn (ItcPackage $item) => round($performanceService->forPackage($item)['total_tokens'], 2))->showOnExport(),
             Text::make('Сумма реинвеста', formatted: fn ($item) => round((float) $item->reinvestProfits->sum('amount'), 2))->showOnExport(),
-            Text::make('Дивидендов начислено всего', formatted: fn ($item) => round((float) $item->stakingTransactionAccruals->reject(fn ($a) => $a->type === StakingTransactionAccrualEnum::TopUpBonus)->sum('amount'), 2))->showOnExport(),
+            Text::make('Дивидендов начислено всего', formatted: fn (ItcPackage $item) => round($performanceService->forPackage($item)['yield_tokens'], 2))->showOnExport(),
             Text::make('Доходность пакета', formatted: fn ($item) => round((float) $item->month_profit_percent, 2))->showOnExport(),
         ];
     }

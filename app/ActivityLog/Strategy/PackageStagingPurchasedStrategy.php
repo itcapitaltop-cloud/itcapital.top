@@ -14,6 +14,7 @@ final class PackageStagingPurchasedStrategy implements ActivityStrategyContract
         return __('activity/user.package_purchased', [
             'amount' => $activity->getExtraProperty('amount', 0),
             'uuid' => $activity->getExtraProperty('package_uuid', 0),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

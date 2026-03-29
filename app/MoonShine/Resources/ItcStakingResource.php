@@ -8,6 +8,7 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Models\ItcPackage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingDetailPage;
 use App\MoonShine\Pages\ItcStaking\ItcStakingIndexPage;
+use App\Services\Token\TokenRateResolver;
 use App\Settings\GeneralSetting;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,8 +16,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FormBuilder;
+use MoonShine\Components\TableBuilder;
 use MoonShine\Decorations\Block;
+use MoonShine\Fields\Date;
+use MoonShine\Fields\Hidden;
 use MoonShine\Fields\Number;
+use MoonShine\Fields\Text;
 use MoonShine\Pages\Page;
 use MoonShine\Resources\ModelResource;
 
@@ -112,6 +117,81 @@ class ItcStakingResource extends ModelResource
                     ]);
                 },
             )->primary(),
+            ActionButton::make('Курс токена')->inModal(
+                title: fn () => 'Изменение курса токена по дате',
+                content: function () {
+                    $tokenRateResolver = app(TokenRateResolver::class);
+                    $tokenRatesCollection = \App\Models\TokenRate::query()
+                        ->latest('effective_from')
+                        ->get();
+                    $activeEffectiveFrom = $tokenRatesCollection
+                        ->filter(fn (\App\Models\TokenRate $tokenRate): bool => $tokenRate->effective_from !== null && ! $tokenRate->effective_from->isFuture())
+                        ->max(fn (\App\Models\TokenRate $tokenRate): ?string => $tokenRate->effective_from?->toDateString());
+                    $tokenRates = $tokenRatesCollection
+                        ->map(fn (\App\Models\TokenRate $tokenRate): array => [
+                            'id' => $tokenRate->id,
+                            'effective_from' => $tokenRate->effective_from?->format('Y-m-d'),
+                            'effective_from_human' => $tokenRate->effective_from?->format('d.m.Y'),
+                            'rate' => (float) $tokenRate->rate,
+                            'status' => $this->resolveTokenRateStatus($tokenRate, $activeEffectiveFrom),
+                        ]);
+
+                    return Block::make([
+                        FormBuilder::make()
+                            ->action('/itcapitalmoonshineadminpanel/itc-staking/change/token-rate')
+                            ->fields([
+                                Hidden::make('token_rate_id')
+                                    ->fill(''),
+                                Date::make('Дата начала действия', 'effective_from')
+                                    ->fill($tokenRateResolver->currentEffectiveFrom())
+                                    ->required(),
+                                Number::make('Курс токена в USD', 'rate')
+                                    ->default($tokenRateResolver->currentRate())
+                                    ->customAttributes([
+                                        'step' => 'any',
+                                        'min' => '0.000001',
+                                    ])
+                                    ->required(),
+                            ])
+                            ->async()
+                            ->method('POST')
+                            ->submit('Сохранить'),
+                        TableBuilder::make()
+                            ->withNotFound()
+                            ->items($tokenRates->toArray())
+                            ->fields([
+                                Text::make('Дата', 'effective_from_human'),
+                                Number::make('Курс USD', 'rate'),
+                                Text::make('Статус', 'status'),
+                            ])
+                            ->buttons([
+                                ActionButton::make('Редактировать', function ($item): string {
+                                    if (! is_array($item)) {
+                                        return '#';
+                                    }
+
+                                    $tokenRateId = (string) ($item['id'] ?? '');
+                                    $effectiveFrom = (string) ($item['effective_from'] ?? '');
+                                    $rate = (string) ($item['rate'] ?? '');
+
+                                    return "javascript:(function(){document.querySelector('[name=\"token_rate_id\"]')&& (document.querySelector('[name=\"token_rate_id\"]').value='{$tokenRateId}');document.querySelector('[name=\"effective_from\"]')&& (document.querySelector('[name=\"effective_from\"]').value='{$effectiveFrom}');document.querySelector('[name=\"rate\"]')&& (document.querySelector('[name=\"rate\"]').value='{$rate}');})();";
+                                })
+                                    ->secondary()
+                                    ->showInDropdown(),
+                                ActionButton::make('Удалить', function ($item): string {
+                                    if (! is_array($item) || ! isset($item['id'])) {
+                                        return '#';
+                                    }
+
+                                    return route('admin.itc-staking.delete-token-rate', ['tokenRateId' => $item['id']]);
+                                })
+                                    ->async(method: 'POST')
+                                    ->error()
+                                    ->showInDropdown(),
+                            ]),
+                    ]);
+                },
+            )->primary(),
         ];
     }
 
@@ -160,5 +240,22 @@ class ItcStakingResource extends ModelResource
     public function rules(Model $item): array
     {
         return [];
+    }
+
+    private function resolveTokenRateStatus(\App\Models\TokenRate $tokenRate, ?string $activeEffectiveFrom): string
+    {
+        if ($tokenRate->effective_from === null) {
+            return 'Прошлый';
+        }
+
+        if ($tokenRate->effective_from->isFuture()) {
+            return 'Не наступил';
+        }
+
+        if ($activeEffectiveFrom !== null && $tokenRate->effective_from->toDateString() === $activeEffectiveFrom) {
+            return 'Активный';
+        }
+
+        return 'Прошлый';
     }
 }

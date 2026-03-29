@@ -1,7 +1,7 @@
 {
     "about_club": "关于俱乐部",
     "passive_income": "被动收入",
-    "exchange_rate_itc": "购买汇率：1 代币 = :count ITC",
+    "exchange_rate_itc": "当前汇率：1 代币 = :count USD",
     "academy": "学院",
     "home": "首页",
     "itc_staking": "ITC 质押现已上线",
@@ -784,6 +784,8 @@
     "component_livewire_account_itc_staking_statistic_to_moth": "每月收益",
     "component_livewire_account_itc_staking_statistic_last_moth": "上月收益",
     "component_livewire_account_itc_staking_statistic_general": "总收益",
+    "component_livewire_account_itc_staking_statistic_unrealized_pnl": "未实现盈亏",
+    "component_livewire_account_itc_staking_statistic_total_profit_usd": "按当前汇率的总收益",
     "application_created": "输入申请已创建",
     "application_withdraw": "提款申请已创建",
     "accessibly": "明白",

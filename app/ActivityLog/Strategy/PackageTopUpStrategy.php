@@ -14,6 +14,7 @@ final class PackageTopUpStrategy implements ActivityStrategyContract
         return __('activity/user.top_up_package', [
             'amount' => $activity->getExtraProperty('amount', 0),
             'uuid' => $activity->getExtraProperty('uuid', 0),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

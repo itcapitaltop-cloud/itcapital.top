@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Packages;
 
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Http\Controllers\Controller;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\Package\Staking\StakingPurchaseService;
+use App\Services\Token\TokenRateResolver;
 use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -124,6 +124,28 @@ final class ItcStakingController extends Controller
         return back();
     }
 
+    public function changeTokenRate(MoonShineRequest $request, TokenRateResolver $tokenRateResolver): MoonShineJsonResponse
+    {
+        $tokenRateResolver->upsertRate(
+            $request->input('effective_from'),
+            (float) $request->input('rate'),
+            $request->integer('token_rate_id') ?: null
+        );
+
+        return MoonShineJsonResponse::make()
+            ->toast('Курс токена сохранен', ToastType::SUCCESS)
+            ->redirect(request()->headers->get('referer'));
+    }
+
+    public function deleteTokenRate(int $tokenRateId, TokenRateResolver $tokenRateResolver): MoonShineJsonResponse
+    {
+        $tokenRateResolver->deleteRate($tokenRateId);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Курс токена удален', ToastType::SUCCESS)
+            ->redirect(request()->headers->get('referer'));
+    }
+
     /**
      * @param \MoonShine\MoonShineRequest $request
      * @param string $uuid
@@ -143,21 +165,21 @@ final class ItcStakingController extends Controller
         $oldAmount = $transaction->amount;
         $oldPercent = $package->month_profit_percent;
 
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $request->input('amount') / $exchangeRateItc;
+        if ((float) $request->input('amount') > 0) {
+            app(StakingPurchaseService::class)->addPurchase(
+                $package,
+                (float) $request->input('amount'),
+                $package->transaction->user_id
+            );
 
-        $profit = $request->input('amount') - $token;
-
-        $transaction->increment('amount', $token);
-
-        new StakingAccrualService()
-            ->accrue($package, StakingTransactionAccrualEnum::TopUpBonus, $profit, $package->transaction->user_id);
+            $transaction->refresh();
+        }
 
         $package->update([
             'month_profit_percent' => $request->input('profit_percent'),
         ]);
 
-        if ($transaction->wasChanged('amount')) {
+        if ($oldAmount !== $transaction->amount) {
 
             activity('admin')
                 ->performedOn($package)

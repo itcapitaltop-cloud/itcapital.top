@@ -113,7 +113,12 @@
                 @if (count($packages) > 0)
                     <div class="flex flex-col gap-6 md:gap-[44px] mt-4 md:mt-[20px]">
                         @foreach ($packages as $package)
-                            <x-account.itc.package-staking :package="$package" :lastMonthProfitability="$lastMonthProfitability" :totalProfitability="$totalProfitability" />
+                            <x-account.itc.package-staking
+                                :package="$package"
+                                :lastMonthProfitability="$lastMonthProfitability"
+                                :packagePerformance="$packagePerformances[$package->id] ?? []"
+                                :summaryPerformance="$summaryPerformance"
+                            />
                         @endforeach
                     </div>
                 @else

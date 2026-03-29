@@ -9,7 +9,7 @@ use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Models\ItcPackage;
 use App\Models\Package\Staking\StakingTransactionAccrual;
 use App\Models\User;
-use App\Settings\GeneralSetting;
+use App\Services\Token\TokenRateResolver;
 use Illuminate\Support\Facades\DB;
 
 final class StakingAccrualService
@@ -22,8 +22,7 @@ final class StakingAccrualService
         float $amount,
         int $userId,
     ): StakingTransactionAccrual {
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $amount * $exchangeRateItc;
+        $token = round($amount / app(TokenRateResolver::class)->currentRate(), 2);
         $profit = $token - $amount;
 
         return DB::transaction(function () use ($package, $amount, $profit, $userId) {
@@ -35,6 +34,7 @@ final class StakingAccrualService
                     'profit' => $profit,
                     'package_uuid' => $package->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
+                    'exchange_rate' => app(TokenRateResolver::class)->currentRate(),
                 ])
                 ->log('admin_package_purchased');
 
@@ -49,8 +49,7 @@ final class StakingAccrualService
 
     public function accrueTopUpStaking(ItcPackage $package, float $amount, int $userId): StakingTransactionAccrual
     {
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $amount * $exchangeRateItc;
+        $token = round($amount / app(TokenRateResolver::class)->currentRate(), 2);
         $profit = $token - $amount;
 
         return DB::transaction(function () use ($package, $profit, $userId, $token) {
@@ -63,6 +62,7 @@ final class StakingAccrualService
                     'uuid' => $package->uuid,
                     'amount' => $token,
                     'package_type' => PackageTypeEnum::STAKING,
+                    'exchange_rate' => app(TokenRateResolver::class)->currentRate(),
                 ])
                 ->log('top_up_package');
 
@@ -104,9 +104,11 @@ final class StakingAccrualService
 
         return DB::transaction(function () use ($package, $profit, $userId) {
             $balanceStaking = ItcPackage::query()
-                ->calculateStakingBalance($userId)
+                ->active(PackageTypeEnum::STAKING)
+                ->whereHas('transaction', fn ($query) => $query->where('user_id', $userId))
+                ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
                 ->get()
-                ->sum(fn ($item) => $item->transaction_sum + $item->staking_accruals_sum);
+                ->sum(fn (ItcPackage $item): float => app(StakingPerformanceService::class)->forPackage($item)['total_tokens']);
 
             activity('package')
                 ->performedOn($package)

@@ -1,4 +1,4 @@
-@props(['package', 'lastMonthProfitability', 'totalProfitability'])
+@props(['package', 'lastMonthProfitability', 'packagePerformance', 'summaryPerformance'])
 
 @php
     use App\Enums\Itc\PackageTypeEnum;
@@ -18,7 +18,7 @@
                     <span class="text-[24px] sm:text-[30px] md:text-[36px] font-dela leading-none">
                         {{ $package->type === PackageTypeEnum::PRESENT && $package->zeroing
                             ? 0
-                            : scale($package->transaction_sum + $package->staking_accruals_sum)->stripTrailingZeros() }}
+                            : scale($packagePerformance['total_tokens'] ?? 0)->stripTrailingZeros() }}
                     </span>
                     <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-4 sm:w-[19px] translate-y-[2px]"
                         alt="ITC">
@@ -77,7 +77,31 @@
             <div class="flex items-baseline gap-1">
                 <img src="{{ vite()->icon('/currency/itc-staking.svg') }}" class="w-3 sm:w-4" alt="ITC">
                 <span class="text-lg sm:text-xl font-semibold">
-                    {{ scale($totalProfitability->staking_accruals_sum)->stripTrailingZeros() }}
+                    {{ scale($packagePerformance['yield_tokens'] ?? 0)->stripTrailingZeros() }}
+                </span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center">
+            <span class="text-white/70 text-sm sm:text-base">
+                {{ __('component_livewire_account_itc_staking_statistic_unrealized_pnl') }}
+            </span>
+            <div class="flex items-baseline gap-1">
+                <img src="{{ vite()->icon('/currency/itc.svg') }}" class="w-3 sm:w-4" alt="USD">
+                <span class="text-lg sm:text-xl font-semibold">
+                    {{ number_format((float) ($packagePerformance['unrealized_pnl_usd'] ?? 0), 2, '.', '') }}
+                </span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center">
+            <span class="text-white/70 text-sm sm:text-base">
+                {{ __('component_livewire_account_itc_staking_statistic_total_profit_usd') }}
+            </span>
+            <div class="flex items-baseline gap-1">
+                <img src="{{ vite()->icon('/currency/itc.svg') }}" class="w-3 sm:w-4" alt="USD">
+                <span class="text-lg sm:text-xl font-semibold">
+                    {{ number_format((float) ($packagePerformance['total_profit_usd'] ?? 0), 2, '.', '') }}
                 </span>
             </div>
         </div>

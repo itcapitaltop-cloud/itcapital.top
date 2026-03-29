@@ -87,6 +87,11 @@ class ItcPackage extends Model
         return $this->hasMany(StakingTransactionAccrual::class);
     }
 
+    public function stakingPurchases(): HasMany
+    {
+        return $this->hasMany(StakingPurchase::class);
+    }
+
     public function reinvestProfitsAll(): HasMany
     {
         return $this->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid');

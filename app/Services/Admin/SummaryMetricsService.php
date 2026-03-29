@@ -10,13 +10,14 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\PackageProfit;
 use App\Models\Transaction;
+use App\Services\Package\Staking\StakingPerformanceService;
 use Illuminate\Support\Facades\DB;
 
 final class SummaryMetricsService
 {
     public function totalPackagesAmount(): array
     {
-        return ItcPackage::query()
+        $totals = ItcPackage::query()
             ->withoutTestUsers()
             ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
             ->select('type')
@@ -40,6 +41,18 @@ final class SummaryMetricsService
                 2
             ))
             ->toArray();
+
+        $stakingPackages = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->withoutTestUsers()
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
+            ->get();
+
+        if ($stakingPackages->isNotEmpty()) {
+            $totals[PackageTypeEnum::STAKING->value] = app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
+        }
+
+        return $totals;
     }
 
     public function mainBalance(): string
@@ -116,19 +129,13 @@ final class SummaryMetricsService
 
     public function tokenBalance(): int|float
     {
-        return ItcPackage::query()
+        $packages = ItcPackage::query()
             ->active(PackageTypeEnum::STAKING)
-            ->whereHas('transaction.user', fn ($q) => $q->where('is_test', false))
-            ->withSum(
-                ['transaction as transaction_sum'],
-                'amount'
-            )
-            ->withSum(
-                ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))],
-                'amount'
-            )
-            ->get()
-            ->sum(fn ($item) => $item->transaction_sum + $item->staking_accruals_sum);
+            ->withoutTestUsers()
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
+            ->get();
+
+        return app(StakingPerformanceService::class)->forPackages($packages)['total_tokens'];
     }
 
     public function sumByPeriod(TrxTypeEnum $type, string $period): int|float|string

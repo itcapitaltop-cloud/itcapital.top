@@ -14,6 +14,7 @@ final class AdminPackagePurchasedStrategy implements ActivityStrategyContract
         return __('activity/admin.admin_package_purchased', [
             'uuid' => $activity->getExtraProperty('package_uuid', ''),
             'amount' => $activity->getExtraProperty('amount', 0),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

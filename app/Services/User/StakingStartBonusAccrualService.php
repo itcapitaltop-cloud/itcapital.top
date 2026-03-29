@@ -11,6 +11,7 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\Token\TokenRateResolver;
 use App\Settings\GeneralSetting;
 
 final class StakingStartBonusAccrualService implements StartBonusAccrualContract
@@ -40,7 +41,7 @@ final class StakingStartBonusAccrualService implements StartBonusAccrualContract
             return;
         }
 
-        $generalSettings = app(GeneralSetting::class)->exchange_rate_itc * 100;
+        $generalSettings = round(1 / app(TokenRateResolver::class)->currentRate(), 2);
 
         $reward = (float) ($packageAmount / 100 * $generalSettings);
 

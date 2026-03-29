@@ -11,6 +11,7 @@ use App\Models\ItcPackage;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Resources\ItcStakingResource;
+use App\Services\Package\Staking\StakingPerformanceService;
 use App\Settings\GeneralSetting;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\FlexibleRender;
@@ -45,10 +46,18 @@ class ItcStakingDetailPage extends DetailPage
         $package = $this->getResource()->getItem();
 
         $packages = ItcPackage::query()
-            ->active(PackageTypeEnum::STAKING)
-            ->calculateStakingTotalProfitability($package->transaction->user->id)
-            ->with('stakingTransactionAccruals')
+            ->where('type', PackageTypeEnum::STAKING)
+            ->whereHas('transaction', fn ($query) => $query->where('user_id', $package->transaction->user->id))
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
             ->get();
+
+        $performanceService = app(StakingPerformanceService::class);
+        $packageRows = $packages->map(function (ItcPackage $stakingPackage) use ($performanceService): array {
+            return [
+                ...$stakingPackage->toArray(),
+                'performance' => $performanceService->forPackage($stakingPackage),
+            ];
+        });
 
         $adminLogs = BusinessActivity::query()
             ->packagesStakingWithAdmin($package->transaction->user->id)
@@ -87,17 +96,25 @@ class ItcStakingDetailPage extends DetailPage
                     Heading::make("Пакеты {$package->transaction->user->username}")->h(2),
                     TableBuilder::make()
                         ->withNotFound()
-                        ->items($packages->toArray())
+                        ->items($packageRows->toArray())
                         ->fields([
                             Text::make('ID', 'uuid')->showOnExport(),
                             Date::make('Дата открытия', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
-                            Text::make('Сумма', 'amount', formatted: function (array $package): float {
-                                return round((float) $package['transaction']['amount'] + (float) collect($package['staking_transaction_accruals'])->sum('amount'), 2);
+                            Text::make('Всего токенов', formatted: function (array $package): float {
+                                return round((float) data_get($package, 'performance.total_tokens', 0), 2);
                             }),
-                            Number::make('Доходность за все время', formatted: function (array $package): float {
-                                return round((float) $package['staking_accruals_sum'], 2);
+                            Number::make('Вложено USD', formatted: function (array $package): float {
+                                return round((float) data_get($package, 'performance.invested_usd', 0), 2);
                             }),
-
+                            Number::make('Доходность в токенах', formatted: function (array $package): float {
+                                return round((float) data_get($package, 'performance.yield_tokens', 0), 2);
+                            }),
+                            Number::make('Нереализованный P&L USD', formatted: function (array $package): float {
+                                return round((float) data_get($package, 'performance.unrealized_pnl_usd', 0), 2);
+                            }),
+                            Number::make('Общая прибыль USD', formatted: function (array $package): float {
+                                return round((float) data_get($package, 'performance.total_profit_usd', 0), 2);
+                            }),
                             Number::make('Процент прибыли', 'month_profit_percent', formatted: function (array $package): string {
                                 return $package['month_profit_percent'] . '%';
                             }),
