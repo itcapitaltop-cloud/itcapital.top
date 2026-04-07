@@ -18,16 +18,32 @@ final class BusinessActivity extends Activity
     #[Scope]
     public function packagesStaking(Builder $query, int $userId): Builder
     {
-        return $query->where('subject_type', ItcPackage::class)
-            ->whereIn('description', [
-                'package_purchased',
-                'profit_accrued',
-                'top_up_package',
-                'start_bonus_package',
-                'regular_premium_package',
-            ])
-            ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
-            ->where('causer_id', $userId);
+        return $query->where(function ($query) use ($userId) {
+            $query->where(function ($query) use ($userId) {
+                $query->where('subject_type', ItcPackage::class)
+                    ->whereIn('description', [
+                        'package_purchased',
+                        'profit_accrued',
+                        'top_up_package',
+                        'start_bonus_package',
+                        'regular_premium_package',
+                    ])
+                    ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
+                    ->where('causer_id', $userId);
+            })->orWhere(function ($query) use ($userId) {
+                $query->where('subject_type', ItcPackage::class)
+                    ->where('description', 'admin_package_added_manual_profit')
+                    ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
+                    ->whereHasMorph(
+                        'subject',
+                        [ItcPackage::class],
+                        fn ($query) => $query->whereHas(
+                            'transaction',
+                            fn ($query) => $query->where('user_id', $userId)
+                        )
+                    );
+            });
+        });
     }
 
     /**
