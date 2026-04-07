@@ -47,6 +47,7 @@ final class BusinessActivity extends Activity
                         'profit_accrued',
                         'admin_package_changed_amount',
                         'admin_package_changed_percentage',
+                        'admin_package_added_manual_profit',
                         'top_up_package',
                         'start_bonus_package',
                     ])

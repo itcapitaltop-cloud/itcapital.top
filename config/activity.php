@@ -12,5 +12,6 @@ return [
         'admin_package_purchased' => \App\ActivityLog\Strategy\Admin\AdminPackagePurchasedStrategy::class,
         'admin_package_changed_amount' => \App\ActivityLog\Strategy\Admin\AdminPackageChangedPercent::class,
         'admin_package_changed_percentage' => \App\ActivityLog\Strategy\Admin\AdminPackageChangedPercent::class,
+        'admin_package_added_manual_profit' => \App\ActivityLog\Strategy\Admin\AdminPackageAddedManualProfit::class,
     ],
 ];

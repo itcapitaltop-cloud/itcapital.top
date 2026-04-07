@@ -6,6 +6,7 @@ namespace App\MoonShine\Pages\ItcStaking;
 
 use App\ActivityLog\ActivityManager;
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Itc\StakingTransactionAccrualEnum;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
@@ -24,7 +25,9 @@ use MoonShine\Decorations\Tabs;
 use MoonShine\Fields\Date;
 use MoonShine\Fields\Enum;
 use MoonShine\Fields\Field;
+use MoonShine\Fields\Hidden;
 use MoonShine\Fields\Number;
+use MoonShine\Fields\Select;
 use MoonShine\Fields\Text;
 use MoonShine\Pages\Crud\DetailPage;
 use Spatie\Activitylog\Models\Activity;
@@ -130,6 +133,22 @@ class ItcStakingDetailPage extends DetailPage
                                     fn () => 'event.stopPropagation()',
                                     'stop'
                                 ),
+                            ActionButton::make('')
+                                ->inModal(
+                                    title: static fn ($item) => 'Ручной профит',
+                                    content: function (array $item): Block {
+                                        $package = ItcPackage::whereUuid($item['uuid'])->firstOrFail();
+
+                                        return $this->itcPackageManualProfitForm($package);
+                                    },
+                                    name: 'itc-package-manual-profit-modal'
+                                )
+                                ->icon('heroicons.banknotes')
+                                ->success()
+                                ->onClick(
+                                    fn () => 'event.stopPropagation()',
+                                    'stop'
+                                ),
                         ]),
                 ]),
 
@@ -209,46 +228,95 @@ class ItcStakingDetailPage extends DetailPage
         ];
     }
 
-    private function itcPackageEditForm(ItcPackage $package, array $item): FormBuilder
+    private function itcPackageEditForm(ItcPackage $package, array $item): Block
     {
-        $packages = ItcPackage::query()
-            ->active(PackageTypeEnum::STAKING)
-            ->userPackagesWithFinancials($package->transaction->user->id)
-            ->count();
+        return Block::make([
+            FormBuilder::make()
+                ->action("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}")
+                ->method('POST')
+                ->async()
+                ->fields([
+                    Date::make('Дата открытия', 'created_at')
+                        ->fill($package->created_at)
+                        ->required(),
 
-        return FormBuilder::make()
-            ->action("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}")
-            ->method('POST')
-            ->async()
-            ->fields([
-                Date::make('Дата открытия', 'created_at')
-                    ->fill($package->created_at)
-                    ->required(),
+                    Number::make('Процент прибыли', 'profit_percent')
+                        ->fill($package->month_profit_percent)
+                        ->customAttributes(
+                            [
+                                'wire:model.defer' => 'percent',
+                                'step' => 'any',
+                            ])
+                        ->required(),
 
-                Number::make('Процент прибыли', 'profit_percent')
-                    ->fill($package->month_profit_percent)
-                    ->customAttributes(
-                        [
-                            'wire:model.defer' => 'percent',
+                    Number::make('Процент стартовой премии', 'start_bonus_staking_percent')
+                        ->fill($package->transaction->user->setting('start_bonus_staking_percent', app(GeneralSetting::class)->start_bonus_staking_percent))
+                        ->customAttributes(
+                            [
+                                'wire:model.defer' => 'percent',
+                                'step' => 'any',
+                            ])
+                        ->required(),
+
+                    Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
+                        ->fill(0)
+                        ->required(),
+
+                    Hidden::make('manual_profit')
+                        ->fill(0)
+                        ->setValue(0),
+
+                    Hidden::make('manual_accrual_type')
+                        ->fill(StakingTransactionAccrualEnum::Profit->value)
+                        ->setValue(StakingTransactionAccrualEnum::Profit->value),
+                ])
+                ->submit('Сохранить пакет'),
+        ]);
+    }
+
+    private function itcPackageManualProfitForm(ItcPackage $package): Block
+    {
+        return Block::make([
+            FormBuilder::make()
+                ->action("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}")
+                ->method('POST')
+                ->async()
+                ->fields([
+                    Number::make('Сумма будет начислена сверху на пакет', 'manual_profit')
+                        ->fill(0)
+                        ->customAttributes([
                             'step' => 'any',
                         ])
-                    ->required(),
+                        ->required(),
 
-                Number::make('Процент стартовой премии', 'start_bonus_staking_percent')
-                    ->fill($package->transaction->user->setting('start_bonus_staking_percent', app(GeneralSetting::class)->start_bonus_staking_percent))
-                    ->customAttributes(
-                        [
-                            'wire:model.defer' => 'percent',
-                            'step' => 'any',
-                        ])
-                    ->required(),
+                    Select::make('Тип начисления', 'manual_accrual_type')
+                        ->options($this->manualAccrualTypeOptions())
+                        ->default(StakingTransactionAccrualEnum::Profit->value)
+                        ->required(),
 
-                Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
-                    ->fill(0)
-                    ->required(),
+                    Hidden::make('profit_percent')
+                        ->fill($package->month_profit_percent)
+                        ->setValue($package->month_profit_percent),
 
-            ])
-            ->submit('Сохранить');
+                    Hidden::make('amount')
+                        ->fill(0)
+                        ->setValue(0),
+                ])
+                ->submit('Начислить профит'),
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function manualAccrualTypeOptions(): array
+    {
+        return [
+            StakingTransactionAccrualEnum::Profit->value => 'Начисление доходности',
+            StakingTransactionAccrualEnum::TopUpBonus->value => 'Начисление токенов',
+            StakingTransactionAccrualEnum::StartBonus->value => 'Стартовый бонус',
+            StakingTransactionAccrualEnum::PartnerBonus->value => 'Партнерский бонус',
+        ];
     }
 
     private function closePackageButton(array $item): ActionButton

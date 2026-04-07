@@ -14,6 +14,7 @@ use App\Services\Package\Staking\StakingAccrualService;
 use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -97,7 +98,7 @@ final class ItcStakingController extends Controller
             $package = ItcPackage::query()->findOrFail($request->input('package_id'));
 
             User::query()->findOrFail($request->input('user_id'))->setSettings([
-                'start_bonus_staking_percent' => $request->input('percent'),
+                'regular_staking_percent' => $request->input('percent'),
             ]);
 
             activity('packages')
@@ -109,6 +110,8 @@ final class ItcStakingController extends Controller
                     'package_type' => PackageTypeEnum::STAKING,
                 ])
                 ->log('admin_package_changed_staking_regular_percent');
+
+            return back();
         }
 
         $generalSetting->regular_staking_percent = $request->input('percent');
@@ -131,6 +134,13 @@ final class ItcStakingController extends Controller
      */
     public function editStaking(MoonShineRequest $request, string $uuid): MoonShineJsonResponse
     {
+        $request->validate([
+            'profit_percent' => ['required', 'numeric', 'min:0'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'manual_profit' => ['nullable', 'numeric', 'min:0'],
+            'manual_accrual_type' => ['nullable', Rule::enum(StakingTransactionAccrualEnum::class)],
+        ]);
+
         $transaction = Transaction::query()
             ->whereUuid($uuid)
             ->firstOrFail();
@@ -142,16 +152,28 @@ final class ItcStakingController extends Controller
 
         $oldAmount = $transaction->amount;
         $oldPercent = $package->month_profit_percent;
+        $manualProfit = round((float) $request->input('manual_profit', 0), 2);
+        $topUpAmount = round((float) $request->input('amount', 0), 2);
+        $manualAccrualType = StakingTransactionAccrualEnum::from(
+            (string) $request->input('manual_accrual_type', StakingTransactionAccrualEnum::Profit->value)
+        );
 
         $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $request->input('amount') / $exchangeRateItc;
+        $token = $topUpAmount / $exchangeRateItc;
 
-        $profit = $request->input('amount') - $token;
+        $profit = $topUpAmount - $token;
 
-        $transaction->increment('amount', $token);
+        if ($topUpAmount > 0) {
+            $transaction->increment('amount', $token);
 
-        new StakingAccrualService()
-            ->accrue($package, StakingTransactionAccrualEnum::TopUpBonus, $profit, $package->transaction->user_id);
+            new StakingAccrualService()
+                ->accrue($package, StakingTransactionAccrualEnum::TopUpBonus, $profit, $package->transaction->user_id);
+        }
+
+        if ($manualProfit > 0) {
+            new StakingAccrualService()
+                ->accrue($package, $manualAccrualType, $manualProfit, $package->transaction->user_id);
+        }
 
         $package->update([
             'month_profit_percent' => $request->input('profit_percent'),
@@ -165,7 +187,7 @@ final class ItcStakingController extends Controller
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $request->input('amount'),
+                    'amount' => $topUpAmount,
                     'old_amount' => $oldAmount,
                 ])
                 ->log('admin_package_changed_amount');
@@ -178,11 +200,24 @@ final class ItcStakingController extends Controller
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $request->input('amount'),
+                    'amount' => $topUpAmount,
                     'percent' => $oldPercent,
                     'old_percent' => $package->month_profit_percent,
                 ])
                 ->log('admin_package_changed_percentage');
+        }
+
+        if ($manualProfit > 0) {
+            activity('admin')
+                ->performedOn($package)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'package_uuid' => $transaction->uuid,
+                    'package_type' => PackageTypeEnum::STAKING,
+                    'amount' => $manualProfit,
+                    'accrual_type' => $manualAccrualType->value,
+                ])
+                ->log('admin_package_added_manual_profit');
         }
 
         $referer = request()->headers->get('referer', '');

@@ -48,7 +48,7 @@ final class Index extends Component
 
         $this->dispatch('bought');
 
-        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $accrual->amount + (float) $this->amount);
 
         $this->js('window.location.reload()');
     }
@@ -68,11 +68,11 @@ final class Index extends Component
             ->with(['itcPackage'])
             ->first();
 
-        new StakingAccrualService()->accrueTopUpStaking($transaction->itcPackage, (float) $this->amount, auth()->id());
+        $accrual = new StakingAccrualService()->accrueTopUpStaking($transaction->itcPackage, (float) $this->amount, auth()->id());
 
         $transaction->increment('amount', $this->amount);
 
-        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $this->amount);
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $accrual->amount + (float) $this->amount);
 
         $this->js('window.location.reload()');
     }

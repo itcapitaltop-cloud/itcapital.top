@@ -7,8 +7,9 @@ namespace App\Actions\Packages\ProfitAccural;
 use App\Contracts\ActionContract;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Helpers\Notify;
-use App\Models\Transaction;
+use App\Models\ItcPackage;
 use App\Services\Package\Staking\StakingAccrualService;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -19,27 +20,34 @@ final class ItcStaking implements ActionContract
      *
      * @throws \Throwable
      */
-    public function execute(): bool
+    public function execute(?CarbonInterface $asOf = null): bool
     {
-        DB::transaction(function () {
-            Transaction::query()
-                ->select(['id', 'uuid', 'amount', 'user_id'])
+        $asOf ??= now();
+
+        DB::transaction(function () use ($asOf) {
+            ItcPackage::query()
+                ->select(['id', 'uuid', 'month_profit_percent'])
                 ->with([
-                    'itcPackage' => function ($query) {
-                        $query->select(['id', 'uuid', 'month_profit_percent']);
+                    'transaction' => function ($query) {
+                        $query->select(['id', 'uuid', 'amount', 'user_id']);
                     },
-                    'user' => function ($query) {
+                    'transaction.user' => function ($query) {
                         $query->select(['id']);
                     },
                 ])
-                ->whereHas('itcPackage', function ($query) {
-                    $query->where('type', PackageTypeEnum::STAKING);
-                })
-                ->chunkById(100, function (Collection $transactions) {
-                    $transactions->each(function (Transaction $transaction) {
-                        $this->profitAccrual($transaction);
+                ->withSum('transaction as transaction_sum', 'amount')
+                ->withSum(
+                    ['stakingTransactionAccruals as staking_accruals_sum' => fn ($query) => $query
+                        ->select(DB::raw('COALESCE(SUM(amount),0) / 100'))
+                        ->where('created_at', '<=', $asOf)],
+                    'amount'
+                )
+                ->where('type', PackageTypeEnum::STAKING)
+                ->where('created_at', '<=', $asOf)
+                ->chunkById(100, function (Collection $packages) {
+                    $packages->each(function (ItcPackage $package) {
+                        $this->profitAccrual($package);
                     });
-
                 });
         });
 
@@ -47,14 +55,16 @@ final class ItcStaking implements ActionContract
     }
 
     /**
-     * @param \App\Models\Transaction $transaction
+     * @param \App\Models\ItcPackage $package
      * @return void
      */
-    private function profitAccrual(Transaction $transaction): void
+    private function profitAccrual(ItcPackage $package): void
     {
-        $accrual = new StakingAccrualService()
-            ->accrueProfit($transaction->itcPackage, (float) $transaction->amount, $transaction->user->id);
+        $packageAmount = round((float) ($package->transaction_sum ?? 0) + (float) ($package->staking_accruals_sum ?? 0), 2);
 
-        Notify::bonusStaking($transaction->user, $accrual->amount);
+        $accrual = new StakingAccrualService()
+            ->accrueProfit($package, $packageAmount, $package->transaction->user->id);
+
+        Notify::bonusStaking($package->transaction->user, $accrual->amount);
     }
 }
