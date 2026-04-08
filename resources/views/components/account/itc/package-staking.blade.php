@@ -94,17 +94,6 @@
             </div>
         </div>
 
-        <div class="flex justify-between items-center">
-            <span class="text-white/70 text-sm sm:text-base">
-                {{ __('component_livewire_account_itc_staking_statistic_total_profit_usd') }}
-            </span>
-            <div class="flex items-baseline gap-1">
-                <img src="{{ vite()->icon('/currency/itc.svg') }}" class="w-3 sm:w-4" alt="USD">
-                <span class="text-lg sm:text-xl font-semibold">
-                    {{ number_format((float) ($packagePerformance['total_profit_usd'] ?? 0), 2, '.', '') }}
-                </span>
-            </div>
-        </div>
     </div>
 
     {{-- ► Разделительная линия (горизонтальная на мобильных, внизу статистики) --}}

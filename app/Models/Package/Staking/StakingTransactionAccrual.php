@@ -18,6 +18,7 @@ final class StakingTransactionAccrual extends Model
         'itc_package_id',
         'user_id',
         'amount',
+        'accrual_rate',
         'type',
         'line',
         'source_user_id',
@@ -26,6 +27,7 @@ final class StakingTransactionAccrual extends Model
 
     protected $casts = [
         'amount' => MoneyCast::class,
+        'accrual_rate' => 'decimal:6',
         'type' => StakingTransactionAccrualEnum::class,
     ];
 

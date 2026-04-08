@@ -15,6 +15,7 @@ final class RegularPremiumPackageStrategy implements ActivityStrategyContract
             'amount' => $activity->getExtraProperty('amount', 0),
             'uuid' => $activity->getExtraProperty('package_uuid', 0),
             'username' => $activity->getExtraProperty('username', ''),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

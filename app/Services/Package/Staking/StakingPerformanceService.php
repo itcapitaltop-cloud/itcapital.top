@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Package\Staking;
 
 use App\Enums\Itc\StakingTransactionAccrualEnum;
+use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
+use App\Models\Package\Staking\StakingTransactionAccrual;
 use App\Models\StakingPurchase;
 use App\Services\Token\TokenRateResolver;
 use Illuminate\Support\Collection;
@@ -26,7 +28,6 @@ final class StakingPerformanceService
      *     current_value_usd: float,
      *     purchase_value_usd: float,
      *     unrealized_pnl_usd: float,
-     *     total_profit_usd: float,
      *     average_purchase_rate: float
      * }
      */
@@ -34,11 +35,12 @@ final class StakingPerformanceService
     {
         $package->loadMissing(['transaction', 'stakingPurchases', 'stakingTransactionAccruals']);
 
-        $purchases = $this->normalizePurchases($package->stakingPurchases);
+        $purchases = $this->resolvePurchases($package);
         $topUpBonuses = $package->stakingTransactionAccruals
             ->where('type', StakingTransactionAccrualEnum::TopUpBonus);
         $yieldAccruals = $package->stakingTransactionAccruals
             ->where('type', '!=', StakingTransactionAccrualEnum::TopUpBonus);
+        $accrualLots = $this->normalizeAccruals($yieldAccruals);
 
         $investedUsd = $purchases->isNotEmpty()
             ? round((float) $purchases->sum('amount_usd'), 2)
@@ -55,9 +57,14 @@ final class StakingPerformanceService
         $purchaseValueUsd = round($purchasedTokens * $currentRate, 2);
 
         if ($purchases->isNotEmpty()) {
-            $unrealizedPnlUsd = round((float) $purchases->sum(
+            $purchasePnlUsd = (float) $purchases->sum(
                 fn (array $purchase): float => $purchase['token_amount'] * ($currentRate - $purchase['purchase_rate'])
-            ), 2);
+            );
+            $accrualPnlUsd = (float) $accrualLots->sum(
+                fn (array $accrual): float => $accrual['token_amount'] * ($currentRate - $accrual['accrual_rate'])
+            );
+
+            $unrealizedPnlUsd = round($purchasePnlUsd + $accrualPnlUsd, 2);
         } else {
             $unrealizedPnlUsd = round($purchaseValueUsd - $investedUsd, 2);
         }
@@ -71,7 +78,6 @@ final class StakingPerformanceService
             'current_value_usd' => $currentValueUsd,
             'purchase_value_usd' => $purchaseValueUsd,
             'unrealized_pnl_usd' => $unrealizedPnlUsd,
-            'total_profit_usd' => round($currentValueUsd - $investedUsd, 2),
             'average_purchase_rate' => $purchasedTokens > 0
                 ? round($investedUsd / $purchasedTokens, 6)
                 : 0.0,
@@ -80,7 +86,7 @@ final class StakingPerformanceService
 
     /**
      * @param Collection<int, StakingPurchase> $purchases
-     * @return Collection<int, array{amount_usd: float, token_amount: float, purchase_rate: float}>
+     * @return Collection<int, array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null}>
      */
     private function normalizePurchases(Collection $purchases): Collection
     {
@@ -97,6 +103,7 @@ final class StakingPerformanceService
                     'amount_usd' => round($tokenAmount * $legacyRate, 2),
                     'token_amount' => $tokenAmount,
                     'purchase_rate' => round($legacyRate, 6),
+                    'purchased_at' => $purchase->purchased_at?->timestamp,
                 ];
             }
 
@@ -104,8 +111,126 @@ final class StakingPerformanceService
                 'amount_usd' => $amountUsd,
                 'token_amount' => $tokenAmount,
                 'purchase_rate' => $purchaseRate,
+                'purchased_at' => $purchase->purchased_at?->timestamp,
             ];
         });
+    }
+
+    /**
+     * @param Collection<int, StakingTransactionAccrual> $accruals
+     * @return Collection<int, array{token_amount: float, accrual_rate: float}>
+     */
+    private function normalizeAccruals(Collection $accruals): Collection
+    {
+        $ratesByDate = [];
+
+        return $accruals
+            ->map(function (StakingTransactionAccrual $accrual) use (&$ratesByDate): array {
+                $tokenAmount = round((float) $accrual->amount, 2);
+                $accrualDate = $accrual->created_at?->toDateString() ?? now()->toDateString();
+                $accrualRate = $accrual->accrual_rate !== null
+                    ? round((float) $accrual->accrual_rate, 6)
+                    : ($ratesByDate[$accrualDate] ??= round(
+                        $this->tokenRateResolver->rateForDate($accrual->created_at),
+                        6
+                    ));
+
+                return [
+                    'token_amount' => $tokenAmount,
+                    'accrual_rate' => $accrualRate,
+                ];
+            })
+            ->filter(fn (array $accrual): bool => $accrual['token_amount'] > 0)
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null}>
+     */
+    private function resolvePurchases(ItcPackage $package): Collection
+    {
+        $purchases = $this->normalizePurchases($package->stakingPurchases);
+        $missingInvestedAmount = round((float) ($package->transaction?->amount ?? 0) - (float) $purchases->sum('amount_usd'), 2);
+
+        if ($missingInvestedAmount <= 0.01) {
+            return $purchases;
+        }
+
+        return $purchases->merge($this->recoverMissingPurchasesFromActivity($package, $purchases, $missingInvestedAmount));
+    }
+
+    /**
+     * @param Collection<int, array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null}> $purchases
+     * @return Collection<int, array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null}>
+     */
+    private function recoverMissingPurchasesFromActivity(
+        ItcPackage $package,
+        Collection $purchases,
+        float $missingInvestedAmount,
+    ): Collection {
+        $activityPurchases = BusinessActivity::query()
+            ->where('subject_type', ItcPackage::class)
+            ->where('subject_id', $package->id)
+            ->where('description', 'top_up_package')
+            ->orderBy('created_at')
+            ->get()
+            ->map(function (BusinessActivity $activity): array {
+                $tokenAmount = round((float) $activity->getExtraProperty('amount', 0), 2);
+                $purchaseRate = round((float) $activity->getExtraProperty('exchange_rate', 0), 6);
+
+                return [
+                    'amount_usd' => round($tokenAmount * $purchaseRate, 2),
+                    'token_amount' => $tokenAmount,
+                    'purchase_rate' => $purchaseRate,
+                    'purchased_at' => $activity->created_at?->timestamp,
+                ];
+            })
+            ->filter(fn (array $purchase): bool => $purchase['amount_usd'] > 0 && $purchase['token_amount'] > 0)
+            ->values();
+
+        foreach ($purchases as $purchase) {
+            $matchedIndex = $activityPurchases->search(
+                fn (array $activityPurchase): bool => $this->isSamePurchase($purchase, $activityPurchase)
+            );
+
+            if ($matchedIndex !== false) {
+                $activityPurchases->forget($matchedIndex);
+                $activityPurchases = $activityPurchases->values();
+            }
+        }
+
+        $recoveredPurchases = collect();
+
+        foreach ($activityPurchases as $activityPurchase) {
+            if ($missingInvestedAmount <= 0.01) {
+                break;
+            }
+
+            if ($activityPurchase['amount_usd'] - $missingInvestedAmount > 0.01) {
+                continue;
+            }
+
+            $recoveredPurchases->push($activityPurchase);
+            $missingInvestedAmount = round($missingInvestedAmount - $activityPurchase['amount_usd'], 2);
+        }
+
+        return $recoveredPurchases;
+    }
+
+    /**
+     * @param array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null} $left
+     * @param array{amount_usd: float, token_amount: float, purchase_rate: float, purchased_at: int|null} $right
+     */
+    private function isSamePurchase(array $left, array $right): bool
+    {
+        $timestampsMatch = $left['purchased_at'] === null
+            || $right['purchased_at'] === null
+            || abs($left['purchased_at'] - $right['purchased_at']) <= 60;
+
+        return $timestampsMatch
+            && abs($left['amount_usd'] - $right['amount_usd']) <= 0.01
+            && abs($left['token_amount'] - $right['token_amount']) <= 0.01
+            && abs($left['purchase_rate'] - $right['purchase_rate']) <= 0.000001;
     }
 
     private function isLegacyBackfilledPurchase(
@@ -136,7 +261,6 @@ final class StakingPerformanceService
      *     current_value_usd: float,
      *     purchase_value_usd: float,
      *     unrealized_pnl_usd: float,
-     *     total_profit_usd: float,
      *     average_purchase_rate: float
      * }
      */
@@ -156,7 +280,6 @@ final class StakingPerformanceService
             'current_value_usd' => round((float) $summary->sum('current_value_usd'), 2),
             'purchase_value_usd' => round((float) $summary->sum('purchase_value_usd'), 2),
             'unrealized_pnl_usd' => round((float) $summary->sum('unrealized_pnl_usd'), 2),
-            'total_profit_usd' => round((float) $summary->sum('total_profit_usd'), 2),
             'average_purchase_rate' => $purchasedTokens > 0
                 ? round($investedUsd / $purchasedTokens, 6)
                 : 0.0,

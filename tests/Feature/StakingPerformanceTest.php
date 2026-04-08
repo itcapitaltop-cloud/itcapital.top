@@ -57,8 +57,73 @@ it('calculates staking performance with rate history and multiple purchases', fu
         ->and($performance['yield_tokens'])->toBe(500.0)
         ->and($performance['total_tokens'])->toBe(20500.0)
         ->and($performance['unrealized_pnl_usd'])->toBe(200.0)
-        ->and($performance['current_value_usd'])->toBe(2460.0)
-        ->and($performance['total_profit_usd'])->toBe(260.0);
+        ->and($performance['current_value_usd'])->toBe(2460.0);
+});
+
+it('includes accruals with their own historical rates in unrealized pnl', function () {
+    Carbon::setTestNow('2026-03-15 10:00:00');
+
+    $settings = app(GeneralSetting::class);
+    $settings->exchange_rate_itc = 0.10;
+    $settings->save();
+
+    TokenRate::query()->delete();
+    app(TokenRateResolver::class)->upsertRate('2026-03-01', 0.10);
+
+    $user = User::factory()->create();
+
+    $package = app(StakingPurchaseService::class)->createPackage($user->id, 10);
+
+    Carbon::setTestNow('2026-04-02 10:00:00');
+    app(TokenRateResolver::class)->upsertRate('2026-04-01', 0.12);
+    app(StakingPurchaseService::class)->addPurchase($package->fresh(), 10, $user->id);
+
+    Carbon::setTestNow('2026-05-01 10:00:00');
+    app(TokenRateResolver::class)->upsertRate('2026-05-01', 0.13);
+    app(StakingAccrualService::class)->accrue(
+        $package->fresh(),
+        StakingTransactionAccrualEnum::Profit,
+        3.66,
+        $user->id
+    );
+
+    Carbon::setTestNow('2026-05-10 10:00:00');
+    app(TokenRateResolver::class)->upsertRate('2026-05-10', 0.14);
+    app(StakingAccrualService::class)->accrue(
+        $package->fresh(),
+        StakingTransactionAccrualEnum::StartBonus,
+        1.50,
+        $user->id
+    );
+
+    Carbon::setTestNow('2026-05-20 10:00:00');
+    app(TokenRateResolver::class)->upsertRate('2026-05-20', 0.15);
+    app(StakingAccrualService::class)->accrue(
+        $package->fresh(),
+        StakingTransactionAccrualEnum::PartnerBonus,
+        2.25,
+        $user->id
+    );
+
+    Carbon::setTestNow('2026-06-01 10:00:00');
+    app(TokenRateResolver::class)->upsertRate('2026-06-01', 0.16);
+
+    $package = ItcPackage::query()
+        ->whereKey($package->id)
+        ->with(['transaction', 'stakingPurchases', 'stakingTransactionAccruals'])
+        ->firstOrFail();
+
+    $performance = app(StakingPerformanceService::class)->forPackage($package);
+
+    expect($performance['invested_usd'])->toBe(20.0)
+        ->and($performance['purchased_tokens'])->toBe(183.33)
+        ->and($performance['yield_tokens'])->toBe(7.41)
+        ->and($performance['total_tokens'])->toBe(190.74)
+        ->and($performance['current_value_usd'])->toBe(30.52)
+        ->and($performance['unrealized_pnl_usd'])->toBe(9.5)
+        ->and((float) $package->stakingTransactionAccruals->firstWhere('type', StakingTransactionAccrualEnum::Profit)?->accrual_rate)->toBe(0.13)
+        ->and((float) $package->stakingTransactionAccruals->firstWhere('type', StakingTransactionAccrualEnum::StartBonus)?->accrual_rate)->toBe(0.14)
+        ->and((float) $package->stakingTransactionAccruals->firstWhere('type', StakingTransactionAccrualEnum::PartnerBonus)?->accrual_rate)->toBe(0.15);
 });
 
 afterEach(function () {

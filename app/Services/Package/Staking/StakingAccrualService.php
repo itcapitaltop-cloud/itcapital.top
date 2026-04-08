@@ -77,7 +77,9 @@ final class StakingAccrualService
 
     public function accrueStartBonus(ItcPackage $package, float $amount, int $ancestorId, int $buyerId): StakingTransactionAccrual
     {
-        return DB::transaction(function () use ($package, $ancestorId, $buyerId, $amount) {
+        $currentRate = app(TokenRateResolver::class)->currentRate();
+
+        return DB::transaction(function () use ($package, $ancestorId, $buyerId, $amount, $currentRate) {
             activity('package')
                 ->performedOn($package)
                 ->causedBy($ancestorId)
@@ -85,6 +87,7 @@ final class StakingAccrualService
                     'username' => User::query()->findOrFail($buyerId)->username,
                     'uuid' => $package->uuid,
                     'amount' => $amount,
+                    'exchange_rate' => $currentRate,
                     'package_type' => PackageTypeEnum::STAKING,
                 ])
                 ->log('start_bonus_package');
@@ -94,6 +97,7 @@ final class StakingAccrualService
                 StakingTransactionAccrualEnum::StartBonus,
                 $amount,
                 $ancestorId,
+                accrualRate: $currentRate,
             );
         });
     }
@@ -101,8 +105,9 @@ final class StakingAccrualService
     public function accrueProfit(ItcPackage $package, float $amount, int $userId): StakingTransactionAccrual
     {
         $profit = round(($amount / 100) * $package->month_profit_percent, 2);
+        $currentRate = app(TokenRateResolver::class)->currentRate();
 
-        return DB::transaction(function () use ($package, $profit, $userId) {
+        return DB::transaction(function () use ($package, $profit, $userId, $currentRate) {
             $balanceStaking = ItcPackage::query()
                 ->active(PackageTypeEnum::STAKING)
                 ->whereHas('transaction', fn ($query) => $query->where('user_id', $userId))
@@ -118,6 +123,7 @@ final class StakingAccrualService
                     'percent' => $package->month_profit_percent,
                     'uuid' => $package->uuid,
                     'amount' => $balanceStaking,
+                    'exchange_rate' => $currentRate,
                     'package_type' => PackageTypeEnum::STAKING,
                 ])
                 ->log('profit_accrued');
@@ -127,6 +133,7 @@ final class StakingAccrualService
                 StakingTransactionAccrualEnum::Profit,
                 $profit,
                 $userId,
+                accrualRate: $currentRate,
             );
         });
     }
@@ -138,7 +145,9 @@ final class StakingAccrualService
         ?int $sourceUser = null,
         ?int $line = null,
     ): StakingTransactionAccrual {
-        return DB::transaction(function () use ($package, $amount, $userId, $sourceUser, $line) {
+        $currentRate = app(TokenRateResolver::class)->currentRate();
+
+        return DB::transaction(function () use ($package, $amount, $userId, $sourceUser, $line, $currentRate) {
             $user = User::query()->findOrFail($sourceUser);
 
             activity('packages')
@@ -148,6 +157,7 @@ final class StakingAccrualService
                     'username' => User::query()->findOrFail($userId)->username,
                     'amount' => $amount,
                     'package_uuid' => $package->uuid,
+                    'exchange_rate' => $currentRate,
                     'package_type' => PackageTypeEnum::STAKING,
                 ])
                 ->log('regular_premium_package');
@@ -158,7 +168,8 @@ final class StakingAccrualService
                 $amount,
                 $userId,
                 $sourceUser,
-                $line
+                $line,
+                $currentRate,
             );
         });
     }
@@ -170,11 +181,13 @@ final class StakingAccrualService
         int $userId,
         ?int $sourceUser = null,
         ?int $line = null,
+        ?float $accrualRate = null,
     ): StakingTransactionAccrual {
         return $package->stakingTransactionAccruals()->create([
             'user_id' => $userId,
             'type' => $type,
             'amount' => $amount,
+            'accrual_rate' => $accrualRate,
             'source_user_id' => $sourceUser,
             'line' => $line,
         ]);

@@ -15,6 +15,7 @@ final class PackageProfitAccruedStrategy implements ActivityStrategyContract
             'profit' => $activity->getExtraProperty('profit', 0),
             'uuid' => $activity->getExtraProperty('uuid', 0),
             'amount' => $activity->getExtraProperty('amount', 0),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

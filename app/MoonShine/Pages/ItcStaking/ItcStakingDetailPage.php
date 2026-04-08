@@ -115,9 +115,6 @@ class ItcStakingDetailPage extends DetailPage
                             Number::make('Нереализованный P&L USD', formatted: function (array $package): float {
                                 return round((float) data_get($package, 'performance.unrealized_pnl_usd', 0), 2);
                             }),
-                            Number::make('Общая прибыль USD', formatted: function (array $package): float {
-                                return round((float) data_get($package, 'performance.total_profit_usd', 0), 2);
-                            }),
                             Number::make('Процент прибыли', 'month_profit_percent', formatted: function (array $package): string {
                                 return $package['month_profit_percent'] . '%';
                             }),

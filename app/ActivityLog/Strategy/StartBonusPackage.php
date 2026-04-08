@@ -15,6 +15,7 @@ final class StartBonusPackage implements ActivityStrategyContract
             'amount' => $activity->getExtraProperty('amount', 0),
             'uuid' => $activity->getExtraProperty('uuid', 0),
             'username' => $activity->getExtraProperty('username', ''),
+            'exchange_rate' => $activity->getExtraProperty('exchange_rate', 0.1),
         ]);
     }
 }

@@ -11,8 +11,6 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
-use App\Models\Transaction;
-use App\Services\Package\Staking\StakingAccrualService;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Services\Package\Staking\StakingPurchaseService;
 use App\Services\User\StakingStartBonusAccrualService;
@@ -38,8 +36,7 @@ final class Index extends Component
     {
         $this->validate();
 
-        $package = app(StakingPurchaseService::class)
-            ->createPackage(auth()->id(), (float) $this->amount);
+        $package = app(StakingPurchaseService::class)->createPackage(auth()->id(), (float) $this->amount);
 
         $purchase = $package->stakingPurchases()->latest('id')->firstOrFail();
 
@@ -47,7 +44,7 @@ final class Index extends Component
 
         $this->dispatch('bought');
 
-        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $accrual->amount + (float) $this->amount);
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $purchase->token_amount);
 
         $this->js('window.location.reload()');
     }
@@ -59,24 +56,21 @@ final class Index extends Component
     {
         $this->validate();
 
-        $transaction = Transaction::query()
-            ->where('user_id', auth()->id())
-            ->whereHas('itcPackage', function ($query) {
-                $query->where('type', PackageTypeEnum::STAKING);
+        $package = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', function ($query) {
+                $query->where('user_id', auth()->id());
             })
-            ->with(['itcPackage'])
-            ->first();
+            ->firstOrFail();
 
-        $accrual = new StakingAccrualService()->accrueTopUpStaking($transaction->itcPackage, (float) $this->amount, auth()->id());
+        $purchase = app(StakingPurchaseService::class)->addPurchase($package, (float) $this->amount, auth()->id());
 
-        $transaction->increment('amount', $this->amount);
-
-        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $accrual->amount + (float) $this->amount);
+        new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $purchase->token_amount);
 
         $this->js('window.location.reload()');
     }
 
-    protected function rules(): mixed
+    protected function rules(): array
     {
         return [
             'amount' => [

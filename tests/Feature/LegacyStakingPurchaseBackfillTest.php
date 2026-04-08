@@ -73,7 +73,6 @@ it('normalizes legacy staking purchases in performance calculations', function (
         ->and($performance['yield_tokens'])->toBe(1.7)
         ->and($performance['current_value_usd'])->toBe(10.4)
         ->and($performance['unrealized_pnl_usd'])->toBe(1.7)
-        ->and($performance['total_profit_usd'])->toBe(1.9)
         ->and($performance['average_purchase_rate'])->toBe(0.1);
 });
 
