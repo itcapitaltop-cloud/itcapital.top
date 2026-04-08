@@ -100,7 +100,7 @@ final class StakingAccrualService
 
     public function accrueProfit(ItcPackage $package, float $amount, int $userId): StakingTransactionAccrual
     {
-        $profit = ($amount / 100) * $package->month_profit_percent;
+        $profit = round(($amount / 100) * $package->month_profit_percent, 2);
 
         return DB::transaction(function () use ($package, $profit, $userId) {
             $balanceStaking = ItcPackage::query()
@@ -145,7 +145,7 @@ final class StakingAccrualService
                 ->performedOn($package)
                 ->causedBy($user)
                 ->withProperties([
-                    'username' => $user->username,
+                    'username' => User::query()->findOrFail($userId)->username,
                     'amount' => $amount,
                     'package_uuid' => $package->uuid,
                     'package_type' => PackageTypeEnum::STAKING,

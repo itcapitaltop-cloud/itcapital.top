@@ -11,7 +11,6 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Package\Staking\StakingAccrualService;
-use App\Services\Token\TokenRateResolver;
 use App\Settings\GeneralSetting;
 
 final class StakingStartBonusAccrualService implements StartBonusAccrualContract
@@ -41,9 +40,7 @@ final class StakingStartBonusAccrualService implements StartBonusAccrualContract
             return;
         }
 
-        $generalSettings = round(1 / app(TokenRateResolver::class)->currentRate(), 2);
-
-        $reward = (float) ($packageAmount / 100 * $generalSettings);
+        $reward = (float) ($packageAmount / 100 * $percent);
 
         if ($reward <= 0) {
             return;
