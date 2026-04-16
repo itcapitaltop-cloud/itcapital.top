@@ -4,15 +4,18 @@ use App\Contracts\Logs\LogRepositoryContract;
 use App\Dto\Activity\WriteBusinessActivityData;
 use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
+use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\CurrencyEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\BusinessActivity;
 use App\Models\Deposit;
+use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
+use App\Services\Package\Staking\StakingPurchaseService;
 use Illuminate\Support\Facades\Artisan;
 
 it('строит finance feed из activity log', function () {
@@ -154,4 +157,58 @@ it('делает finance backfill идемпотентным', function () {
         ->where('user_id', $user->id)
         ->where('description', ActivityEventTypeEnum::DepositApproved->value)
         ->count())->toBe(1);
+});
+
+it('не подмешивает legacy курс в описание покупки обычного пакета', function () {
+    $user = User::factory()->create();
+
+    $package = ItcPackage::query()->create([
+        'uuid' => 'PKG-LOG-001',
+        'work_to' => now()->addWeeks(30),
+        'type' => PackageTypeEnum::STANDARD,
+        'month_profit_percent' => '8.2',
+    ]);
+
+    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+        type: ActivityEventTypeEnum::PackagePurchased,
+        userId: $user->id,
+        subject: $package,
+        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+        properties: [
+            'amount' => '250.00',
+            'package_uuid' => $package->uuid,
+            'package_type' => $package->type->value,
+        ],
+        causer: $user,
+        logName: 'packages',
+        context: 'account',
+    ));
+
+    $activity = BusinessActivity::query()
+        ->where('description', ActivityEventTypeEnum::PackagePurchased->value)
+        ->latest('id')
+        ->firstOrFail();
+
+    $text = app(\App\ActivityLog\ActivityManager::class)->resolve($activity);
+
+    expect($text)->toContain('Куплен пакет PKG-LOG-001 на сумму 250.00 ITC')
+        ->and(mb_stripos($text, 'курс'))->toBeFalse();
+});
+
+it('пишет staking покупку в новый business activity log', function () {
+    $user = User::factory()->create();
+
+    $package = app(StakingPurchaseService::class)->createPackage($user->id, 100);
+
+    $activity = BusinessActivity::query()
+        ->where('description', ActivityEventTypeEnum::StakingPackagePurchased->value)
+        ->where('user_id', $user->id)
+        ->latest('id')
+        ->first();
+
+    expect($package->type)->toBe(PackageTypeEnum::STAKING)
+        ->and($activity)->not->toBeNull()
+        ->and($activity?->getExtraProperty('package_uuid'))->toBe($package->uuid)
+        ->and($activity?->getExtraProperty('amount'))->toBe('100')
+        ->and($activity?->getExtraProperty('feeds'))->toContain(ActivityFeedTypeEnum::Staking->value);
 });

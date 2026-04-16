@@ -647,7 +647,7 @@
     "livewire_finance_log_title": "历史记录",
     "livewire_finance_log_date_header": "日期",
     "livewire_finance_log_amount_header": "金额",
-    "livewire_finance_log_type_header": "类型",
+    "livewire_finance_log_type_header": "描述",
     "livewire_finance_log_status_header": "状态",
     "livewire_finance_log_empty": "暂无交易记录",
     "livewire_finance_notification_copy_success": "链接已复制到剪贴板",

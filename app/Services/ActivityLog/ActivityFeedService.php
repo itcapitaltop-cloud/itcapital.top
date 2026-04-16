@@ -7,10 +7,12 @@ namespace App\Services\ActivityLog;
 use App\ActivityLog\ActivityManager;
 use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
+use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\LogActionTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\BusinessActivity;
 use App\Models\Deposit;
+use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\Withdraw;
 use Illuminate\Database\Eloquent\Builder;
@@ -74,7 +76,7 @@ final class ActivityFeedService
      */
     public function userDetailUserFeed(int $userId, int $limit = 200): array
     {
-        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $limit)
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $limit)
             ->get()
             ->map(function (BusinessActivity $activity): array {
                 $amount = $activity->getExtraProperty('amount');
@@ -98,7 +100,7 @@ final class ActivityFeedService
      */
     public function userDetailAdminFeed(int $userId, int $limit = 200): array
     {
-        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin, $limit)
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin, $limit)
             ->get()
             ->map(function (BusinessActivity $activity): array {
                 $oldValues = collect((array) $activity->getExtraProperty('old_values', []));
@@ -119,8 +121,8 @@ final class ActivityFeedService
 
                 return [
                     'action' => $this->adminActionLabel($activity),
-                    'old_values' => $oldValues->map(static fn (mixed $value): string => (string) $value)->implode("\n"),
-                    'new_values' => $newValues->map(static fn (mixed $value): string => (string) $value)->implode("\n"),
+                    'old_values' => $oldValues->map(fn (mixed $value): string => $this->formatDisplayValue($value))->implode("\n"),
+                    'new_values' => $newValues->map(fn (mixed $value): string => $this->formatDisplayValue($value))->implode("\n"),
                     'operation_amount' => $oldValues
                         ->map(function (mixed $oldValue, string|int $key) use ($newValues): string {
                             $newValue = $newValues->get((string) $key);
@@ -203,6 +205,38 @@ final class ActivityFeedService
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit);
+    }
+
+    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed, int $limit): Builder
+    {
+        return $this->baseFeedQuery($userId, $feed, $limit)
+            ->where(function (Builder $query): void {
+                $query
+                    ->where('properties->package_type', '!=', PackageTypeEnum::STAKING->value)
+                    ->orWhereNull('properties->package_type');
+            })
+            ->whereNotIn('description', [
+                ActivityEventTypeEnum::StakingPackagePurchased->value,
+                ActivityEventTypeEnum::StakingPackageToppedUp->value,
+                ActivityEventTypeEnum::StakingProfitAccrued->value,
+                ActivityEventTypeEnum::StakingRegularBonusReceived->value,
+                ActivityEventTypeEnum::StakingStartBonusReceived->value,
+            ])
+            ->where(function (Builder $query): void {
+                $query
+                    ->where('subject_type', '!=', ItcPackage::class)
+                    ->orWhereNotIn('description', [
+                        'top_up_package',
+                        'profit_accrued',
+                        'start_bonus_package',
+                        'regular_premium_package',
+                        'admin_package_purchased',
+                        'admin_package_changed_amount',
+                        'admin_package_changed_percentage',
+                        'admin_package_added_manual_profit',
+                        'admin_package_staking_changed_percentage',
+                    ]);
+            });
     }
 
     private function financeArrow(BusinessActivity $activity): string
@@ -381,5 +415,14 @@ final class ActivityFeedService
     private function formatAmount(string $amount): string
     {
         return number_format((float) $amount, 2, '.', '');
+    }
+
+    private function formatDisplayValue(mixed $value): string
+    {
+        if (is_numeric($value)) {
+            return $this->formatAmount((string) $value);
+        }
+
+        return (string) $value;
     }
 }

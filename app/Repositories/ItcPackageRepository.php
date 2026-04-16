@@ -190,11 +190,14 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
                 type: ActivityEventTypeEnum::PackageClosed,
                 userId: $userId,
                 subject: $package,
-                feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                feeds: $oldType === PackageTypeEnum::STAKING
+                    ? [ActivityFeedTypeEnum::Staking, ActivityFeedTypeEnum::UserDetailUser]
+                    : [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
                 properties: [
                     'amount' => (string) $amount,
                     'package_uuid' => $package->uuid,
-                    'package_type' => $package->type->value,
+                    'package_type' => $oldType->value,
+                    'new_package_type' => $package->type->value,
                 ],
                 causer: auth()->user(),
                 logName: 'packages',

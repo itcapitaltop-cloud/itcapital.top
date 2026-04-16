@@ -376,31 +376,31 @@
 
     <x-slot name="log">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-white whitespace-nowrap">
+            <table class="w-full text-left text-white">
                 <thead class="text-white">
                     <tr class="border-none font-dela text-[16px] leading-[40px]">
-                        <th class="py-2 pr-4">{{ __('livewire_finance_log_date_header') }}</th>
-                        <th class="py-2 pr-4">{{ __('livewire_finance_log_amount_header') }}</th>
+                        <th class="py-2 pr-4 whitespace-nowrap">{{ __('livewire_finance_log_date_header') }}</th>
+                        <th class="py-2 pr-4 whitespace-nowrap">{{ __('livewire_finance_log_amount_header') }}</th>
                         <th class="py-2 pr-4">{{ __('livewire_finance_log_type_header') }}</th>
-                        <th class="py-2">{{ __('livewire_finance_log_status_header') }}</th>
+                        <th class="py-2 whitespace-nowrap">{{ __('livewire_finance_log_status_header') }}</th>
                     </tr>
                 </thead>
                 <tbody class="font-semibold text-[16px]">
                     @forelse($operations as $op)
                         <tr class="border-none">
-                            <td class="py-2 pr-4">
+                            <td class="py-2 pr-4 whitespace-nowrap">
                                 {{ $op['created_at']->format('d.m.Y, H:i') }}
                             </td>
-                            <td class="py-2 pr-4">
+                            <td class="py-2 pr-4 whitespace-nowrap">
                                 ${{ number_format($op['amount']) }}
                             </td>
-                            <td class="py-2 pr-4">
+                            <td class="py-2 pr-4 whitespace-normal break-words">
                                 <img src="{{ vite()->icon($op['arrow'] === 'down' ? '/advantages/arrow-down.svg' : '/advantages/arrow-up.svg') }}"
-                                    class="inline-block mr-1 align-middle"
+                                    class="inline-block mr-1 align-middle shrink-0"
                                     alt="{{ $op['arrow'] === 'down' ? '↓' : '↑' }}" />
                                 {{ $op['type'] }}
                             </td>
-                            <td class="py-2 pl-4">
+                            <td class="py-2 pl-4 whitespace-nowrap">
                                 {{ $op['status'] }}
                             </td>
                         </tr>

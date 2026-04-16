@@ -647,7 +647,7 @@
     "livewire_finance_log_title": "Журнал",
     "livewire_finance_log_date_header": "Дата",
     "livewire_finance_log_amount_header": "Сумма",
-    "livewire_finance_log_type_header": "Тип",
+    "livewire_finance_log_type_header": "Описание",
     "livewire_finance_log_status_header": "Статус",
     "livewire_finance_log_empty": "Операций пока нет",
     "livewire_finance_notification_copy_success": "Ссылка скопирована в буфер",

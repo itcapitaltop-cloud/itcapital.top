@@ -12,7 +12,12 @@ final class AdminPackageStakingPercentStrategy implements ActivityStrategyContra
     public function handle(Activity $activity): string
     {
         return __('activity/admin.admin_package_staking_changed_percentage', [
-            'percent' => $activity->getExtraProperty('percent', 2),
+            'percent' => $this->formatDecimal($activity->getExtraProperty('percent', 2)),
         ]);
+    }
+
+    private function formatDecimal(mixed $value): string
+    {
+        return number_format((float) $value, 2, '.', '');
     }
 }

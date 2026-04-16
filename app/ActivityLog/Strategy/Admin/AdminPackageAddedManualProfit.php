@@ -18,7 +18,7 @@ final class AdminPackageAddedManualProfit implements ActivityStrategyContract
 
         return __('activity/admin.admin_package_added_manual_profit', [
             'uuid' => $activity->getExtraProperty('package_uuid', ''),
-            'amount' => $activity->getExtraProperty('amount', 0),
+            'amount' => $this->formatDecimal($activity->getExtraProperty('amount', 0)),
             'accrual_type' => $this->resolveAccrualTypeLabel($accrualType),
         ]);
     }
@@ -31,5 +31,10 @@ final class AdminPackageAddedManualProfit implements ActivityStrategyContract
             StakingTransactionAccrualEnum::TopUpBonus => __('activity/admin.staking_accrual_type_topup_bonus'),
             StakingTransactionAccrualEnum::Profit, null => __('activity/admin.staking_accrual_type_profit'),
         };
+    }
+
+    private function formatDecimal(mixed $value): string
+    {
+        return number_format((float) $value, 2, '.', '');
     }
 }

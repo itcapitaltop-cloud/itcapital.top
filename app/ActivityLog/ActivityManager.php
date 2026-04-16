@@ -14,6 +14,12 @@ final class ActivityManager
 {
     public function resolve(Activity $activity): string
     {
+        $activityEventType = ActivityEventTypeEnum::tryFrom($activity->description);
+
+        if ($activityEventType !== null) {
+            return $this->resolveBusinessEvent($activity, $activityEventType);
+        }
+
         $strategies = config('activity.strategies');
         $strategyClass = $strategies[$activity->description] ?? null;
 
@@ -22,12 +28,6 @@ final class ActivityManager
             $strategy = app($strategyClass);
 
             return $strategy->handle($activity);
-        }
-
-        $activityEventType = ActivityEventTypeEnum::tryFrom($activity->description);
-
-        if ($activityEventType !== null) {
-            return $this->resolveBusinessEvent($activity, $activityEventType);
         }
 
         $adminAction = LogActionTypeEnum::tryFrom($activity->description);
@@ -53,6 +53,11 @@ final class ActivityManager
             ?? '');
         $line = $activity->getExtraProperty('line');
         $profit = $this->formatAmount($activity->getExtraProperty('profit', $activity->getExtraProperty('amount')));
+        $stakingTokenAmount = $this->formatAmount(
+            $activity->getExtraProperty('token_amount', $activity->getExtraProperty('amount'))
+        );
+        $stakingPurchaseRate = $this->formatRate($activity->getExtraProperty('purchase_rate'));
+        $stakingExchangeRate = $this->formatRate($activity->getExtraProperty('exchange_rate'));
 
         return match ($type) {
             ActivityEventTypeEnum::DepositRequested => "Создана заявка на ввод {$financeDetails} на сумму {$amount}",
@@ -62,7 +67,9 @@ final class ActivityManager
             ActivityEventTypeEnum::WithdrawApproved => "Заявка на вывод {$financeDetails} на сумму {$amount} одобрена",
             ActivityEventTypeEnum::WithdrawRejected => "Заявка на вывод {$financeDetails} на сумму {$amount} отклонена",
             ActivityEventTypeEnum::PackagePurchased => "Куплен пакет {$packageUuid} на сумму {$amount} ITC",
-            ActivityEventTypeEnum::PackageClosed => "Пакет {$packageUuid} закрыт",
+            ActivityEventTypeEnum::PackageClosed => $activity->getExtraProperty('package_type') === 'staking'
+                ? "Пакет стейкинга {$packageUuid} закрыт"
+                : "Пакет {$packageUuid} закрыт",
             ActivityEventTypeEnum::PackageToppedUp => "В пакет {$packageUuid} добавлена сумма {$amount} ITC",
             ActivityEventTypeEnum::PackageProfitAccrued => "Получена доходность {$amount} ITC на пакет {$packageUuid}",
             ActivityEventTypeEnum::PackageProfitWithdrawn => "С пакета {$packageUuid} выведена доходность {$amount} ITC на баланс",
@@ -80,15 +87,26 @@ final class ActivityManager
             ActivityEventTypeEnum::PartnerTransferSent => "Партнеру @{$username} переведена сумма {$amount} ITC с партнерского баланса",
             ActivityEventTypeEnum::PartnerTransferReceived => "Получена сумма {$amount} ITC от партнера @{$username} на основной баланс",
             ActivityEventTypeEnum::RegularBonusTransferredToPartner => "Сумма {$amount} ITC переведена с баланса регулярной премии на партнерский баланс",
-            ActivityEventTypeEnum::StakingPackagePurchased => "Куплен пакет стейкинга {$packageUuid} на сумму {$amount} ITC",
-            ActivityEventTypeEnum::StakingPackageToppedUp => "В пакет стейкинга {$packageUuid} добавлена сумма {$amount} ITC",
-            ActivityEventTypeEnum::StakingProfitAccrued => "Получена доходность {$profit} ITC на пакет стейкинга {$packageUuid}",
+            ActivityEventTypeEnum::StakingPackagePurchased => "Куплен пакет стейкинга {$packageUuid} на {$stakingTokenAmount} ITC{$stakingPurchaseRate}",
+            ActivityEventTypeEnum::StakingPackageToppedUp => "В пакет стейкинга {$packageUuid} добавлено {$stakingTokenAmount} ITC{$stakingPurchaseRate}",
+            ActivityEventTypeEnum::StakingProfitAccrued => "Получена доходность {$profit} ITC на пакет стейкинга {$packageUuid}{$stakingExchangeRate}",
         };
     }
 
     private function formatAmount(mixed $amount): string
     {
         return number_format((float) $amount, 2, '.', '');
+    }
+
+    private function formatRate(mixed $rate): string
+    {
+        if (! is_numeric($rate)) {
+            return '';
+        }
+
+        $formattedRate = rtrim(rtrim(number_format((float) $rate, 6, '.', ''), '0'), '.');
+
+        return ' при курсе ' . $formattedRate;
     }
 
     private function resolveFinanceDetails(Activity $activity, string $currency): string

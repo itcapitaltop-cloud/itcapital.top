@@ -647,7 +647,7 @@
     "livewire_finance_log_title": "History",
     "livewire_finance_log_date_header": "Date",
     "livewire_finance_log_amount_header": "Amount",
-    "livewire_finance_log_type_header": "Type",
+    "livewire_finance_log_type_header": "Description",
     "livewire_finance_log_status_header": "Status",
     "livewire_finance_log_empty": "No transactions yet",
     "livewire_finance_notification_copy_success": "Link copied to clipboard",

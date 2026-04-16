@@ -51,6 +51,7 @@ final class BusinessActivity extends Activity
                         'staking_package_purchased',
                         'staking_package_topped_up',
                         'staking_profit_accrued',
+                        'package_closed',
                         'package_purchased',
                         'profit_accrued',
                         'top_up_package',
@@ -58,7 +59,19 @@ final class BusinessActivity extends Activity
                         'regular_premium_package',
                     ])
                     ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
-                    ->where('causer_id', $userId);
+                    ->where(function ($query) use ($userId) {
+                        $query
+                            ->where('description', 'package_closed')
+                            ->whereHasMorph(
+                                'subject',
+                                [ItcPackage::class],
+                                fn ($query) => $query->whereHas(
+                                    'transaction',
+                                    fn ($query) => $query->where('user_id', $userId)
+                                )
+                            )
+                            ->orWhere('causer_id', $userId);
+                    });
             })->orWhere(function ($query) use ($userId) {
                 $query->where('subject_type', ItcPackage::class)
                     ->where('description', 'admin_package_added_manual_profit')
@@ -84,20 +97,15 @@ final class BusinessActivity extends Activity
     public function packagesStakingWithAdmin(Builder $query, int $userId): Builder
     {
         return $query->where(function ($q) use ($userId) {
-
             $q->where(function ($q) use ($userId) {
                 $q->where('subject_type', ItcPackage::class)
                     ->whereIn('description', [
-                        'staking_package_purchased',
-                        'staking_package_topped_up',
-                        'staking_profit_accrued',
+                        'package_closed',
+                        'close_itc_package',
                         'admin_package_purchased',
-                        'profit_accrued',
                         'admin_package_changed_amount',
                         'admin_package_changed_percentage',
                         'admin_package_added_manual_profit',
-                        'top_up_package',
-                        'start_bonus_package',
                     ])
                     ->whereJsonContains(
                         'properties->package_type',
