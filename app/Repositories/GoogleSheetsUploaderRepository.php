@@ -11,18 +11,35 @@ use RuntimeException;
 
 class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
 {
-    protected GoogleSheets $service;
+    protected ?GoogleSheets $service = null;
 
     /**
      * @throws \Google\Exception
      */
     public function __construct()
     {
+        $serviceAccount = config('services.google.service_account');
+
+        if (! is_string($serviceAccount) || $serviceAccount === '') {
+            return;
+        }
+
+        $decodedConfig = base64_decode($serviceAccount, true);
+
+        if ($decodedConfig === false) {
+            return;
+        }
+
+        $credentials = json_decode($decodedConfig, true);
+
+        if (! is_array($credentials)) {
+            return;
+        }
+
         $client = new Client();
-        $client->setAuthConfig(json_decode(base64_decode(config('services.google.service_account')), true, 512, JSON_THROW_ON_ERROR));
+        $client->setAuthConfig($credentials);
         $client->setScopes([GoogleSheets::SPREADSHEETS]);
         $this->service = new GoogleSheets($client);
-
     }
 
     /**
@@ -30,6 +47,8 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
      */
     public function uploadSheets(string $spreadsheetId, array $sheetsData): void
     {
+        $this->ensureConfigured();
+
         // Fetch remote sheet titles
         $remote = $this->service->spreadsheets->get($spreadsheetId);
         $remoteTitles = array_map(
@@ -73,5 +92,12 @@ class GoogleSheetsUploaderRepository implements GoogleSheetsUploaderContract
             // Convert null values to empty strings and re-index
             return array_map(fn ($cell) => $cell ?? '', array_values($row));
         }, array_values($values));
+    }
+
+    private function ensureConfigured(): void
+    {
+        if ($this->service === null) {
+            throw new RuntimeException('Google Sheets is not configured.');
+        }
     }
 }

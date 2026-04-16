@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Forms\Account\Dashboard;
 
+use App\Dto\Activity\WriteBusinessActivityData;
 use App\Dto\Finance\DepositDataTransferObject;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\CurrencyEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\Deposit;
 use App\Models\PaymentSource;
 use App\Models\Transaction;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -48,7 +52,7 @@ class CreateDepositForm extends Form
                 'user_id' => auth()->id(),
             ]);
 
-            Deposit::create([
+            $deposit = Deposit::create([
                 'uuid' => $uuid,
                 'payment_source_id' => $sourceId,
                 'transaction_hash' => $this->transactionHash,
@@ -56,6 +60,23 @@ class CreateDepositForm extends Form
                 'commission' => 0,
                 'wallet_address' => config('wallet.deposit_address'),
             ]);
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::DepositRequested,
+                userId: auth()->id(),
+                subject: $deposit,
+                feeds: [ActivityFeedTypeEnum::Finance, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => $this->depositAmount,
+                    'currency' => $deposit->currency->value,
+                    'transaction_hash' => $deposit->transaction_hash,
+                    'payment_source' => $deposit->paymentSource?->source,
+                    'bank_name' => $this->depositSource === 'fiat' ? $deposit->transaction_hash : null,
+                ],
+                causer: auth()->user(),
+                logName: 'finance',
+                context: 'account',
+            ));
 
             return new DepositDataTransferObject(
                 paymentSources: $sourceId,

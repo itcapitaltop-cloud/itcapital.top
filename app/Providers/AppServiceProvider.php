@@ -4,8 +4,20 @@ namespace App\Providers;
 
 use App\Contracts\ExternalServices\GoogleDriveBackupUploaderContract;
 use App\Contracts\ExternalServices\GoogleSheetsUploaderContract;
+use App\Models\PackageBalanceWithdraw;
+use App\Models\PackagePartnerTransfer;
+use App\Models\PackageProfit;
+use App\Models\PackageProfitReinvest;
+use App\Models\PackageProfitReinvestWithdraw;
+use App\Models\PackageProfitWithdraw;
 use App\Notifications\ResetPasswordRu;
 use App\Notifications\VerifyEmailRu;
+use App\Observers\PackageBalanceWithdrawObserver;
+use App\Observers\PackagePartnerTransferObserver;
+use App\Observers\PackageProfitObserver;
+use App\Observers\PackageProfitReinvestObserver;
+use App\Observers\PackageProfitReinvestWithdrawObserver;
+use App\Observers\PackageProfitWithdrawObserver;
 use App\Repositories\GoogleDriveBackupUploaderRepository;
 use App\Repositories\GoogleSheetsUploaderRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -39,6 +51,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        PackageProfit::observe(PackageProfitObserver::class);
+        PackageProfitReinvest::observe(PackageProfitReinvestObserver::class);
+        PackageProfitWithdraw::observe(PackageProfitWithdrawObserver::class);
+        PackageProfitReinvestWithdraw::observe(PackageProfitReinvestWithdrawObserver::class);
+        PackageBalanceWithdraw::observe(PackageBalanceWithdrawObserver::class);
+        PackagePartnerTransfer::observe(PackagePartnerTransferObserver::class);
 
         if (! app()->environment('production')) {
             Mail::alwaysTo(config('mail.staging.address'));

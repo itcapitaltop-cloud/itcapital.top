@@ -24,6 +24,7 @@ use App\MoonShine\Handlers\GoogleSheetsExportIndexDataHandler;
 use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
+use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Package\Staking\StakingAccrualService;
 use Carbon\Carbon;
 use Closure;
@@ -401,6 +402,8 @@ class UserResource extends ModelResource
                             ['partner_id' => $newReferrerId],
                             $item->id
                         );
+
+                        app(PartnerReferralActivityService::class)->logAttached($item, $referrer, 'admin');
                     }
                     Artisan::call('user:use-rank --no-bonus');
                 }

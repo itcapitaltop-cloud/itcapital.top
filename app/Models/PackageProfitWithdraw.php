@@ -4,16 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 
- *
  * @property int $id
  * @property string $uuid
  * @property string $package_uuid
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw query()
@@ -22,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw wherePackageUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PackageProfitWithdraw whereUuid($value)
+ *
  * @mixin \Eloquent
  */
 class PackageProfitWithdraw extends Model
@@ -30,6 +30,16 @@ class PackageProfitWithdraw extends Model
 
     protected $fillable = [
         'uuid',
-        'package_uuid'
+        'package_uuid',
     ];
+
+    public function package(): BelongsTo
+    {
+        return $this->belongsTo(ItcPackage::class, 'package_uuid', 'uuid');
+    }
+
+    public function transaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'uuid', 'uuid');
+    }
 }

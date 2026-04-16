@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
@@ -13,6 +16,7 @@ use App\Models\PartnerLevelPercent;
 use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -121,6 +125,26 @@ class RegularPremiumAccrualCommand extends Command
                         'amount' => $amount,
                         'trx_uuid' => $trxUuid,
                     ]);
+
+                    $descendant = User::query()->find($descId);
+
+                    if ($descendant !== null) {
+                        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                            type: ActivityEventTypeEnum::PartnerRegularBonusReceived,
+                            userId: $userId,
+                            subject: $descendant,
+                            feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                            properties: [
+                                'amount' => $amount,
+                                'line' => $line,
+                                'from_username' => $descendant->username,
+                                'transaction_uuid' => $trxUuid,
+                            ],
+                            causer: $descendant,
+                            logName: 'partners',
+                            context: 'system',
+                        ));
+                    }
                 }
             });
 

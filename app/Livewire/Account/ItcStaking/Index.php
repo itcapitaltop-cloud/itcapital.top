@@ -6,13 +6,22 @@ namespace App\Livewire\Account\ItcStaking;
 
 use App\ActivityLog\ActivityManager;
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Helpers\Notify;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
+<<<<<<< Updated upstream
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Services\Package\Staking\StakingPurchaseService;
+=======
+use App\Models\Transaction;
+use App\Services\ActivityLog\BusinessActivityLogger;
+use App\Services\Package\Staking\StakingAccrualService;
+>>>>>>> Stashed changes
 use App\Services\User\StakingStartBonusAccrualService;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -38,7 +47,27 @@ final class Index extends Component
 
         $package = app(StakingPurchaseService::class)->createPackage(auth()->id(), (float) $this->amount);
 
+<<<<<<< Updated upstream
         $purchase = $package->stakingPurchases()->latest('id')->firstOrFail();
+=======
+        $accrual = new StakingAccrualService()
+            ->accrueTopUpStaking($package, (float) $this->amount, auth()->id(), false);
+
+        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+            type: ActivityEventTypeEnum::StakingPackagePurchased,
+            userId: auth()->id(),
+            subject: $package,
+            feeds: [ActivityFeedTypeEnum::Staking, ActivityFeedTypeEnum::UserDetailUser],
+            properties: [
+                'amount' => (string) $this->amount,
+                'package_uuid' => $package->uuid,
+                'package_type' => PackageTypeEnum::STAKING->value,
+            ],
+            causer: auth()->user(),
+            logName: 'packages',
+            context: 'account',
+        ));
+>>>>>>> Stashed changes
 
         Notify::packageStakingBought(auth()->user(), $purchase->token_amount);
 
@@ -105,7 +134,8 @@ final class Index extends Component
             'summaryPerformance' => $summaryPerformance,
             'lastMonthProfitability' => ItcPackage::query()->calculateStakingLastMonthProfitability(auth()->id())->first(),
             'logs' => BusinessActivity::query()
-                ->packagesStaking(auth()->id())
+                ->forUser(auth()->id())
+                ->forFeed(ActivityFeedTypeEnum::Staking)
                 ->latest()
                 ->get()
                 ->each(function (Activity $activity) {

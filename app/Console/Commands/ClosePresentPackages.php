@@ -3,11 +3,15 @@
 namespace App\Console\Commands;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
 use App\Dto\Transactions\CreateTransactionDto;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\PackageZeroing;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -18,7 +22,8 @@ class ClosePresentPackages extends Command
      *
      * @var string
      */
-    protected $signature   = 'itc:close-present-packages';
+    protected $signature = 'itc:close-present-packages';
+
     protected $description = 'Закрывает пакеты Present, срок работы которых истёк';
 
     public function __construct(private readonly TransactionRepositoryContract $repo)
@@ -44,22 +49,36 @@ class ClosePresentPackages extends Command
 
                     // создаём транзакцию
                     $dto = new CreateTransactionDto(
-                        userId:      $package->transaction->user_id,
-                        trxType:     TrxTypeEnum::ZERO_PRESENT_PACKAGE,
+                        userId: $package->transaction->user_id,
+                        trxType: TrxTypeEnum::ZERO_PRESENT_PACKAGE,
                         balanceType: $package->transaction->balance_type,
-                        amount:      -$initialAmount,
-                        acceptedAt:  Carbon::now(),
-                        prefix:      'ITC-',
+                        amount: -$initialAmount,
+                        acceptedAt: Carbon::now(),
+                        prefix: 'ITC-',
                     );
 
                     $result = $this->repo->store($dto, fn () => null);
-                    $trx    = $result['transaction'];
+                    $trx = $result['transaction'];
 
                     // сохраняем связь через uuid
                     PackageZeroing::create([
-                        'package_uuid'     => $package->uuid,
+                        'package_uuid' => $package->uuid,
                         'transaction_uuid' => $trx->uuid,
                     ]);
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PresentPackageZeroed,
+                        userId: $package->transaction->user_id,
+                        subject: $package,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'amount' => (string) abs((float) $initialAmount),
+                            'package_uuid' => $package->uuid,
+                            'transaction_uuid' => $trx->uuid,
+                        ],
+                        logName: 'packages',
+                        context: 'system',
+                    ));
                 }
             });
 

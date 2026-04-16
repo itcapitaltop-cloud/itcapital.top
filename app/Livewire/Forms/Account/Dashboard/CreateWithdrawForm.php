@@ -3,8 +3,11 @@
 namespace App\Livewire\Forms\Account\Dashboard;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
 use App\Dto\Finance\WithdrawDataTransferObject;
 use App\Dto\Transactions\CreateTransactionDto;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\CurrencyEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -12,6 +15,7 @@ use App\Models\PaymentSource;
 use App\Models\Transaction;
 use App\Models\Withdraw;
 use App\Models\WithdrawFiatDetail;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Validate;
@@ -69,7 +73,7 @@ class CreateWithdrawForm extends Form
             amount: $this->withdrawAmount,
             prefix: 'WP-'
         ), function (Transaction $transaction) use ($network, $sourceId) {
-            Withdraw::query()->create([
+            $withdraw = Withdraw::query()->create([
                 'uuid' => $transaction->uuid,
                 'payment_source_id' => $sourceId,
                 'currency' => CurrencyEnum::fromNetwork($network),
@@ -85,6 +89,23 @@ class CreateWithdrawForm extends Form
                     'recipient_name' => $this->recipientName,
                 ]);
             }
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::WithdrawRequested,
+                userId: Auth::id(),
+                subject: $withdraw,
+                feeds: [ActivityFeedTypeEnum::Finance, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => $this->withdrawAmount,
+                    'currency' => $withdraw->currency->value,
+                    'payment_source' => $withdraw->paymentSource?->source,
+                    'wallet_address' => $withdraw->wallet_address,
+                    'bank_name' => $this->withdrawSource === 'fiat' ? $this->bankName : null,
+                ],
+                causer: Auth::user(),
+                logName: 'finance',
+                context: 'account',
+            ));
         });
 
         return new WithdrawDataTransferObject(

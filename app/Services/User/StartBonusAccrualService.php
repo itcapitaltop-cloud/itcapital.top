@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services\User;
 
 use App\Contracts\Accruals\StartBonusAccrualContract;
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -13,6 +16,7 @@ use App\Models\PartnerClosure;
 use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -125,6 +129,8 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
         $transactions = [];
         $rewards = [];
         $notifications = [];
+        $activityLogs = [];
+        $buyer = User::query()->findOrFail($buyerId);
 
         foreach ($ancestors as $ancestor) {
             $reward = round($packageAmount * $ancestor->percent / 100, 2);
@@ -161,6 +167,12 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
                 'user_id' => $ancestor->ancestor_id,
                 'amount' => $reward,
             ];
+
+            $activityLogs[] = [
+                'user_id' => $ancestor->ancestor_id,
+                'amount' => $reward,
+                'line' => $ancestor->line,
+            ];
         }
 
         if (empty($transactions)) {
@@ -181,6 +193,23 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
             // Отправляем уведомления после успешной транзакции
             $this->sendNotifications($notifications);
         });
+
+        foreach ($activityLogs as $activityLog) {
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PartnerStartBonusReceived,
+                userId: $activityLog['user_id'],
+                subject: $buyer,
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => (string) $activityLog['amount'],
+                    'line' => $activityLog['line'],
+                    'from_username' => $buyer->username,
+                ],
+                causer: $buyer,
+                logName: 'partners',
+                context: 'system',
+            ));
+        }
     }
 
     private function sendNotifications(array $notifications): void

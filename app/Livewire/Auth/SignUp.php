@@ -9,6 +9,7 @@ use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\User;
 use App\Repositories\PartnerClosureRepository;
+use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Traits\Livewire\FormComponentTrait;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
@@ -115,6 +116,10 @@ class SignUp extends Component
 
             return $user;
         });
+
+        if ($partner !== null) {
+            app(PartnerReferralActivityService::class)->logAttached($user, $partner, 'account');
+        }
 
         event(new Registered($user));
 

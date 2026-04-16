@@ -149,5 +149,5 @@ Route::controller(MainPageModalsController::class)
     });
 
 Route::controller(AdminLogActionController::class)->middleware(Authenticate::class)->prefix('admin')->group(function () {
-    Route::post('log-admin-action', 'withdrawOneProfitReinvest')->name('admin.log.store');
+    Route::post('log-admin-action', 'store')->name('admin.log.store');
 });

@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Account\Wallet;
 
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\CurrencyEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\Deposit;
 use App\Models\Transaction;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Traits\Livewire\FormComponentTrait;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,12 +23,13 @@ class CreateDeposit extends Component
 
     #[Validate(['required', 'numeric', 'min:0'])]
     public string $amount = '';
+
     #[Validate(['required', 'string', 'max:255'])]
     public string $transactionHash = '';
 
     public function onSubmit(): void
     {
-        $uuid = 'DP-'.Str::random(10);
+        $uuid = 'DP-' . Str::random(10);
 
         DB::transaction(function () use ($uuid) {
             Transaction::query()->create([
@@ -35,13 +40,28 @@ class CreateDeposit extends Component
                 'user_id' => auth()->id(),
             ]);
 
-            Deposit::query()->create([
+            $deposit = Deposit::query()->create([
                 'transaction_hash' => $this->transactionHash,
                 'uuid' => $uuid,
                 'currency' => CurrencyEnum::USDT_TRC_20,
                 'commission' => 0,
-                'wallet_address' => 'test'
+                'wallet_address' => 'test',
             ]);
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::DepositRequested,
+                userId: auth()->id(),
+                subject: $deposit,
+                feeds: [ActivityFeedTypeEnum::Finance, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => $this->amount,
+                    'currency' => $deposit->currency->value,
+                    'transaction_hash' => $deposit->transaction_hash,
+                ],
+                causer: auth()->user(),
+                logName: 'finance',
+                context: 'account',
+            ));
         });
 
         $this->redirectRoute('wallet');

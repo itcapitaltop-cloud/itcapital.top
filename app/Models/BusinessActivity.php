@@ -4,13 +4,39 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity;
 
 final class BusinessActivity extends Activity
 {
+    protected $casts = [
+        'properties' => 'collection',
+        'user_id' => 'integer',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    #[Scope]
+    public function forUser(Builder $query, int $userId): Builder
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    #[Scope]
+    public function forFeed(Builder $query, ActivityFeedTypeEnum|string $feed): Builder
+    {
+        $value = $feed instanceof ActivityFeedTypeEnum ? $feed->value : $feed;
+
+        return $query->whereJsonContains('properties->feeds', $value);
+    }
+
     /**
      * @param \Illuminate\Database\Eloquent\Builder<\Spatie\Activitylog\Models\Activity> $query
      * @return \Illuminate\Database\Eloquent\Builder<\Spatie\Activitylog\Models\Activity>
@@ -22,6 +48,9 @@ final class BusinessActivity extends Activity
             $query->where(function ($query) use ($userId) {
                 $query->where('subject_type', ItcPackage::class)
                     ->whereIn('description', [
+                        'staking_package_purchased',
+                        'staking_package_topped_up',
+                        'staking_profit_accrued',
                         'package_purchased',
                         'profit_accrued',
                         'top_up_package',
@@ -59,6 +88,9 @@ final class BusinessActivity extends Activity
             $q->where(function ($q) use ($userId) {
                 $q->where('subject_type', ItcPackage::class)
                     ->whereIn('description', [
+                        'staking_package_purchased',
+                        'staking_package_topped_up',
+                        'staking_profit_accrued',
                         'admin_package_purchased',
                         'profit_accrued',
                         'admin_package_changed_amount',

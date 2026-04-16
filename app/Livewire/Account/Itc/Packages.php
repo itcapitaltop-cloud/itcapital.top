@@ -5,7 +5,10 @@ namespace App\Livewire\Account\Itc;
 use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
 use App\Dto\Transactions\CreateTransactionDto;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -21,6 +24,7 @@ use App\Models\PackageProfitWithReinvestLink;
 use App\Models\ReinvestToPackageBody;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -182,6 +186,21 @@ class Packages extends Component
             ->first();
 
         $package->increment('amount', $this->withdrawPackageAmount);
+
+        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+            type: ActivityEventTypeEnum::PackageToppedUp,
+            userId: Auth::id(),
+            subject: $package->itcPackage,
+            feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+            properties: [
+                'amount' => $this->withdrawPackageAmount,
+                'package_uuid' => $uuid,
+                'source_balance' => 'main',
+            ],
+            causer: Auth::user(),
+            logName: 'packages',
+            context: 'account',
+        ));
 
         app(StartBonusAccrualContract::class)->accrue(auth()->id(), (float) $this->withdrawPackageAmount);
 
@@ -449,12 +468,27 @@ class Packages extends Component
             acceptedAt: Carbon::now(),
             prefix: 'ITC-',
         ), function (Transaction $trx) {
-            ItcPackage::query()->create([
+            $package = ItcPackage::query()->create([
                 'uuid' => $trx->uuid,
                 'work_to' => Carbon::now()->addWeeks(30),
                 'type' => PackageTypeEnum::STANDARD,
                 'month_profit_percent' => '8.2',
             ]);
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PackagePurchased,
+                userId: $trx->user_id,
+                subject: $package,
+                feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => (string) $trx->amount,
+                    'package_uuid' => $package->uuid,
+                    'package_type' => $package->type->value,
+                ],
+                causer: Auth::user(),
+                logName: 'packages',
+                context: 'account',
+            ));
 
             app(StartBonusAccrualContract::class)
                 ->accrue($trx->user_id, (float) $trx->amount);
@@ -484,13 +518,30 @@ class Packages extends Component
                     prefix: 'ITC-',
                 ),
                 function (Transaction $trx) {
-                    return ItcPackage::query()->create([
+                    $package = ItcPackage::query()->create([
                         'uuid' => $trx->uuid,
                         'work_to' => now()->addMonths($this->duration),
                         'duration_months' => $this->duration,
                         'type' => PackageTypeEnum::PRESENT,
                         'month_profit_percent' => $this->percent,
                     ]);
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PackagePurchased,
+                        userId: $trx->user_id,
+                        subject: $package,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'amount' => (string) $trx->amount,
+                            'package_uuid' => $package->uuid,
+                            'package_type' => $package->type->value,
+                        ],
+                        causer: Auth::user(),
+                        logName: 'packages',
+                        context: 'account',
+                    ));
+
+                    return $package;
                 }
             );
         } else {
@@ -504,12 +555,29 @@ class Packages extends Component
                     prefix: 'ITC-',
                 ),
                 function (Transaction $trx) {
-                    return ItcPackage::query()->create([
+                    $package = ItcPackage::query()->create([
                         'uuid' => $trx->uuid,
                         'work_to' => now()->addWeeks(30),
                         'type' => $this->packageType,
                         'month_profit_percent' => $this->percent,
                     ]);
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PackagePurchased,
+                        userId: $trx->user_id,
+                        subject: $package,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'amount' => (string) $trx->amount,
+                            'package_uuid' => $package->uuid,
+                            'package_type' => $package->type->value,
+                        ],
+                        causer: Auth::user(),
+                        logName: 'packages',
+                        context: 'account',
+                    ));
+
+                    return $package;
                 }
             );
         }

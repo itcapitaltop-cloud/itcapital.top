@@ -6,7 +6,10 @@ use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
 use App\Dto\Transactions\CreateTransactionDto;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -19,6 +22,7 @@ use App\Models\PackageProfitWithdraw;
 use App\Models\PartnerRank;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Closure;
@@ -74,11 +78,49 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
         return $skipBalance
             ? $transactionRepo->store(
                 $dto,
-                fn (Transaction $trx) => ItcPackage::create($packageData + ['uuid' => $trx->uuid])
+                function (Transaction $trx) use ($packageData) {
+                    $package = ItcPackage::create($packageData + ['uuid' => $trx->uuid]);
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PackagePurchased,
+                        userId: $trx->user_id,
+                        subject: $package,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'amount' => (string) $trx->amount,
+                            'package_uuid' => $package->uuid,
+                            'package_type' => $package->type->value,
+                        ],
+                        causer: auth()->user(),
+                        logName: 'packages',
+                        context: auth()->check() ? 'admin' : 'system',
+                    ));
+
+                    return $package;
+                }
             )
             : $transactionRepo->checkBalanceAndStore(
                 $dto,
-                fn (Transaction $trx) => ItcPackage::create($packageData + ['uuid' => $trx->uuid])
+                function (Transaction $trx) use ($packageData) {
+                    $package = ItcPackage::create($packageData + ['uuid' => $trx->uuid]);
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PackagePurchased,
+                        userId: $trx->user_id,
+                        subject: $package,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'amount' => (string) $trx->amount,
+                            'package_uuid' => $package->uuid,
+                            'package_type' => $package->type->value,
+                        ],
+                        causer: auth()->user(),
+                        logName: 'packages',
+                        context: auth()->check() ? 'admin' : 'system',
+                    ));
+
+                    return $package;
+                }
             );
     }
 
@@ -99,6 +141,8 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
                 ->firstOrFail();
 
             $userId = $package->transaction->user_id;
+            $oldType = $package->type;
+            $oldAmount = $package->transaction->amount;
 
             $amount = BigDecimal::of($package->transaction->amount);
 
@@ -117,7 +161,7 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
             }
 
             foreach ($package->reinvestProfits as $reinvest) {
-                $reinvestRepo->withdraw($reinvest->uuid, $transactionRepo);
+                $reinvestRepo->withdraw($reinvest->uuid, $transactionRepo, false);
             }
 
             $profit = $this->getCurrentProfitAmountByPackageUuid($uuid);
@@ -142,17 +186,32 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
             $package->type = PackageTypeEnum::ARCHIVE;
             $package->save();
 
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PackageClosed,
+                userId: $userId,
+                subject: $package,
+                feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => (string) $amount,
+                    'package_uuid' => $package->uuid,
+                    'package_type' => $package->type->value,
+                ],
+                causer: auth()->user(),
+                logName: 'packages',
+                context: auth()->check() ? 'admin' : 'system',
+            ));
+
             app(LogRepositoryContract::class)->updated(
                 $package,
                 'close_itc_package',
                 [
-                    'old_type' => $package->getOriginal('type'),
-                    'old_amount' => $package->transaction->getOriginal('amount'),
+                    'old_type' => $oldType->value,
+                    'old_amount' => (string) $oldAmount,
                     'old_user_id' => $userId,
                 ],
                 [
-                    'new_type' => PackageTypeEnum::ARCHIVE,
-                    'new_amount' => $package->transaction->amount,
+                    'new_type' => PackageTypeEnum::ARCHIVE->value,
+                    'new_amount' => (string) $package->transaction->amount,
                     'new_user_id' => $userId,
                 ],
                 $userId

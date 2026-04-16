@@ -21,20 +21,19 @@ use Illuminate\Support\Str;
 
 class PackageReinvestRepository implements PackageReinvestRepositoryContract
 {
-
     public function store(CreatePackageReinvestDto $dto): PackageReinvest
     {
-//        Log::channel('source')->debug('Creating packageReinvest');
+        //        Log::channel('source')->debug('Creating packageReinvest');
         return PackageReinvest::query()->create([
             'uuid' => 'ITCR-' . Str::random(10),
             'package_uuid' => $dto->packageUuid,
-            'expire' => $dto->expire
+            'expire' => $dto->expire,
         ]);
     }
 
-    public function withdraw(string $reinvestUuid, TransactionRepositoryContract $transactionRepo): void
+    public function withdraw(string $reinvestUuid, TransactionRepositoryContract $transactionRepo, bool $writeAdminAudit = true): void
     {
-        DB::transaction(function () use ($reinvestUuid, $transactionRepo) {
+        DB::transaction(function () use ($reinvestUuid, $transactionRepo, $writeAdminAudit) {
             DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 
             $reinvest = PackageProfitReinvest::query()
@@ -51,26 +50,28 @@ class PackageReinvestRepository implements PackageReinvestRepositoryContract
             $userId = $package->transaction->user_id;
 
             $transaction = $transactionRepo->commonStore(new CreateTransactionDto(
-                userId:      $userId,
-                trxType:     TrxTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT,
+                userId: $userId,
+                trxType: TrxTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT,
                 balanceType: BalanceTypeEnum::MAIN,
-                amount:      $amount,
-                acceptedAt:  Carbon::now(),
-                prefix:      'WPRP-',
+                amount: $amount,
+                acceptedAt: Carbon::now(),
+                prefix: 'WPRP-',
             ));
 
             PackageProfitReinvestWithdraw::query()->create([
-                'uuid'           => $transaction->uuid,
-                'reinvest_uuid'  => $reinvestUuid,
+                'uuid' => $transaction->uuid,
+                'reinvest_uuid' => $reinvestUuid,
             ]);
 
-            app(LogRepositoryContract::class)->updated(
-                $transaction,
-                'withdraw_package_reinvest_profit',
-                ['reinvest_amount'   => $reinvest->amount],
-                ['withdrawn_amount'  => (string) $amount],
-                $userId
-            );
+            if ($writeAdminAudit) {
+                app(LogRepositoryContract::class)->updated(
+                    $transaction,
+                    'withdraw_package_reinvest_profit',
+                    ['reinvest_amount' => $reinvest->amount],
+                    ['withdrawn_amount' => (string) $amount],
+                    $userId
+                );
+            }
         });
     }
 }

@@ -6,17 +6,13 @@ namespace App\MoonShine\Pages\User;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\LogActionTypeEnum;
-use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
-use App\Models\LogAdminAction;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\Partner;
 use App\Models\PartnerLevelPercent;
-use App\Models\PartnerReward;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserAuthLog;
@@ -25,6 +21,7 @@ use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Components\StatisticLinearPartner;
 use App\MoonShine\Resources\UserResource;
+use App\Services\ActivityLog\ActivityFeedService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
@@ -357,89 +354,10 @@ class UserDetailPage extends DetailPage
                 ];
             });
 
-        $transactions = Transaction::query()
-            ->where('user_id', $item->id)
-            ->whereNot('trx_type', TrxTypeEnum::HIDDEN_DEPOSIT)
-            ->whereDoesntHave('partnerReward')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function (Transaction $tx) {
-                return [
-                    'action' => in_array($tx->trx_type, TrxTypeEnum::getDebits())
-                        ? 'Увеличение баланса'
-                        : 'Уменьшение баланса',
-                    'type' => $tx->trx_type->getName(),
-                    'operation_amount' => round((float) $tx->amount, 2),
-                    'date' => $tx->created_at->format('d.m.Y'),
-                ];
-            })
-            ->toArray();
+        $activityFeedService = app(ActivityFeedService::class);
 
-        // Партнёрские начисления
-        $partnerRewards = PartnerReward::query()
-            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
-            ->with(['transaction', 'from'])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function (PartnerReward $reward) {
-                $typeName = match ($reward->reward_type) {
-                    PartnerRewardTypeEnum::START => 'Стартовая премия',
-                    PartnerRewardTypeEnum::REGULAR => 'Регулярная премия',
-                    PartnerRewardTypeEnum::STAKING_START => 'Стартовая премия стейкинг',
-                    PartnerRewardTypeEnum::STAKING_REGULAR => 'Стейкинг регулярная премия',
-                };
-
-                return [
-                    'action' => 'Увеличение баланса',
-                    'type' => $typeName . ' (линия ' . $reward->line . ')',
-                    'from_user' => $reward->from
-                        ? $reward->from->username . ' (' . $reward->from->email . ')'
-                        : 'Не указан',
-                    'operation_amount' => round((float) $reward->amount, 2),
-                    'date' => $reward->created_at->format('d.m.Y'),
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        // Объединяем и сортируем по дате
-        $userLogs = collect([...$transactions, ...$partnerRewards])
-            ->sortByDesc(function ($item) {
-                return \Carbon\Carbon::createFromFormat('d.m.Y', $item['date']);
-            })
-            ->values()
-            ->toArray();
-
-        $adminLogs = LogAdminAction::query()
-            ->where('target_user_id', $item->id)
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (LogAdminAction $log) => [
-                'action' => LogActionTypeEnum::from($log->action_type)->label(),
-                'model' => class_basename($log->model_type),
-                'old_values' => collect($log->old_values)
-                    ->map(fn ($value) => $value)
-                    ->implode("\n"),
-                'new_values' => collect($log->new_values)
-                    ->map(fn ($value) => $value)
-                    ->implode("\n"),
-                'operation_amount' => collect($log->old_values)
-                    ->map(function ($oldValue, $key) use ($log) {
-                        $newValue = $log->new_values[$key] ?? null;
-
-                        if (is_numeric($oldValue) && is_numeric($newValue)) {
-                            $diff = $newValue - $oldValue;
-
-                            return $diff >= 0 ? "+{$diff}" : $diff;
-                        }
-
-                        return '';
-                    })
-                    ->filter()
-                    ->implode("\n"),
-                'date' => $log->created_at->format('d.m.Y H:i'),
-            ])
-            ->toArray();
+        $userLogs = $activityFeedService->userDetailUserFeed($item->id);
+        $adminLogs = $activityFeedService->userDetailAdminFeed($item->id);
 
         $referrerLink = $item->referrer ?
             Url::make(
@@ -982,7 +900,7 @@ class UserDetailPage extends DetailPage
                                     TableBuilder::make()
                                         ->withNotFound()
                                         ->fields([
-                                            Text::make('Действие', 'action'),
+                                            Text::make('Событие', 'action'),
                                             Text::make('Старые значения', 'old_values'),
                                             Text::make('Новые значения', 'new_values'),
                                             Text::make('Сумма операции', 'operation_amount'),
@@ -995,20 +913,24 @@ class UserDetailPage extends DetailPage
                                 TableBuilder::make()
                                     ->withNotFound()
                                     ->fields([
-                                        Text::make('Действие', 'action'),
-                                        Text::make('Тип', 'type'),
+                                        Text::make('Событие', 'type'),
                                         Text::make('Сумма операции', 'operation_amount'),
                                         Text::make('Пользователь', 'from_user'),
                                         Text::make('Дата', 'date'),
                                     ])
                                     ->items($userLogs)
                                     ->trAttributes(function (array $data, int $row, ComponentAttributeBag $attributes): ComponentAttributeBag {
-                                        // в $data['action'] лежит «Увеличение баланса» или «Уменьшение баланса»
-                                        $color = $data['action'] === 'Увеличение баланса' ? 'green' : 'red';
+                                        $color = match ($data['action']) {
+                                            'Увеличение баланса' => 'green',
+                                            'Уменьшение баланса' => 'red',
+                                            default => null,
+                                        };
 
-                                        return $attributes->merge([
-                                            'style' => "color: {$color};",
-                                        ]);
+                                        if ($color === null) {
+                                            return $attributes;
+                                        }
+
+                                        return $attributes->merge(['style' => "color: {$color};"]);
                                     }),
                             ]),
                         ]),

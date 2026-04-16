@@ -21,6 +21,7 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -311,6 +312,12 @@ class AdminController extends Controller
 
         Artisan::call('user:use-rank --no-bonus');
 
+        $referrer = User::query()->find((int) $request->input('user_id'));
+
+        if ($referrer !== null) {
+            app(PartnerReferralActivityService::class)->logAttached($user, $referrer, 'admin');
+        }
+
         // 4) Успех
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_partner_added'), ToastType::SUCCESS)
@@ -389,7 +396,7 @@ class AdminController extends Controller
                     'update_referrer',
                     ['partner_id' => $oldPartnerId],
                     ['partner_id' => $newPartnerId],
-                    $oldPartnerId
+                    $userId
                 );
             });
         } catch (Throwable $e) {
@@ -399,6 +406,13 @@ class AdminController extends Controller
         }
 
         Artisan::call('user:use-rank --no-bonus');
+
+        $user = User::query()->find($userId);
+        $referrer = User::query()->find($newPartnerId);
+
+        if ($user !== null && $referrer !== null) {
+            app(PartnerReferralActivityService::class)->logAttached($user, $referrer, 'admin');
+        }
 
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_referral_updated'), ToastType::SUCCESS)

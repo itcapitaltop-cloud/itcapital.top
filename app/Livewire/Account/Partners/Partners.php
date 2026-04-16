@@ -7,6 +7,9 @@ namespace App\Livewire\Account\Partners;
 use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
@@ -16,6 +19,7 @@ use App\Models\PartnerClosure;
 use App\Models\PartnerRankRequirement;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -137,6 +141,7 @@ class Partners extends Component
     public function sendToMainSelf(): void
     {
         $amount = $this->partnerBalance;
+        $baseUuid = null;
 
         if ($amount <= 0) {
             $this->addError('toPartnerAmount', __('livewire_partners_partner_balance_empty'));
@@ -144,7 +149,7 @@ class Partners extends Component
             return;
         }
 
-        DB::transaction(function () use ($amount) {
+        DB::transaction(function () use ($amount, &$baseUuid) {
             Transaction::create([
                 'uuid' => $uuid = 'PSM-' . Str::random(10),
                 'amount' => $amount,
@@ -153,6 +158,8 @@ class Partners extends Component
                 'user_id' => Auth::id(),
                 'accepted_at' => now(),
             ]);
+
+            $baseUuid = $uuid;
 
             Transaction::create([
                 'uuid' => $uuid . '-M',
@@ -163,6 +170,20 @@ class Partners extends Component
                 'accepted_at' => now(),
             ]);
         });
+
+        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+            type: ActivityEventTypeEnum::PartnerToMainTransferred,
+            userId: Auth::id(),
+            subject: Auth::user(),
+            feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+            properties: [
+                'amount' => (string) $amount,
+                'transaction_uuid' => $baseUuid,
+            ],
+            causer: Auth::user(),
+            logName: 'partners',
+            context: 'account',
+        ));
 
         $this->dispatch(
             'new-system-notification',
@@ -179,8 +200,9 @@ class Partners extends Component
             $receiver = User::where('username', $this->toUsername)->firstOrFail();
 
             $amount = (float) str_replace(',', '.', $this->toPartnerAmount);
+            $uuid = null;
 
-            DB::transaction(function () use ($receiver, $amount) {
+            DB::transaction(function () use ($receiver, $amount, &$uuid) {
                 $uuid = 'PT-' . Str::random(10);
 
                 Transaction::create([
@@ -200,6 +222,36 @@ class Partners extends Component
                     'user_id' => Auth::id(),
                 ]);
             });
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PartnerTransferSent,
+                userId: Auth::id(),
+                subject: $receiver,
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => (string) $amount,
+                    'username' => $receiver->username,
+                    'transaction_uuid' => $uuid,
+                ],
+                causer: Auth::user(),
+                logName: 'partners',
+                context: 'account',
+            ));
+
+            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PartnerTransferReceived,
+                userId: $receiver->id,
+                subject: Auth::user(),
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'amount' => (string) $amount,
+                    'username' => Auth::user()->username,
+                    'transaction_uuid' => $uuid,
+                ],
+                causer: Auth::user(),
+                logName: 'partners',
+                context: 'account',
+            ));
         } catch (Throwable $e) {
             Log::channel('source')->debug($e->getMessage());
 
@@ -459,6 +511,19 @@ class Partners extends Component
                 'accepted_at' => now(),
             ]);
         });
+
+        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+            type: ActivityEventTypeEnum::RegularBonusTransferredToPartner,
+            userId: Auth::id(),
+            subject: Auth::user(),
+            feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+            properties: [
+                'amount' => (string) $amount,
+            ],
+            causer: Auth::user(),
+            logName: 'partners',
+            context: 'account',
+        ));
     }
 
     public function getPackagesForTopupProperty()

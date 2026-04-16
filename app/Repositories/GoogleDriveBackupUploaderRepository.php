@@ -8,10 +8,11 @@ use Google\Exception;
 use Google\Service\Drive;
 use Google\Service\Drive\DriveFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderContract
 {
-    protected Drive $service;
+    protected ?Drive $service = null;
 
     protected ?string $folderId;
 
@@ -21,11 +22,30 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
      */
     public function __construct()
     {
+        $this->folderId = config('services.google.folder_id', null);
+
+        $serviceAccount = config('services.google.service_account');
+
+        if (! is_string($serviceAccount) || $serviceAccount === '') {
+            return;
+        }
+
+        $decodedConfig = base64_decode($serviceAccount, true);
+
+        if ($decodedConfig === false) {
+            return;
+        }
+
+        $credentials = json_decode($decodedConfig, true);
+
+        if (! is_array($credentials)) {
+            return;
+        }
+
         $client = new Client();
-        $client->setAuthConfig(json_decode(base64_decode(config('services.google.service_account')), true, 512, JSON_THROW_ON_ERROR));
+        $client->setAuthConfig($credentials);
         $client->addScope(Drive::DRIVE);
         $this->service = new Drive($client);
-        $this->folderId = config('services.google.folder_id', null);
     }
 
     /**
@@ -33,6 +53,8 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
      */
     public function uploadBackup(string $localPath, string $remoteName): void
     {
+        $this->ensureConfigured();
+
         $fileMetadata = new DriveFile([
             'name' => $remoteName,
         ]);
@@ -54,6 +76,8 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
      */
     public function getBackupFiles(): array
     {
+        $this->ensureConfigured();
+
         $q = "name contains 'backup_' and name contains '.sql'";
 
         if ($this->folderId) {
@@ -79,6 +103,15 @@ class GoogleDriveBackupUploaderRepository implements GoogleDriveBackupUploaderCo
      */
     public function deleteFile(string $fileId): void
     {
+        $this->ensureConfigured();
+
         $this->service->files->delete($fileId);
+    }
+
+    private function ensureConfigured(): void
+    {
+        if ($this->service === null) {
+            throw new RuntimeException('Google Drive is not configured.');
+        }
     }
 }

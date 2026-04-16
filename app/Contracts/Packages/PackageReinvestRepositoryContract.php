@@ -10,5 +10,5 @@ interface PackageReinvestRepositoryContract
 {
     public function store(CreatePackageReinvestDto $dto): PackageReinvest;
 
-    public function withdraw(string $reinvestUuid, TransactionRepositoryContract $transactionRepo): void;
+    public function withdraw(string $reinvestUuid, TransactionRepositoryContract $transactionRepo, bool $writeAdminAudit = true): void;
 }
