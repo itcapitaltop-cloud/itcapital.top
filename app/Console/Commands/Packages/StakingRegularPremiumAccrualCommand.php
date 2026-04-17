@@ -111,7 +111,7 @@ final class StakingRegularPremiumAccrualCommand extends Command
             ->join('staking_transaction_accruals as sta', 'sta.itc_package_id', '=', 'itc_packages.id')
             ->where('itc_packages.type', PackageTypeEnum::STAKING)
             ->whereIn('sta.type', [StakingTransactionAccrualEnum::Profit])
-            ->whereBetween('sta.created_at', [$this->from, '2026-04-30 23:59:59'])
+            ->whereBetween('sta.created_at', [$this->from, $this->to])
             ->groupBy('transactions.user_id')
             ->pluck('amount', 'user_id')
             ->toArray();
