@@ -46,6 +46,28 @@ final class StakingPurchaseService
         });
     }
 
+    public function addPurchaseByTokens(ItcPackage $package, float $tokenAmount, int $userId): StakingPurchase
+    {
+        return DB::transaction(function () use ($package, $tokenAmount, $userId): StakingPurchase {
+            $purchaseRate = $this->tokenRateResolver->currentRate();
+            $amountUsd = round($tokenAmount * $purchaseRate, 2);
+
+            $package->transaction()->increment('amount', $amountUsd);
+
+            $purchase = $package->stakingPurchases()->create([
+                'user_id' => $userId,
+                'amount_usd' => $amountUsd,
+                'token_amount' => round($tokenAmount, 2),
+                'purchase_rate' => round($purchaseRate, 6),
+                'purchased_at' => now(),
+            ]);
+
+            $this->stakingAccrualService->accrueTopUpStaking($package, $amountUsd, $userId, false);
+
+            return $purchase;
+        });
+    }
+
     public function recordPurchase(
         ItcPackage $package,
         float $amountUsd,

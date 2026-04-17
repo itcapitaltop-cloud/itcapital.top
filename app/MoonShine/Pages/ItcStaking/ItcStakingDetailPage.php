@@ -272,8 +272,11 @@ class ItcStakingDetailPage extends DetailPage
                             ])
                         ->required(),
 
-                    Number::make('Cумма будет добавлена в существующий пакет стейкинга', 'amount')
+                    Number::make('Количество токенов будет добавлено в существующий пакет стейкинга', 'amount')
                         ->fill(0)
+                        ->customAttributes([
+                            'step' => 'any',
+                        ])
                         ->required(),
 
                     Hidden::make('manual_profit')

@@ -57,11 +57,11 @@ final class BusinessActivity extends Activity
                         'top_up_package',
                         'start_bonus_package',
                         'regular_premium_package',
+                        'admin_package_changed_amount',
                     ])
                     ->whereJsonContains('properties->package_type', PackageTypeEnum::STAKING->value)
                     ->where(function ($query) use ($userId) {
                         $query
-                            ->where('description', 'package_closed')
                             ->whereHasMorph(
                                 'subject',
                                 [ItcPackage::class],

@@ -11,10 +11,10 @@ final class AdminPackageChangedAmount implements ActivityStrategyContract
 {
     public function handle(Activity $activity): string
     {
-        return __('activity/admin.admin_package_changed_amount', [
-            'uuid' => $activity->getExtraProperty('package_uuid', ''),
+        return __('activity/admin.admin_package_changed_amount_user_feed', [
+            'uuid' => (string) $activity->getExtraProperty('package_uuid', ''),
+            'old_amount' => $this->formatDecimal($activity->getExtraProperty('old_amount', 0)),
             'amount' => $this->formatDecimal($activity->getExtraProperty('amount', 0)),
-            'new_amount' => $this->formatDecimal($activity->getExtraProperty('old_amount', 0)),
         ]);
     }
 

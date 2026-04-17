@@ -1,0 +1,23 @@
+<?php
+
+return [
+    'update_itc_package_amount' => 'Package amount change',
+    'update_itc_package_type' => 'Package type change',
+    'update_itc_package_profit_percent' => 'Package yield change',
+    'update_itc_package_created_at' => 'Package opening date change',
+    'update_referrer' => 'Referrer change',
+    'update_user_rank' => 'User rank change',
+    'update_user_email' => 'User email change',
+    'update_user_username' => 'User name change',
+    'update_investments_sum' => 'Investment amount change',
+    'update_partner_balance' => 'Partner balance change',
+    'update_withdraw_amount' => 'Withdrawal amount change',
+    'delete_package_reinvest_profit' => 'Delete package profit reinvest',
+    'approve_transaction' => 'Approve transaction',
+    'reject_transaction' => 'Reject transaction',
+    'moderate_transaction' => 'Set transaction status to "On moderation"',
+    'withdraw_package_reinvest_profit' => 'Withdraw profit reinvest to balance',
+    'extend_package_reinvest_profit' => 'Extend profit reinvest period',
+    'close_itc_package' => 'Close package',
+    'update_regular_bonus' => 'Regular bonus change',
+];

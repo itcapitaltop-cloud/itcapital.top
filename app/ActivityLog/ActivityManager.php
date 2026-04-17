@@ -33,10 +33,24 @@ final class ActivityManager
         $adminAction = LogActionTypeEnum::tryFrom($activity->description);
 
         if ($adminAction !== null) {
+            if ($adminAction === LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT) {
+                $packageUuid = (string) $activity->getExtraProperty('package_uuid', '');
+                $oldAmount = (string) collect((array) $activity->getExtraProperty('old_values', []))->get('amount', '0');
+                $newAmount = (string) collect((array) $activity->getExtraProperty('new_values', []))->get('amount', '0');
+
+                if ($packageUuid !== '') {
+                    return __('activity/admin.admin_package_changed_amount_user_feed', [
+                        'uuid' => $packageUuid,
+                        'old_amount' => $this->formatAmount($oldAmount),
+                        'amount' => $this->formatAmount($newAmount),
+                    ]);
+                }
+            }
+
             return $adminAction->label();
         }
 
-        return 'Неизвестное событие';
+        return __('activity/feed.unknown_event');
     }
 
     private function resolveBusinessEvent(Activity $activity, ActivityEventTypeEnum $type): string
@@ -60,36 +74,36 @@ final class ActivityManager
         $stakingExchangeRate = $this->formatRate($activity->getExtraProperty('exchange_rate'));
 
         return match ($type) {
-            ActivityEventTypeEnum::DepositRequested => "Создана заявка на ввод {$financeDetails} на сумму {$amount}",
-            ActivityEventTypeEnum::DepositApproved => "Заявка на ввод {$financeDetails} на сумму {$amount} одобрена",
-            ActivityEventTypeEnum::DepositRejected => "Заявка на ввод {$financeDetails} на сумму {$amount} отклонена",
-            ActivityEventTypeEnum::WithdrawRequested => "Создана заявка на вывод {$financeDetails} на сумму {$amount}",
-            ActivityEventTypeEnum::WithdrawApproved => "Заявка на вывод {$financeDetails} на сумму {$amount} одобрена",
-            ActivityEventTypeEnum::WithdrawRejected => "Заявка на вывод {$financeDetails} на сумму {$amount} отклонена",
-            ActivityEventTypeEnum::PackagePurchased => "Куплен пакет {$packageUuid} на сумму {$amount} ITC",
+            ActivityEventTypeEnum::DepositRequested => __('activity/feed.business.deposit_requested', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::DepositApproved => __('activity/feed.business.deposit_approved', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::DepositRejected => __('activity/feed.business.deposit_rejected', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::WithdrawRequested => __('activity/feed.business.withdraw_requested', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::WithdrawApproved => __('activity/feed.business.withdraw_approved', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::WithdrawRejected => __('activity/feed.business.withdraw_rejected', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackagePurchased => __('activity/feed.business.package_purchased', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageClosed => $activity->getExtraProperty('package_type') === 'staking'
-                ? "Пакет стейкинга {$packageUuid} закрыт"
-                : "Пакет {$packageUuid} закрыт",
-            ActivityEventTypeEnum::PackageToppedUp => "В пакет {$packageUuid} добавлена сумма {$amount} ITC",
-            ActivityEventTypeEnum::PackageProfitAccrued => "Получена доходность {$amount} ITC на пакет {$packageUuid}",
-            ActivityEventTypeEnum::PackageProfitWithdrawn => "С пакета {$packageUuid} выведена доходность {$amount} ITC на баланс",
-            ActivityEventTypeEnum::PackageReinvested => "Доходность {$amount} ITC реинвестирована в пакет {$packageUuid}",
-            ActivityEventTypeEnum::PackageAmountWithdrawnToBalance => "С пакета {$packageUuid} выведена сумма {$amount} ITC на основной баланс",
-            ActivityEventTypeEnum::PackageReinvestWithdrawnToBalance => "Реинвест {$amount} ITC выведен с пакета {$packageUuid} на основной баланс",
-            ActivityEventTypeEnum::PresentPackageZeroed => "Подарочный пакет {$packageUuid} обнулен на сумму {$amount} ITC",
-            ActivityEventTypeEnum::ReferralAddedToLine => "В линию {$line} добавлен реферал @{$username}",
-            ActivityEventTypeEnum::BecameReferralOfUser => "Пользователь стал рефералом @{$username}",
-            ActivityEventTypeEnum::PartnerRegularBonusReceived => "Получена регулярная премия {$amount} ITC от реферала @{$username} линии {$line}",
-            ActivityEventTypeEnum::PartnerStartBonusReceived => "Получена стартовая премия {$amount} ITC от реферала @{$username} линии {$line}",
-            ActivityEventTypeEnum::StakingRegularBonusReceived => "Получена регулярная премия на стейкинг {$amount} ITC от реферала @{$username}",
-            ActivityEventTypeEnum::StakingStartBonusReceived => "Получена стартовая премия на стейкинг {$amount} ITC от реферала @{$username}",
-            ActivityEventTypeEnum::PartnerToMainTransferred => "Сумма {$amount} ITC выведена с партнерского на основной баланс",
-            ActivityEventTypeEnum::PartnerTransferSent => "Партнеру @{$username} переведена сумма {$amount} ITC с партнерского баланса",
-            ActivityEventTypeEnum::PartnerTransferReceived => "Получена сумма {$amount} ITC от партнера @{$username} на основной баланс",
-            ActivityEventTypeEnum::RegularBonusTransferredToPartner => "Сумма {$amount} ITC переведена с баланса регулярной премии на партнерский баланс",
-            ActivityEventTypeEnum::StakingPackagePurchased => "Куплен пакет стейкинга {$packageUuid} на {$stakingTokenAmount} ITC{$stakingPurchaseRate}",
-            ActivityEventTypeEnum::StakingPackageToppedUp => "В пакет стейкинга {$packageUuid} добавлено {$stakingTokenAmount} ITC{$stakingPurchaseRate}",
-            ActivityEventTypeEnum::StakingProfitAccrued => "Получена доходность {$profit} ITC на пакет стейкинга {$packageUuid}{$stakingExchangeRate}",
+                ? __('activity/feed.business.staking_package_closed', ['uuid' => $packageUuid, 'amount' => $amount])
+                : __('activity/feed.business.package_closed', ['uuid' => $packageUuid]),
+            ActivityEventTypeEnum::PackageToppedUp => __('activity/feed.business.package_topped_up', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackageProfitAccrued => __('activity/feed.business.package_profit_accrued', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackageProfitWithdrawn => __('activity/feed.business.package_profit_withdrawn', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackageReinvested => __('activity/feed.business.package_reinvested', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackageAmountWithdrawnToBalance => __('activity/feed.business.package_amount_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PackageReinvestWithdrawnToBalance => __('activity/feed.business.package_reinvest_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::PresentPackageZeroed => __('activity/feed.business.present_package_zeroed', ['uuid' => $packageUuid, 'amount' => $amount]),
+            ActivityEventTypeEnum::ReferralAddedToLine => __('activity/feed.business.referral_added_to_line', ['line' => $line, 'username' => $username]),
+            ActivityEventTypeEnum::BecameReferralOfUser => __('activity/feed.business.became_referral_of_user', ['username' => $username]),
+            ActivityEventTypeEnum::PartnerRegularBonusReceived => __('activity/feed.business.partner_regular_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
+            ActivityEventTypeEnum::PartnerStartBonusReceived => __('activity/feed.business.partner_start_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
+            ActivityEventTypeEnum::StakingRegularBonusReceived => __('activity/feed.business.staking_regular_bonus_received', ['amount' => $amount, 'username' => $username]),
+            ActivityEventTypeEnum::StakingStartBonusReceived => __('activity/feed.business.staking_start_bonus_received', ['amount' => $amount, 'username' => $username]),
+            ActivityEventTypeEnum::PartnerToMainTransferred => __('activity/feed.business.partner_to_main_transferred', ['amount' => $amount]),
+            ActivityEventTypeEnum::PartnerTransferSent => __('activity/feed.business.partner_transfer_sent', ['amount' => $amount, 'username' => $username]),
+            ActivityEventTypeEnum::PartnerTransferReceived => __('activity/feed.business.partner_transfer_received', ['amount' => $amount, 'username' => $username]),
+            ActivityEventTypeEnum::RegularBonusTransferredToPartner => __('activity/feed.business.regular_bonus_transferred_to_partner', ['amount' => $amount]),
+            ActivityEventTypeEnum::StakingPackagePurchased => __('activity/feed.business.staking_package_purchased', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
+            ActivityEventTypeEnum::StakingPackageToppedUp => __('activity/feed.business.staking_package_topped_up', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
+            ActivityEventTypeEnum::StakingProfitAccrued => __('activity/feed.business.staking_profit_accrued', ['uuid' => $packageUuid, 'profit' => $profit, 'rate' => $stakingExchangeRate]),
         };
     }
 
@@ -106,7 +120,7 @@ final class ActivityManager
 
         $formattedRate = rtrim(rtrim(number_format((float) $rate, 6, '.', ''), '0'), '.');
 
-        return ' при курсе ' . $formattedRate;
+        return __('activity/feed.rate_suffix', ['rate' => $formattedRate]);
     }
 
     private function resolveFinanceDetails(Activity $activity, string $currency): string
@@ -126,9 +140,9 @@ final class ActivityManager
         }
 
         if ($paymentSource === 'fiat') {
-            return 'на банковский счёт' . ($bankName !== '' ? ', ' . $bankName : '');
+            return __('activity/feed.finance.bank_account', ['bank' => $bankName]);
         }
 
-        return 'через криптовалюту, ' . $currency;
+        return __('activity/feed.finance.crypto', ['currency' => $currency]);
     }
 }

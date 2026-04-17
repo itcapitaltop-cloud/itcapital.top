@@ -7,6 +7,7 @@ use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Transactions\CreateTransactionDto;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TransactionStatusEnum;
@@ -21,6 +22,7 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
@@ -169,7 +171,41 @@ class AdminController extends Controller
                 'update_itc_package_amount',
                 ['amount' => (string) $oldAmount],
                 ['amount' => (string) $package->transaction->amount],
-                $targetUserId
+                $targetUserId,
+                ['package_uuid' => $package->uuid],
+            );
+
+            app(BusinessActivityLogger::class)->writeDescription(
+                description: 'update_itc_package_amount',
+                userId: $targetUserId,
+                subject: $package->transaction,
+                feeds: [ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'package_uuid' => $package->uuid,
+                    'amount' => (string) $package->transaction->amount,
+                    'old_values' => ['amount' => (string) $oldAmount],
+                    'new_values' => ['amount' => (string) $package->transaction->amount],
+                    'package_type' => $package->type->value,
+                ],
+                causer: auth()->user(),
+                logName: 'admin',
+                context: 'admin',
+            );
+
+            app(BusinessActivityLogger::class)->writeDescription(
+                description: 'admin_package_changed_amount',
+                userId: $targetUserId,
+                subject: $package->transaction,
+                feeds: [ActivityFeedTypeEnum::Packages],
+                properties: [
+                    'package_uuid' => $package->uuid,
+                    'amount' => (string) $package->transaction->amount,
+                    'old_amount' => (string) $oldAmount,
+                    'package_type' => $package->type->value,
+                ],
+                causer: auth()->user(),
+                logName: 'admin',
+                context: 'admin',
             );
         }
 

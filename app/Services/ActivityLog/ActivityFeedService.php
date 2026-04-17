@@ -101,6 +101,8 @@ final class ActivityFeedService
     public function userDetailAdminFeed(int $userId, int $limit = 200): array
     {
         return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin, $limit)
+            ->where('description', '!=', LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT->value)
+            ->where('description', '!=', LogActionTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT->value)
             ->get()
             ->map(function (BusinessActivity $activity): array {
                 $oldValues = collect((array) $activity->getExtraProperty('old_values', []));
@@ -253,24 +255,39 @@ final class ActivityFeedService
     {
         return match ($activity->description) {
             ActivityEventTypeEnum::DepositRequested->value,
-            ActivityEventTypeEnum::WithdrawRequested->value => 'На модерации',
+            ActivityEventTypeEnum::WithdrawRequested->value => __('activity/feed.status.on_moderation'),
             ActivityEventTypeEnum::DepositApproved->value,
-            ActivityEventTypeEnum::WithdrawApproved->value => 'Одобрено',
+            ActivityEventTypeEnum::WithdrawApproved->value => __('activity/feed.status.approved'),
             ActivityEventTypeEnum::DepositRejected->value,
-            ActivityEventTypeEnum::WithdrawRejected->value => 'Отклонено',
-            default => '—',
+            ActivityEventTypeEnum::WithdrawRejected->value => __('activity/feed.status.rejected'),
+            default => __('activity/feed.empty'),
         };
     }
 
     private function userDetailAction(BusinessActivity $activity): string
     {
+        if ($activity->description === LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT->value) {
+            $oldAmount = (float) collect((array) $activity->getExtraProperty('old_values', []))->get('amount', 0);
+            $newAmount = (float) collect((array) $activity->getExtraProperty('new_values', []))->get('amount', 0);
+
+            if ($newAmount > $oldAmount) {
+                return __('activity/feed.user_detail.balance_increase');
+            }
+
+            if ($newAmount < $oldAmount) {
+                return __('activity/feed.user_detail.balance_decrease');
+            }
+
+            return __('activity/feed.user_detail.action');
+        }
+
         if (in_array($activity->description, $this->neutralUserDetailEvents(), true)) {
-            return 'Действие';
+            return __('activity/feed.user_detail.action');
         }
 
         return in_array($activity->description, $this->positiveUserDetailEvents(), true)
-            ? 'Увеличение баланса'
-            : 'Уменьшение баланса';
+            ? __('activity/feed.user_detail.balance_increase')
+            : __('activity/feed.user_detail.balance_decrease');
     }
 
     /**
@@ -323,11 +340,25 @@ final class ActivityFeedService
                 return $transactionActionLabel;
             }
 
+            if ($actionType === LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT) {
+                $packageUuid = (string) $activity->getExtraProperty('package_uuid', '');
+                $oldAmount = $this->formatAmount((string) collect((array) $activity->getExtraProperty('old_values', []))->get('amount', '0'));
+                $newAmount = $this->formatAmount((string) collect((array) $activity->getExtraProperty('new_values', []))->get('amount', '0'));
+
+                if ($packageUuid !== '') {
+                    return __('activity/admin.admin_package_changed_amount_user_feed', [
+                        'uuid' => $packageUuid,
+                        'old_amount' => $oldAmount,
+                        'amount' => $newAmount,
+                    ]);
+                }
+            }
+
             if ($actionType === LogActionTypeEnum::CLOSE_ITC_PACKAGE) {
                 $packageUuid = data_get($activity->subject, 'uuid');
 
                 if (is_string($packageUuid) && $packageUuid !== '') {
-                    return 'Закрытие пакета ' . $packageUuid;
+                    return __('activity/feed.admin_action.close_package', ['uuid' => $packageUuid]);
                 }
             }
 
@@ -344,8 +375,8 @@ final class ActivityFeedService
         }
 
         $suffix = match ($activity->subject->trx_type) {
-            TrxTypeEnum::DEPOSIT => 'заявки на ввод',
-            TrxTypeEnum::WITHDRAW => 'заявки на вывод',
+            TrxTypeEnum::DEPOSIT => __('activity/feed.transaction.deposit_request'),
+            TrxTypeEnum::WITHDRAW => __('activity/feed.transaction.withdraw_request'),
             default => null,
         };
 
@@ -354,9 +385,9 @@ final class ActivityFeedService
         }
 
         return match ($actionType) {
-            LogActionTypeEnum::APPROVE_TRANSACTION => 'Одобрение ' . $suffix,
-            LogActionTypeEnum::REJECT_TRANSACTION => 'Отклонение ' . $suffix,
-            LogActionTypeEnum::MODERATE_TRANSACTION => 'Перевод ' . $suffix . ' на модерацию',
+            LogActionTypeEnum::APPROVE_TRANSACTION => __('activity/feed.admin_action.approve_transaction', ['suffix' => $suffix]),
+            LogActionTypeEnum::REJECT_TRANSACTION => __('activity/feed.admin_action.reject_transaction', ['suffix' => $suffix]),
+            LogActionTypeEnum::MODERATE_TRANSACTION => __('activity/feed.admin_action.moderate_transaction', ['suffix' => $suffix]),
             default => null,
         };
     }
@@ -368,8 +399,8 @@ final class ActivityFeedService
 
             if ($withdraw !== null) {
                 return $withdraw->fiatDetail?->bank_name
-                    ? 'банк: ' . $withdraw->fiatDetail->bank_name
-                    : 'крипта: ' . $withdraw->currency->value;
+                    ? __('activity/feed.channel.bank', ['bank' => $withdraw->fiatDetail->bank_name])
+                    : __('activity/feed.channel.crypto', ['currency' => $withdraw->currency->value]);
             }
         }
 
@@ -378,8 +409,8 @@ final class ActivityFeedService
 
             if ($deposit !== null) {
                 return ($deposit->paymentSource?->source ?? null) === 'fiat'
-                    ? 'банк: ' . ($deposit->transaction_hash ?: __('livewire_finance_bank_not_specified'))
-                    : 'крипта: ' . $deposit->currency->value;
+                    ? __('activity/feed.channel.bank', ['bank' => $deposit->transaction_hash ?: __('livewire_finance_bank_not_specified')])
+                    : __('activity/feed.channel.crypto', ['currency' => $deposit->currency->value]);
             }
         }
 
@@ -390,8 +421,8 @@ final class ActivityFeedService
     {
         return match ($actionType) {
             LogActionTypeEnum::APPROVE_TRANSACTION,
-            LogActionTypeEnum::REJECT_TRANSACTION => 'На модерации',
-            LogActionTypeEnum::MODERATE_TRANSACTION => 'Одобрена/Отклонена',
+            LogActionTypeEnum::REJECT_TRANSACTION => __('activity/feed.status.on_moderation'),
+            LogActionTypeEnum::MODERATE_TRANSACTION => __('activity/feed.status.approved_or_rejected'),
             default => '',
         };
     }
@@ -399,9 +430,9 @@ final class ActivityFeedService
     private function transactionAdminNewStatus(?LogActionTypeEnum $actionType, string $channel): string
     {
         $status = match ($actionType) {
-            LogActionTypeEnum::APPROVE_TRANSACTION => 'Одобрена',
-            LogActionTypeEnum::REJECT_TRANSACTION => 'Отклонена',
-            LogActionTypeEnum::MODERATE_TRANSACTION => 'На модерации',
+            LogActionTypeEnum::APPROVE_TRANSACTION => __('activity/feed.status.approved_feminine'),
+            LogActionTypeEnum::REJECT_TRANSACTION => __('activity/feed.status.rejected_feminine'),
+            LogActionTypeEnum::MODERATE_TRANSACTION => __('activity/feed.status.on_moderation'),
             default => '',
         };
 

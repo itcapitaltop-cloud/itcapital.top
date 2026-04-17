@@ -921,8 +921,8 @@ class UserDetailPage extends DetailPage
                                     ->items($userLogs)
                                     ->trAttributes(function (array $data, int $row, ComponentAttributeBag $attributes): ComponentAttributeBag {
                                         $color = match ($data['action']) {
-                                            'Увеличение баланса' => 'green',
-                                            'Уменьшение баланса' => 'red',
+                                            __('activity/feed.user_detail.balance_increase') => 'green',
+                                            __('activity/feed.user_detail.balance_decrease') => 'red',
                                             default => null,
                                         };
 

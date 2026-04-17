@@ -10,8 +10,14 @@ use Illuminate\Support\Facades\Auth;
 
 class LogRepository implements LogRepositoryContract
 {
-    public function updated(Model $model, string $actionType, array $oldValues, array $newValues, ?int $targetUseId = null): void
-    {
+    public function updated(
+        Model $model,
+        string $actionType,
+        array $oldValues,
+        array $newValues,
+        ?int $targetUseId = null,
+        array $extraProperties = [],
+    ): void {
         $ownerId = $targetUseId ?? $this->resolveOwnerId($model);
 
         if ($ownerId === null) {
@@ -28,6 +34,7 @@ class LogRepository implements LogRepositoryContract
                 'new_values' => $newValues,
                 'model_type' => get_class($model),
                 'model_id' => $model->getKey(),
+                ...$extraProperties,
             ],
             causer: Auth::user(),
             logName: 'admin',

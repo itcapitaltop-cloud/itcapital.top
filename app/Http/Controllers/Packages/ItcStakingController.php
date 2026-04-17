@@ -11,8 +11,9 @@ use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\Package\Staking\StakingPerformanceService;
+use App\Services\Package\Staking\StakingPurchaseService;
 use App\Services\Token\TokenRateResolver;
-use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -169,28 +170,24 @@ final class ItcStakingController extends Controller
             ->firstOrFail();
 
         $package = ItcPackage::query()
-            ->with(['transaction'])
+            ->with(['transaction', 'stakingPurchases', 'stakingTransactionAccruals'])
             ->whereUuid($uuid)
             ->firstOrFail();
 
         $oldAmount = $transaction->amount;
         $oldPercent = $package->month_profit_percent;
         $manualProfit = round((float) $request->input('manual_profit', 0), 2);
-        $topUpAmount = round((float) $request->input('amount', 0), 2);
+        $topUpTokens = round((float) $request->input('amount', 0), 2);
+        $oldTotalTokens = app(StakingPerformanceService::class)->forPackage($package)['total_tokens'];
         $manualAccrualType = StakingTransactionAccrualEnum::from(
             (string) $request->input('manual_accrual_type', StakingTransactionAccrualEnum::Profit->value)
         );
 
-        $exchangeRateItc = app(GeneralSetting::class)->exchange_rate_itc * 100;
-        $token = $topUpAmount / $exchangeRateItc;
-
-        $profit = $topUpAmount - $token;
-
-        if ($topUpAmount > 0) {
-            $transaction->increment('amount', $token);
-
-            new StakingAccrualService()
-                ->accrue($package, StakingTransactionAccrualEnum::TopUpBonus, $profit, $package->transaction->user_id);
+        if ($topUpTokens > 0) {
+            app(StakingPurchaseService::class)->addPurchaseByTokens($package, $topUpTokens, $package->transaction->user_id);
+            $package->refresh();
+            $package->load(['transaction', 'stakingPurchases', 'stakingTransactionAccruals']);
+            $transaction = $package->transaction;
         }
 
         if ($manualProfit > 0) {
@@ -202,16 +199,17 @@ final class ItcStakingController extends Controller
             'month_profit_percent' => $request->input('profit_percent'),
         ]);
 
-        if ($oldAmount !== $transaction->amount) {
+        $newTotalTokens = app(StakingPerformanceService::class)->forPackage($package)['total_tokens'];
 
+        if (round((float) $oldTotalTokens, 2) !== round((float) $newTotalTokens, 2)) {
             activity('admin')
                 ->performedOn($package)
                 ->causedBy(auth()->user())
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $topUpAmount,
-                    'old_amount' => $oldAmount,
+                    'amount' => round((float) $newTotalTokens, 2),
+                    'old_amount' => round((float) $oldTotalTokens, 2),
                 ])
                 ->log('admin_package_changed_amount');
         }
@@ -223,7 +221,7 @@ final class ItcStakingController extends Controller
                 ->withProperties([
                     'package_uuid' => $transaction->uuid,
                     'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $topUpAmount,
+                    'amount' => $topUpTokens,
                     'percent' => $oldPercent,
                     'old_percent' => $package->month_profit_percent,
                 ])
