@@ -63,8 +63,8 @@ return [
         'partner_transfer_sent' => 'Партнеру @:username переведена сумма :amount ITC с партнерского баланса',
         'partner_transfer_received' => 'Получена сумма :amount ITC от партнера @:username на основной баланс',
         'regular_bonus_transferred_to_partner' => 'Сумма :amount ITC переведена с баланса регулярной премии на партнерский баланс',
-        'staking_package_purchased' => 'Куплен пакет стейкинга :uuid на :amount ITC:rate',
-        'staking_package_topped_up' => 'В пакет стейкинга :uuid добавлено :amount ITC:rate',
-        'staking_profit_accrued' => 'Получена доходность :profit ITC на пакет стейкинга :uuid:rate',
+        'staking_package_purchased' => 'Куплен пакет стейкинга :uuid на :amount коинов:rate',
+        'staking_package_topped_up' => 'В пакет стейкинга :uuid добавлено :amount коинов:rate',
+        'staking_profit_accrued' => 'Получена доходность :profit коинов на пакет стейкинга :uuid:rate',
     ],
 ];
