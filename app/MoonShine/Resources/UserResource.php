@@ -192,6 +192,12 @@ class UserResource extends ModelResource
 
     public function query(): Builder
     {
+        $debits = collect(TrxTypeEnum::getDebits())->map(fn (TrxTypeEnum $type) => $type->value)->toArray();
+        $credits = collect(TrxTypeEnum::getCredits())->map(fn (TrxTypeEnum $type) => $type->value)->toArray();
+
+        $debitsList = "'" . implode("','", $debits) . "'";
+        $creditsList = "'" . implode("','", $credits) . "'";
+
         $q = parent::query()
             ->leftJoin('user_summary', 'user_summary.user_id', 'users.id')
             ->select([
@@ -199,7 +205,23 @@ class UserResource extends ModelResource
                 'user_summary.buy_packages_sum   as buy_packages_sum',
                 'user_summary.reinvests_sum     as reinvests_sum',
                 'user_summary.investments_sum     as investments_sum',
-                'user_summary.partner_balance   as partner_balance',
+                DB::raw("COALESCE((
+                    SELECT SUM(
+                        CASE
+                            WHEN transactions.trx_type IN ($debitsList)
+                                 AND transactions.accepted_at IS NOT NULL
+                                 AND transactions.rejected_at IS NULL
+                                THEN transactions.amount
+                            WHEN transactions.trx_type IN ($creditsList)
+                                 AND transactions.rejected_at IS NULL
+                                THEN -transactions.amount
+                            ELSE 0
+                        END
+                    )
+                    FROM transactions
+                    WHERE transactions.user_id = users.id
+                      AND transactions.balance_type = 'partner'
+                ), 0) as partner_balance"),
                 'user_summary.partners_count    as partners_count',
                 'user_summary.first_package_at  as first_package_at',
             ]);
@@ -210,7 +232,8 @@ class UserResource extends ModelResource
     public function resolveItemQuery(): Builder
     {
         return parent::resolveItemQuery()
-            ->withoutGlobalScope('notBanned');
+            ->withoutGlobalScope('notBanned')
+            ->with(['summary', 'referrer', 'levelOverride']);
     }
 
     public function ban(): MoonShineJsonResponse

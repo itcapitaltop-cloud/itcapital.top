@@ -1,109 +1,87 @@
-# Architecture: Modular Monolith
+# Architecture
 
-## Overview
-ITCapital already behaves like a modular monolith: one Laravel application, one deployment unit, and several business areas with shared infrastructure. That matches the current team and code shape better than microservices or a strict layered rewrite.
+## Recommended Pattern
+Use a pragmatic layered Laravel architecture with explicit application services and actions around the existing Eloquent models, MoonShine admin resources, Livewire components, and Blade views.
 
-The goal is not to force a new structure on the codebase. The goal is to keep growing the existing Laravel app with clearer boundaries between account, wallet, package, partner, academy, and admin concerns while preserving Laravel's normal ergonomics.
+This project already contains technical debt and mixed patterns, so architecture work should improve seams incrementally rather than force a large rewrite.
 
-## Decision Rationale
-- **Project type:** Multi-domain financial/account web platform with user-facing and admin-facing workflows
-- **Tech stack:** PHP 8.4, Laravel 12, Blade, Livewire 3, PostgreSQL, Redis
-- **Key factor:** The domain is broad and stateful, but the app is still a single deployable system with many shared models, services, and admin operations
-
-## Folder Structure
-```text
-app/
-  Actions/            Small write-side domain operations
-  Http/Controllers/   HTTP entry points and thin request orchestration
-  Livewire/           Reactive UI components for account/auth/public flows
-  Models/             Eloquent models and relationships
-  MoonShine/          Admin panel resources, pages, handlers, auth pipelines
-  Repositories/       Data-access and external persistence adapters
-  Services/           Domain/application services grouped by area
-  Providers/          Container bindings and bootstrapping
-database/
-  migrations/         Schema evolution
-  factories/          Test and seeding factories
-resources/
-  views/              Blade pages and shared templates
-  js/                 Vite entrypoints and realtime bootstrap
-routes/
-  web.php             Public, account, academy, and admin routes
-docker/               Runtime containers for app, nginx, db, redis, cron
-tests/                Pest feature coverage for domain flows
-```
+## Layers
+| Layer | Locations | Responsibilities |
+|-------|-----------|------------------|
+| Presentation | `routes/`, `app/Http/`, `app/Livewire/`, `resources/views/`, `app/View/Components/`, `app/MoonShine/` | Routing, request validation, authorization entry points, rendering, admin UI behavior |
+| Application | `app/Actions/`, `app/Services/`, `app/Tasks/` | Business workflows, orchestration, transactions, external integrations, activity logging coordination |
+| Domain Data | `app/Models/`, `app/Enums/`, `app/Dto/`, `app/Casts/`, `app/Settings/` | Eloquent state, typed domain values, settings, casts, relationships, query scopes |
+| Persistence | `database/migrations/`, `database/factories/`, `database/seeders/`, `app/Repositories/` | Schema, test data, data access abstractions where already used |
+| Infrastructure | `docker/`, `docker-compose.yml`, `config/`, `.mcp.json` | Runtime services, framework configuration, external tools |
 
 ## Dependency Rules
-- ✅ Routes, controllers, and Livewire components may depend on actions, services, form-like validation objects, and Eloquent models
-- ✅ Actions and services may depend on models, repositories, contracts, and framework abstractions
-- ✅ Repositories may depend on external SDKs, query logic, and persistence concerns
-- ✅ MoonShine resources may reuse application services instead of embedding business rules directly
-- ❌ Controllers must not become the home for package, partner, wallet, or accrual business logic
-- ❌ Livewire components must not duplicate domain rules that already belong in actions or services
-- ❌ Repositories must not render views or own HTTP concerns
-- ❌ Domain services should not depend on Blade views or MoonShine resource classes
+- Controllers, Livewire components, and MoonShine pages may call actions or services, not embed complex business workflows.
+- Services and actions may use Eloquent models, repositories, DTOs, enums, settings, events, queues, and logging services.
+- Models should keep relationships, casts, scopes, and simple invariants; avoid growing large procedural workflows inside models.
+- Repositories should be used consistently where they already exist; do not introduce a repository for every model by default.
+- Activity logging should be centralized through existing activity-log services and strategies rather than repeated inline logging blocks.
+- Database write flows that affect balances, staking state, profit, reinvestment, withdrawals, ranks, or rewards should be transactional.
+- Admin UI resources should delegate calculations and state changes to services/actions.
 
-## Layer / Module Communication
-- Public web routes, account pages, academy pages, and admin resources should call into shared domain actions and services instead of inventing parallel logic paths
-- Shared business rules should live in reusable services or actions, with transport-specific adapters at the edges: controllers, Livewire, console, or MoonShine
-- Eloquent models remain the canonical persistence layer, but orchestration across multiple models should happen in actions/services instead of fat controllers
-- External integrations such as Google Drive / Sheets should stay behind contracts and repository-style adapters bound in service providers
+## Financial and Staking Rules
+- Avoid floating-point arithmetic for financial values.
+- Keep package, staking, accrual, reinvestment, and withdrawal transitions explicit and test-covered.
+- Prefer idempotent operations for scheduled jobs, backfills, observers, and retryable work.
+- Use row-level locking or other concurrency controls when changing balances or dependent financial state.
+- Preserve legacy data assumptions unless a migration/backfill plan explicitly changes them.
 
-## Key Principles
-1. Organize new code by business capability first, framework type second.
-2. Keep entry points thin and move state transitions into explicit actions or services.
-3. Reuse the same domain logic across Blade, Livewire, admin, and console flows whenever behavior overlaps.
+## Activity Logging
+- New business event logs should use `spatie/laravel-activitylog` and existing project services/strategies.
+- Prefer structured event names and properties that allow admin audit views to filter and explain what happened.
+- Do not log secrets, raw tokens, passwords, full credentials, or sensitive payloads.
 
-## Code Examples
+## Testing Guidelines
+- Use Pest for new tests unless a nearby test file uses PHPUnit style and consistency is more important.
+- Feature tests should cover HTTP/admin-visible behavior, authorization, validation, and persistence outcomes.
+- Unit tests should cover pure services, DTOs, calculation logic, and transition rules.
+- Use factories and fakes for queues, notifications, events, HTTP clients, and storage.
+- Add regression tests for bug fixes in financial, partner, staking, and activity-log behavior.
 
-### Thin Controller Delegating to an Action
+## Database Guidelines
+- Use migrations for all schema changes.
+- Index columns used in frequent filters, joins, admin tables, dashboards, and reports.
+- Use eager loading and aggregate queries for admin dashboards and feeds.
+- Review expensive queries with PostgreSQL `EXPLAIN ANALYZE` when performance is relevant.
+- Treat backfills as production-impacting work: make them resumable or scoped when data volume may be large.
+
+## Frontend Guidelines
+- Preserve the existing Blade, Livewire, Vite, and Tailwind stack.
+- Keep UI components aligned with existing account, dashboard, data, tab, widget, and index component patterns.
+- Use Livewire for reactive server-backed interfaces already following project conventions.
+- Keep JavaScript additions minimal and integrate with existing `resources/js/app.js`, `bootstrap.js`, and `echo.js` as appropriate.
+
+## Example Workflow Shape
 ```php
-<?php
-
-namespace App\Http\Controllers\Packages;
-
-use App\Actions\Staking\CreateStakingPackageAction;
-use App\Http\Requests\Packages\StoreStakingPackageRequest;
-use Illuminate\Http\RedirectResponse;
-
-class ItcStakingController
-{
-    public function store(StoreStakingPackageRequest $request, CreateStakingPackageAction $action): RedirectResponse
-    {
-        $action->handle(
-            user: $request->user(),
-            payload: $request->validated(),
-        );
-
-        return to_route('itc-staking')->with('status', 'staking-created');
-    }
-}
-```
-
-### Service Depending on a Repository Contract
-```php
-<?php
-
-namespace App\Services\Admin;
-
-use App\Contracts\ExternalServices\GoogleSheetsUploaderContract;
-
-class SummaryMetricsService
+final readonly class PurchaseStakingPackageAction
 {
     public function __construct(
-        protected GoogleSheetsUploaderContract $googleSheetsUploader,
-    ) {
-    }
+        private BusinessActivityLogger $activityLogger,
+    ) {}
 
-    public function export(array $rows): void
+    public function execute(User $user, PurchaseStakingPackageData $data): ItcPackage
     {
-        $this->googleSheetsUploader->upload($rows);
+        return DB::transaction(function () use ($user, $data): ItcPackage {
+            // Validate state, create or update package records, then log the business event.
+        });
     }
 }
 ```
 
-## Anti-Patterns
-- ❌ Adding more business branching directly inside `routes/web.php`, controllers, or MoonShine resource callbacks
-- ❌ Copying the same accrual, partner, or wallet logic into both Livewire and admin code paths
-- ❌ Treating repositories as generic dumping grounds for business decisions
-- ❌ Splitting the app into pseudo-microservices before domain boundaries are stable and independently deployable
+## Verification Commands
+Use the commands that match the changed area:
+- `php artisan test`
+- `./vendor/bin/pest`
+- `./vendor/bin/phpstan analyse`
+- `./vendor/bin/pint --test`
+- `npm run build`
+
+## Migration Strategy
+- Prefer small migrations with clear names.
+- Keep destructive schema changes separate from data backfills.
+- For legacy repair migrations, document the assumptions in the migration body with concise comments.
+- Avoid changing historical migrations unless the project has not shared or run them anywhere; add a new migration instead.

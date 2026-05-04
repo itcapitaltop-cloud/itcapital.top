@@ -9,12 +9,9 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
-use App\Models\PackageProfit;
-use App\Models\PackageProfitReinvest;
 use App\Models\Partner;
 use App\Models\PartnerLevelPercent;
 use App\Models\Transaction;
-use App\Models\User;
 use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
@@ -23,7 +20,6 @@ use App\MoonShine\Components\StatisticLinearPartner;
 use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\Alert;
@@ -46,7 +42,6 @@ use MoonShine\Fields\Hidden;
 use MoonShine\Fields\Number;
 use MoonShine\Fields\Password;
 use MoonShine\Fields\Preview;
-use MoonShine\Fields\Relationships\BelongsTo;
 use MoonShine\Fields\Select;
 use MoonShine\Fields\Switcher;
 use MoonShine\Fields\Template;
@@ -83,8 +78,8 @@ class UserDetailPage extends DetailPage
 
         $activeTab = request('tab', 'main');
         $openPackage = request('openPackage');
+        $loadedSections = [];
 
-        //        Log::channel('source')->debug($activeTab);
         if (! $item->relationLoaded('summary')) {
             $item->load('summary');
         }
@@ -275,89 +270,100 @@ class UserDetailPage extends DetailPage
             components: $packageComponents
         )->name('create-package-modal');
 
-        $packages = ItcPackage::query()
-            ->with([
-                'transaction:id,uuid,amount,user_id',
-                'reinvestProfits' => fn ($q) => $q
-                    ->whereDoesntHave('withdraw')
-                    ->select('id', 'uuid', 'package_uuid', 'amount', 'created_at', 'matured_at'),
-            ])
-            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
-            ->withSum([
-                'reinvestProfits as reinvest_profits_sum_amount' => fn ($q) => $q->whereDoesntHave('withdraw'),
-            ], 'amount')
-            ->withSum([
-                'profits as profits_sum_amount' => fn ($q) => $q   // profits — базовая связь
-                    ->select(DB::raw('COALESCE(SUM(amount),0)')),
-            ], 'amount')
-            ->get()
-            ->map(fn (ItcPackage $pkg) => [
-                'uuid' => $pkg->transaction->uuid,
-                'amount' => $pkg->transaction->amount,
-                'type' => $pkg->type,
-                'month_profit_percent' => $pkg->month_profit_percent,
-                // все реинвесты по пакету (включая soft-deleted и снятые)
-                'reinvest_total_all' => (float) PackageProfitReinvest::withTrashed()
-                    ->where('package_uuid', $pkg->uuid)
-                    ->sum('amount'),
-                'unwithdrawn_profits' => function ($item) {
-                    $package = ItcPackage::whereUuid($item->uuid)
-                        ->withSum('profits', 'amount')
-                        ->withSum('reinvestProfitsAll', 'amount')
-                        ->withSum('withdrawProfitsTransactions', 'amount');
+        $packages = [];
+        $unwithdrawnProfits = collect();
+        $partners = collect();
+        $userLogs = [];
+        $adminLogs = [];
 
-                    return $package->getCurrentProfitAmount()->isNegative() ? '0' : scale($package->getCurrentProfitAmount())->stripTrailingZeros()->__toString();
-                },
-                // все дивиденды по пакету (включая soft-deleted)
-                'profits_total_all' => (float) PackageProfit::withTrashed()
-                    ->where('package_uuid', $pkg->uuid)
-                    ->sum('amount'),
-                'itc_created_at' => $pkg->created_at,
-                'reinvest_profits' => $pkg->reinvestProfits
-                    ->map(fn ($r) => [
-                        'uuid' => $r->uuid,
-                        'package_uuid' => $r->package_uuid,
-                        'amount' => $r->amount,
-                        'matured_at' => $r->matured_at,
-                        'created_at' => $r->created_at,
-                    ])
-                    ->toArray(),
-            ])
-            ->toArray();
+        if ($activeTab === 'packages') {
+            $packageModels = ItcPackage::query()
+                ->with([
+                    'transaction:id,uuid,amount,user_id',
+                    'reinvestProfits' => fn ($q) => $q
+                        ->whereDoesntHave('withdraw')
+                        ->select('id', 'uuid', 'package_uuid', 'amount', 'created_at', 'matured_at'),
+                ])
+                ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
+                ->withSum([
+                    'reinvestProfits as reinvest_profits_sum_amount' => fn ($q) => $q->whereDoesntHave('withdraw'),
+                ], 'amount')
+                ->withSum([
+                    'profits as profits_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum('reinvestProfitsAll', 'amount')
+                ->withSum('withdrawProfitsTransactions', 'amount')
+                ->withSum([
+                    'reinvestProfitsAll as reinvest_total_all' => fn ($q) => $q->withTrashed(),
+                ], 'amount')
+                ->withSum([
+                    'profits as profits_total_all' => fn ($q) => $q->withTrashed(),
+                ], 'amount')
+                ->get();
 
-        $unwithdrawnProfits = ItcPackage::query()
-            ->withSum('profits', 'amount')
-            ->withSum('reinvestProfitsAll', 'amount')
-            ->withSum('withdrawProfitsTransactions', 'amount')
-            ->whereHas('transaction', fn ($q) => $q->where('user_id', $item->id))
-            ->get()
-            ->mapWithKeys(fn (ItcPackage $pkg) => [
-                $pkg->uuid => [
-                    'unwithdrawn_profits' => $pkg->getCurrentProfitAmount()
-                        ->toFloat(),
-                ],
-            ]);
+            $unwithdrawnProfits = $packageModels
+                ->mapWithKeys(fn (ItcPackage $pkg) => [
+                    $pkg->uuid => [
+                        'unwithdrawn_profits' => $pkg->getCurrentProfitAmount()->toFloat(),
+                    ],
+                ]);
 
-        $reinvests = collect($packages)
-            ->pluck('reinvest_profits')
-            ->flatten(1)
-            ->all();
-        $partners = Partner::with('user')
-            ->where('partner_id', $item->id)
-            ->get()
-            ->map(function (Partner $partner) {
-                return [
-                    'id' => $partner?->user_id,
-                    'username' => $partner?->user?->username,
-                    'email' => $partner?->user?->email,
-                    'partner_id' => $partner?->partner_id,
-                ];
-            });
+            $packages = $packageModels
+                ->map(fn (ItcPackage $pkg) => [
+                    'uuid' => $pkg->transaction->uuid,
+                    'amount' => $pkg->transaction->amount,
+                    'type' => $pkg->type,
+                    'month_profit_percent' => $pkg->month_profit_percent,
+                    'reinvest_total_all' => (float) ($pkg->reinvest_total_all ?? 0),
+                    'profits_total_all' => (float) ($pkg->profits_total_all ?? 0),
+                    'itc_created_at' => $pkg->created_at,
+                    'reinvest_profits' => $pkg->reinvestProfits
+                        ->map(fn ($r) => [
+                            'uuid' => $r->uuid,
+                            'package_uuid' => $r->package_uuid,
+                            'amount' => $r->amount,
+                            'matured_at' => $r->matured_at,
+                            'created_at' => $r->created_at,
+                        ])
+                        ->toArray(),
+                ])
+                ->toArray();
 
-        $activityFeedService = app(ActivityFeedService::class);
+            $loadedSections['packages'] = count($packages);
+        } else {
+            $loadedSections['packages'] = 'deferred';
+        }
 
-        $userLogs = $activityFeedService->userDetailUserFeed($item->id);
-        $adminLogs = $activityFeedService->userDetailAdminFeed($item->id);
+        if ($activeTab === 'referrals') {
+            $partners = Partner::with('user')
+                ->where('partner_id', $item->id)
+                ->get()
+                ->map(function (Partner $partner) {
+                    return [
+                        'id' => $partner?->user_id,
+                        'username' => $partner?->user?->username,
+                        'email' => $partner?->user?->email,
+                        'partner_id' => $partner?->partner_id,
+                    ];
+                });
+
+            $loadedSections['referrals'] = $partners->count();
+        } else {
+            $loadedSections['referrals'] = 'deferred';
+        }
+
+        if ($activeTab === 'logs') {
+            $activityFeedService = app(ActivityFeedService::class);
+
+            $userLogs = $activityFeedService->userDetailUserFeed($item->id);
+            $adminLogs = $activityFeedService->userDetailAdminFeed($item->id);
+            $loadedSections['user_logs'] = count($userLogs);
+            $loadedSections['admin_logs'] = count($adminLogs);
+        } else {
+            $loadedSections['user_logs'] = 'deferred';
+            $loadedSections['admin_logs'] = 'deferred';
+        }
 
         $referrerLink = $item->referrer ?
             Url::make(
@@ -514,13 +520,12 @@ class UserDetailPage extends DetailPage
                     ModelCast::make(Partner::class)
                 )
                 ->fields([
-                    BelongsTo::make(
-                        'Переназначить реферера',
-                        'referrer',
-                        formatted: fn (User $user) => "{$user->username}, {$user->email}",
-                        resource: new UserResource()
+                    Number::make(
+                        'ID нового реферера',
+                        'partner_id'
                     )
-                        ->searchable(),
+                        ->min(1)
+                        ->hint('Введите ID пользователя-реферера. Список пользователей не загружается, чтобы не переполнять память.'),
                     Hidden::make('user_id')->fill($partner['id']),
                 ])
                 ->async()
@@ -562,15 +567,76 @@ class UserDetailPage extends DetailPage
                 ]),
         ]);
 
-        $override = $item->levelOverride
-            ? UserLevelPercentOverride::where('user_id', $item->id)->get()
-            : null;
+        $override = null;
+        $percentGridRows = [];
+
+        if ($activeTab === 'level_settings') {
+            $override = $item->levelOverride
+                ? UserLevelPercentOverride::where('user_id', $item->id)->get()
+                : null;
+            $percentGridRows = PartnerLevelPercent::asGridRows(override: $override);
+            $loadedSections['level_settings'] = count($percentGridRows);
+        } else {
+            $loadedSections['level_settings'] = 'deferred';
+        }
+
+        $deferredTab = static function (string $tab, string $label): FlexibleRender {
+            $url = e(request()->fullUrlWithQuery(['tab' => $tab]));
+            $id = 'deferred-tab-' . $tab;
+
+            return FlexibleRender::make(
+                fn () => <<<HTML
+                    <div id="{$id}" class="p-4" data-deferred-tab-url="{$url}">
+                        <span class="opacity-70">Загрузка...</span>
+                        <noscript><a class="btn btn-primary" href="{$url}">{$label}</a></noscript>
+                        <script>
+                            (() => {
+                                const el = document.getElementById('{$id}');
+                                if (!el || el.dataset.deferredTabBound === '1') return;
+                                el.dataset.deferredTabBound = '1';
+
+                                const redirectWhenVisible = () => {
+                                    const visible = el.offsetParent !== null;
+                                    if (visible && window.location.href !== el.dataset.deferredTabUrl) {
+                                        window.location.href = el.dataset.deferredTabUrl;
+                                    }
+                                };
+
+                                redirectWhenVisible();
+
+                                const observer = new IntersectionObserver((entries) => {
+                                    if (entries.some((entry) => entry.isIntersecting)) {
+                                        redirectWhenVisible();
+                                    }
+                                });
+
+                                observer.observe(el);
+                            })();
+                        </script>
+                    </div>
+                HTML
+            );
+        };
+
+        if ($activeTab === 'statistic_linear_partner') {
+            $statisticComponents = [
+                Block::make([
+                    StatisticLinearPartner::make($item->id),
+                ]),
+            ];
+            $loadedSections['statistic_linear_partner'] = 1;
+        } else {
+            $statisticComponents = [$deferredTab('statistic_linear_partner', 'Загрузить статистику по линиям')];
+            $loadedSections['statistic_linear_partner'] = 'deferred';
+        }
+
         $line = 0;
 
         $staking = ItcPackage::with([
             'transaction',
             'transaction.user' => fn ($query) => $query->where('id', $item->id),
         ])
+            ->whereHas('transaction', fn ($query) => $query->where('user_id', $item->id))
             ->where('type', PackageTypeEnum::STAKING)
             ->first();
 
@@ -621,6 +687,7 @@ class UserDetailPage extends DetailPage
                 Tab::make(
                     'Пакеты',
                     [
+                        ...($activeTab !== 'packages' ? [$deferredTab('packages', 'Загрузить пакеты')] : []),
                         Heading::make("Пакеты {$item['username']}")->h(2),
                         TableBuilder::make()
                             ->withNotFound()
@@ -719,6 +786,7 @@ class UserDetailPage extends DetailPage
                 Tab::make(
                     'Рефералы',
                     [
+                        ...($activeTab !== 'referrals' ? [$deferredTab('referrals', 'Загрузить рефералов')] : []),
                         FormBuilder::make()
                             ->action('/itcapitalmoonshineadminpanel/partners')
                             ->fields([
@@ -783,6 +851,7 @@ class UserDetailPage extends DetailPage
                 )->name('referrals')
                     ->active(fn () => $activeTab === 'referrals'),
                 Tab::make('Настройка рангов', [
+                    ...($activeTab !== 'level_settings' ? [$deferredTab('level_settings', 'Загрузить настройку рангов')] : []),
                     // Форма с чекбоксом и полем "Ранг"
                     Block::make([
                         FormBuilder::make()
@@ -842,7 +911,7 @@ class UserDetailPage extends DetailPage
                                             ]),
                                     ])
                                     ->items(
-                                        PartnerLevelPercent::asGridRows(override: $override)
+                                        $percentGridRows
                                     )
                                     ->customAttributes([
                                         'x-bind:class' => "!override_enabled ? 'mns-disabled-edit' : ''",
@@ -889,10 +958,12 @@ class UserDetailPage extends DetailPage
                             }',
                         ]),
                 ])
-                    ->name('level_settings'),
+                    ->name('level_settings')
+                    ->active(fn () => $activeTab === 'level_settings'),
                 Tab::make(
                     'Журнал',
                     [
+                        ...($activeTab !== 'logs' ? [$deferredTab('logs', 'Загрузить журнал')] : []),
                         Tabs::make([
                             Tab::make(
                                 'Администратор',
@@ -938,12 +1009,9 @@ class UserDetailPage extends DetailPage
                 )
                     ->name('logs')
                     ->active(fn () => $activeTab === 'logs'),
-                Tab::make('Статистика по линиям', [
-                    Block::make([
-                        StatisticLinearPartner::make($item->id),
-                    ]),
-                ])
-                    ->name('statistic_linear_partner'),
+                Tab::make('Статистика по линиям', $statisticComponents)
+                    ->name('statistic_linear_partner')
+                    ->active(fn () => $activeTab === 'statistic_linear_partner'),
             ]),
         ];
 
