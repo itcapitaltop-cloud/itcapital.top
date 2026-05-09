@@ -34,6 +34,7 @@ app/View/Components/ Blade component classes
 bootstrap/           Laravel bootstrap files
 config/              Laravel and package configuration
 database/            Migrations, factories, seeders, and settings data
+.devcontainer/       Dev Container manifest, Compose override, and bootstrap script
 docker/              Docker build contexts for app, nginx, PostgreSQL, and Redis
 lang/                Localization files
 public/              Public web root and built/static assets
@@ -59,6 +60,9 @@ tests/               Pest/PHPUnit test suite
 | `composer.json` | PHP dependencies and autoload configuration |
 | `package.json` | JavaScript dependencies and frontend scripts |
 | `docker-compose.yml` | Local app, nginx, PostgreSQL, and Redis services |
+| `.devcontainer/devcontainer.json` | Dev Container IDE/runtime manifest |
+| `.devcontainer/docker-compose.devcontainer.yml` | Dev Container Compose override |
+| `.devcontainer/post-create.sh` | Dev Container bootstrap script |
 | `phpstan.neon` | PHPStan/Larastan configuration |
 | `phpunit.xml` | Test runner configuration |
 | `pint.json` | Laravel Pint formatting configuration |

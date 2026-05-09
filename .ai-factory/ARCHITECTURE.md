@@ -12,7 +12,7 @@ This project already contains technical debt and mixed patterns, so architecture
 | Application | `app/Actions/`, `app/Services/`, `app/Tasks/` | Business workflows, orchestration, transactions, external integrations, activity logging coordination |
 | Domain Data | `app/Models/`, `app/Enums/`, `app/Dto/`, `app/Casts/`, `app/Settings/` | Eloquent state, typed domain values, settings, casts, relationships, query scopes |
 | Persistence | `database/migrations/`, `database/factories/`, `database/seeders/`, `app/Repositories/` | Schema, test data, data access abstractions where already used |
-| Infrastructure | `docker/`, `docker-compose.yml`, `config/`, `.mcp.json` | Runtime services, framework configuration, external tools |
+| Infrastructure | `.devcontainer/`, `docker/`, `docker-compose.yml`, `config/`, `.mcp.json` | Runtime services, development containers, framework configuration, external tools |
 
 ## Dependency Rules
 - Controllers, Livewire components, and MoonShine pages may call actions or services, not embed complex business workflows.
