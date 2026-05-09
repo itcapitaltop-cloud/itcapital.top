@@ -72,3 +72,79 @@ it('builds line statistics for the requested user instead of the authenticated a
         ->and((float) $lineBar['current'])->toBe(1000.0)
         ->and((float) $lineBar['target'])->toBe(5000.0);
 });
+
+it('preserves pre-override line excess and fills missing manual-rank baseline', function () {
+    $admin = User::factory()->create();
+    $sponsor = User::factory()->create([
+        'rank' => 1,
+        'overridden_rank' => true,
+        'overridden_rank_from' => now()->subDay(),
+    ]);
+    $lineOnePartner = User::factory()->create();
+    $lineTwoPartner = User::factory()->create();
+
+    $rankOne = PartnerRank::factory()->create(['rank' => 1]);
+    PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankOne->id,
+        'line' => 1,
+        'required_turnover' => 4000,
+        'personal_deposit' => null,
+    ]);
+    PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankOne->id,
+        'line' => 2,
+        'required_turnover' => 5000,
+        'personal_deposit' => null,
+    ]);
+
+    $rankTwo = PartnerRank::factory()->create(['rank' => 2]);
+    PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankTwo->id,
+        'line' => 1,
+        'required_turnover' => 5000,
+        'personal_deposit' => null,
+    ]);
+    PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankTwo->id,
+        'line' => 2,
+        'required_turnover' => 6000,
+        'personal_deposit' => null,
+    ]);
+
+    PartnerClosure::factory()->create([
+        'ancestor_id' => $sponsor->id,
+        'descendant_id' => $lineOnePartner->id,
+        'depth' => 1,
+    ]);
+    PartnerClosure::factory()->create([
+        'ancestor_id' => $sponsor->id,
+        'descendant_id' => $lineTwoPartner->id,
+        'depth' => 2,
+    ]);
+
+    foreach ([
+        [$lineOnePartner, 6500],
+        [$lineTwoPartner, 3000],
+    ] as [$partner, $amount]) {
+        $transaction = Transaction::factory()->create([
+            'user_id' => $partner->id,
+            'amount' => $amount,
+            'trx_type' => TrxTypeEnum::BUY_PACKAGE,
+            'accepted_at' => now()->subDays(2),
+        ]);
+
+        ItcPackage::factory()->create([
+            'uuid' => $transaction->uuid,
+            'closed_at' => null,
+        ]);
+    }
+
+    $this->actingAs($admin);
+
+    $bars = collect(ProgressBarAction::make()->run($sponsor->id));
+    $lineOneBar = $bars->first(fn (array $bar): bool => (float) $bar['target'] === 5000.0);
+    $lineTwoBar = $bars->first(fn (array $bar): bool => (float) $bar['target'] === 6000.0);
+
+    expect((float) $lineOneBar['current'])->toBe(2500.0)
+        ->and((float) $lineTwoBar['current'])->toBe(0.0);
+});

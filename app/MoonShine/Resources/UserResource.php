@@ -26,6 +26,7 @@ use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\User\UserRankServices;
 use Carbon\Carbon;
 use Closure;
 use Exception;
@@ -614,8 +615,9 @@ class UserResource extends ModelResource
 
     public function saveLevelOverride(MoonShineRequest $request): MoonShineJsonResponse
     {
+        $data = [];
+
         try {
-            Log::channel('source')->debug($request->session()->token());
             $data = $request->all();
 
             $userId = $data['user_id'] ?? null;
@@ -628,6 +630,16 @@ class UserResource extends ModelResource
             // Статусы галочек
             $overrideEnabled = (bool) ($data['override_enabled'] ?? false);
             $overriddenRank = (bool) ($data['overridden_rank'] ?? false);
+
+            Log::debug('[UserResource.saveLevelOverride] start', [
+                'user_id' => $user->id,
+                'old_rank' => $user->rank,
+                'requested_rank' => $data['rank'] ?? null,
+                'old_overridden_rank' => (bool) $user->overridden_rank,
+                'requested_overridden_rank' => $overriddenRank,
+                'old_overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                'override_enabled' => $overrideEnabled,
+            ]);
 
             $url = to_page(
                 page: new UserDetailPage(),
@@ -646,15 +658,42 @@ class UserResource extends ModelResource
             }
 
             if (! $overriddenRank && $user->overridden_rank) {
-                $user->overridden_rank = false;
-                $user->overridden_rank_from = null;
-                $user->save();
-                Artisan::call('user:use-rank --no-bonus', ['--user' => $user->id]);
+                $oldRank = (int) $user->rank;
+
+                $user->forceFill([
+                    'overridden_rank' => false,
+                    'overridden_rank_from' => null,
+                ])->save();
+
+                $user->refresh();
+                app(UserRankServices::class)->recalculateAndUpdateRank($user, false);
+                $user->refresh();
+
+                Log::info('[UserResource.saveLevelOverride] manual rank disabled and natural rank restored', [
+                    'user_id' => $user->id,
+                    'old_rank' => $oldRank,
+                    'natural_rank' => $user->rank,
+                    'overridden_rank' => (bool) $user->overridden_rank,
+                    'overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                ]);
             } else {
+                $resetOverrideDate = $overriddenRank
+                    && (! $user->overridden_rank || (int) $user->rank !== (int) $rank);
+
                 $user->rank = $rank;
                 $user->overridden_rank = $overriddenRank;
-                $user->overridden_rank_from = $overriddenRank ? now() : null;
+                $user->overridden_rank_from = $overriddenRank
+                    ? ($resetOverrideDate ? now() : $user->overridden_rank_from)
+                    : null;
                 $user->save();
+
+                Log::debug('[UserResource.saveLevelOverride] manual rank state saved', [
+                    'user_id' => $user->id,
+                    'rank' => $user->rank,
+                    'overridden_rank' => (bool) $user->overridden_rank,
+                    'overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                    'reset_override_date' => $resetOverrideDate,
+                ]);
             }
 
             if (! $overrideEnabled) {
@@ -723,6 +762,12 @@ class UserResource extends ModelResource
                 ->toast('Сохранено')
                 ->redirect($url);
         } catch (Throwable $e) {
+            Log::error('[UserResource.saveLevelOverride] failed', [
+                'user_id' => $data['user_id'] ?? null,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
             return MoonShineJsonResponse::make()
                 ->toast('Ошибка: ' . $e->getMessage(), 'error');
         }

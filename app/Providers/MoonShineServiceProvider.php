@@ -125,6 +125,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
                 ->canSee($this->canSeeResource(AdminUserResource::class)),
             MenuItem::make('Роли', new MoonShineUserRoleResource())
                 ->canSee($this->canSeeResource(MoonShineUserRoleResource::class)),
+            MenuItem::make('Документация', '/itcapitalmoonshineadminpanel/docs')
+                ->canSee($this->canSeeMoonShineUser()),
         ];
     }
 
@@ -173,6 +175,13 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             }
 
             return $user->isSuperUser();
+        };
+    }
+
+    private function canSeeMoonShineUser(): Closure
+    {
+        return function (): bool {
+            return auth(config('moonshine.auth.guard', 'moonshine'))->user() instanceof MoonshineUser;
         };
     }
 

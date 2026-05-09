@@ -268,3 +268,75 @@ it('пересчет ранга с учетом overridden_rank', function () {
     // Должен соответствовать рангу 2
     expect($calculatedRank)->toBe(2);
 });
+
+it('сохраняет излишек оборота по линиям при расчете ручного ранга', function () {
+    $overrideFrom = now()->subDay();
+
+    $user = User::factory()->create([
+        'rank' => 1,
+        'overridden_rank' => true,
+        'overridden_rank_from' => $overrideFrom,
+    ]);
+
+    $lineOnePartner = User::factory()->create();
+    $lineTwoPartner = User::factory()->create();
+
+    \App\Models\PartnerClosure::factory()->create([
+        'ancestor_id' => $user->id,
+        'descendant_id' => $lineOnePartner->id,
+        'depth' => 1,
+    ]);
+    \App\Models\PartnerClosure::factory()->create([
+        'ancestor_id' => $user->id,
+        'descendant_id' => $lineTwoPartner->id,
+        'depth' => 2,
+    ]);
+
+    $rankOne = \App\Models\PartnerRank::factory()->create(['rank' => 1]);
+    \App\Models\PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankOne->id,
+        'line' => 1,
+        'required_turnover' => 4000,
+        'personal_deposit' => null,
+    ]);
+    \App\Models\PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankOne->id,
+        'line' => 2,
+        'required_turnover' => 5000,
+        'personal_deposit' => null,
+    ]);
+
+    $rankTwo = \App\Models\PartnerRank::factory()->create(['rank' => 2]);
+    \App\Models\PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankTwo->id,
+        'line' => 1,
+        'required_turnover' => 5000,
+        'personal_deposit' => null,
+    ]);
+    \App\Models\PartnerRankRequirement::factory()->create([
+        'partner_rank_id' => $rankTwo->id,
+        'line' => 2,
+        'required_turnover' => 6000,
+        'personal_deposit' => null,
+    ]);
+
+    foreach ([
+        [$lineOnePartner, 6500, now()->subDays(2)],
+        [$lineOnePartner, 2500, now()],
+        [$lineTwoPartner, 3000, now()->subDays(2)],
+        [$lineTwoPartner, 6000, now()],
+    ] as [$partner, $amount, $acceptedAt]) {
+        $transaction = Transaction::factory()->create([
+            'user_id' => $partner->id,
+            'amount' => $amount,
+            'trx_type' => \App\Enums\Transactions\TrxTypeEnum::BUY_PACKAGE,
+            'accepted_at' => $acceptedAt,
+        ]);
+
+        \App\Models\ItcPackage::factory()->create(['uuid' => $transaction->uuid]);
+    }
+
+    $service = app(\App\Services\User\UserRankServices::class);
+
+    expect($service->calculateRank($user))->toBe(2);
+});

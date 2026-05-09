@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Tasks\User\AwardUserRankBonusTask;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final class UserRankServices
 {
@@ -29,6 +30,8 @@ final class UserRankServices
      * @var array<int, float>
      */
     private array $lineTurnoverCache = [];
+
+    private bool $useManualRankBaseline = false;
 
     /**
      * @param \App\Contracts\Repositories\PartnerRepositoryContract $partnerRepository
@@ -53,6 +56,14 @@ final class UserRankServices
         $newRank = $this->calculateRank($user);
         $oldRank = $user->rank;
 
+        Log::debug('[UserRankServices.recalculateAndUpdateRank] calculated rank', [
+            'user_id' => $user->id,
+            'old_rank' => $oldRank,
+            'new_rank' => $newRank,
+            'with_bonus' => $withBonus,
+            'overridden_rank' => (bool) $user->overridden_rank,
+        ]);
+
         if ($newRank === $oldRank) {
             return false;
         }
@@ -63,6 +74,13 @@ final class UserRankServices
         }
 
         $user->update(['rank' => $newRank]);
+
+        Log::info('[UserRankServices.recalculateAndUpdateRank] persisted rank change', [
+            'user_id' => $user->id,
+            'old_rank' => $oldRank,
+            'new_rank' => $newRank,
+            'with_bonus' => $withBonus,
+        ]);
 
         return true;
     }
@@ -75,20 +93,57 @@ final class UserRankServices
      */
     public function calculateRank(User $user): int
     {
+        return $this->calculateRankForMode(
+            user: $user,
+            useManualRankBaseline: (bool) $user->overridden_rank,
+        );
+    }
+
+    public function calculateNaturalRank(User $user): int
+    {
+        return $this->calculateRankForMode($user, false);
+    }
+
+    private function calculateRankForMode(User $user, bool $useManualRankBaseline): int
+    {
         $this->resetCaches();
+        $this->useManualRankBaseline = $useManualRankBaseline;
 
         $rankTable = $this->partnerRepository->requirements();
+        $mode = $useManualRankBaseline ? 'manual_effective' : 'natural';
 
-        $personalDeposit = $this->calculatePersonalDeposit($user);
+        Log::debug('[UserRankServices.calculateRank] start', [
+            'user_id' => $user->id,
+            'mode' => $mode,
+            'current_rank' => $user->rank,
+            'overridden_rank' => (bool) $user->overridden_rank,
+            'overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+        ]);
+
+        $personalDeposit = $this->calculatePersonalDeposit($user, $useManualRankBaseline);
         $this->buildCumulativeLineRequirements($rankTable);
 
         foreach ($rankTable as $rankData) {
             $rank = $rankData->rank;
 
             if ($this->meetsRankRequirements($user, $rankData, $personalDeposit)) {
+                Log::debug('[UserRankServices.calculateRank] completed', [
+                    'user_id' => $user->id,
+                    'mode' => $mode,
+                    'result_rank' => $rank,
+                    'personal_deposit' => $personalDeposit,
+                ]);
+
                 return $rank;
             }
         }
+
+        Log::debug('[UserRankServices.calculateRank] completed', [
+            'user_id' => $user->id,
+            'mode' => $mode,
+            'result_rank' => 0,
+            'personal_deposit' => $personalDeposit,
+        ]);
 
         return 0;
     }
@@ -110,13 +165,34 @@ final class UserRankServices
             ->first(fn ($req) => is_null($req->line));
 
         if ($personalRequirement && $personalDeposit < (float) $personalRequirement->deposit) {
+            Log::debug('[UserRankServices.meetsRankRequirements] personal deposit requirement failed', [
+                'user_id' => $user->id,
+                'target_rank' => $rankData->rank,
+                'personal_deposit' => $personalDeposit,
+                'required_deposit' => (float) $personalRequirement->deposit,
+                'mode' => $this->useManualRankBaseline ? 'manual_effective' : 'natural',
+            ]);
+
             return false;
         }
 
-        $cumLines = $this->cumLineReqByRank[$rankData->rank] ?? [];
+        $lineRequirements = $rankData->requirements->whereNotNull('line');
 
-        foreach ($cumLines as $line => $requiredTotal) {
-            if ($this->getLineTurnover($user, (int) $line) < (float) $requiredTotal) {
+        foreach ($lineRequirements as $requirement) {
+            $line = (int) $requirement->line;
+            $requiredTotal = (float) $requirement->requiredTurnover;
+            $lineTurnover = $this->getLineTurnover($user, $line);
+
+            if ($lineTurnover < $requiredTotal) {
+                Log::debug('[UserRankServices.meetsRankRequirements] line requirement failed', [
+                    'user_id' => $user->id,
+                    'target_rank' => $rankData->rank,
+                    'line' => $line,
+                    'line_turnover' => $lineTurnover,
+                    'required_turnover' => $requiredTotal,
+                    'mode' => $this->useManualRankBaseline ? 'manual_effective' : 'natural',
+                ]);
+
                 return false;
             }
         }
@@ -137,13 +213,65 @@ final class UserRankServices
             return $this->lineTurnoverCache[$line];
         }
 
-        $baseAmount = $this->getBaseLineRequirement($user, $line);
         $lineIds = $this->getDescendantIds($user->id, $line);
 
-        $buyAmount = $this->calculateBuyAmount($lineIds, $user->overridden_rank_from);
-        $reinvestAmount = $this->calculateReinvestAmount($lineIds, $user->overridden_rank_from);
+        if (! $this->useManualRankBaseline) {
+            $buyAmount = $this->calculateBuyAmount($lineIds, null);
+            $reinvestAmount = $this->calculateReinvestAmount($lineIds, null);
 
-        return $this->lineTurnoverCache[$line] = $baseAmount + $buyAmount + $reinvestAmount;
+            $turnover = $buyAmount + $reinvestAmount;
+
+            Log::debug('[UserRankServices.getLineTurnover] factual line turnover', [
+                'user_id' => $user->id,
+                'line' => $line,
+                'buy_amount' => $buyAmount,
+                'reinvest_amount' => $reinvestAmount,
+                'turnover' => $turnover,
+                'mode' => 'natural',
+            ]);
+
+            return $this->lineTurnoverCache[$line] = $turnover;
+        }
+
+        $baseAmount = $this->getBaseLineRequirement($user, $line);
+        $fromDate = $user->overridden_rank_from;
+        $allAmount = $this->calculateBuyAmount($lineIds, null)
+            + $this->calculateReinvestAmount($lineIds, null);
+
+        if (! $fromDate) {
+            $effectiveAmount = $baseAmount + $allAmount;
+
+            Log::debug('[UserRankServices.getLineTurnover] manual line turnover without start date', [
+                'user_id' => $user->id,
+                'line' => $line,
+                'manual_rank' => $user->rank,
+                'base_amount' => $baseAmount,
+                'all_amount' => $allAmount,
+                'effective_amount' => $effectiveAmount,
+            ]);
+
+            return $this->lineTurnoverCache[$line] = $effectiveAmount;
+        }
+
+        $sinceAmount = $this->calculateBuyAmount($lineIds, $fromDate)
+            + $this->calculateReinvestAmount($lineIds, $fromDate);
+        $beforeAmount = max(0.0, $allAmount - $sinceAmount);
+
+        $effectiveAmount = $baseAmount + $allAmount;
+
+        Log::debug('[UserRankServices.getLineTurnover] manual line turnover', [
+            'user_id' => $user->id,
+            'line' => $line,
+            'manual_rank' => $user->rank,
+            'overridden_rank_from' => $fromDate->format(DATE_ATOM),
+            'base_amount' => $baseAmount,
+            'before_amount' => $beforeAmount,
+            'since_amount' => $sinceAmount,
+            'all_amount' => $allAmount,
+            'effective_amount' => $effectiveAmount,
+        ]);
+
+        return $this->lineTurnoverCache[$line] = $effectiveAmount;
     }
 
     /**
@@ -155,13 +283,19 @@ final class UserRankServices
      */
     private function getBaseLineRequirement(User $user, int $line): float
     {
-        if (! $user->overridden_rank) {
+        if (! $this->useManualRankBaseline) {
             return 0.0;
         }
 
         $baseRank = $this->partnerRepository->findRankByLevel($user->rank);
 
         if (! $baseRank) {
+            Log::warning('[UserRankServices.getBaseLineRequirement] manual rank requirement not found', [
+                'user_id' => $user->id,
+                'manual_rank' => $user->rank,
+                'line' => $line,
+            ]);
+
             return 0.0;
         }
 
@@ -193,7 +327,7 @@ final class UserRankServices
     {
         $query = DB::table('transactions')
             ->whereIn('user_id', $userIds)
-            ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
+            ->where('trx_type', TrxTypeEnum::BUY_PACKAGE->value)
             ->whereNotNull('accepted_at');
 
         if ($fromDate) {
@@ -221,23 +355,41 @@ final class UserRankServices
      * @param \App\Models\User $user
      * @return float
      */
-    private function calculatePersonalDeposit(User $user): float
+    private function calculatePersonalDeposit(User $user, bool $useManualRankBaseline): float
     {
         $allPersonal = $this->itcPackageRepository->personalDepositToPackage($user);
 
-        if (! $user->overridden_rank) {
+        if (! $useManualRankBaseline) {
+            Log::debug('[UserRankServices.calculatePersonalDeposit] factual personal deposit', [
+                'user_id' => $user->id,
+                'personal_deposit' => $allPersonal,
+                'mode' => 'natural',
+            ]);
+
             return $allPersonal;
         }
 
         $baseRank = $this->partnerRepository->findRankByLevel($user->rank);
 
         if (! $baseRank) {
+            Log::warning('[UserRankServices.calculatePersonalDeposit] manual rank requirement not found', [
+                'user_id' => $user->id,
+                'manual_rank' => $user->rank,
+            ]);
+
             return $allPersonal;
         }
 
         $personalMin = $this->getPersonalMinimumForRank($baseRank);
 
         if ($allPersonal >= $personalMin) {
+            Log::debug('[UserRankServices.calculatePersonalDeposit] manual personal deposit uses factual amount', [
+                'user_id' => $user->id,
+                'manual_rank' => $user->rank,
+                'personal_deposit' => $allPersonal,
+                'personal_minimum' => $personalMin,
+            ]);
+
             return $allPersonal;
         }
 
@@ -246,7 +398,17 @@ final class UserRankServices
             $user->overridden_rank_from
         );
 
-        return $personalMin + $sinceSum;
+        $effectivePersonal = $personalMin + $sinceSum;
+
+        Log::debug('[UserRankServices.calculatePersonalDeposit] manual personal deposit uses baseline', [
+            'user_id' => $user->id,
+            'manual_rank' => $user->rank,
+            'personal_minimum' => $personalMin,
+            'since_sum' => $sinceSum,
+            'effective_personal_deposit' => $effectivePersonal,
+        ]);
+
+        return $effectivePersonal;
     }
 
     /**
@@ -290,5 +452,6 @@ final class UserRankServices
     {
         $this->cumLineReqByRank = [];
         $this->lineTurnoverCache = [];
+        $this->useManualRankBaseline = false;
     }
 }
