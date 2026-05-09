@@ -33,7 +33,10 @@
                 "xdebug.php-debug",
                 "onecentlin.laravel-blade",
                 "bradlc.vscode-tailwindcss",
-                "esbenp.prettier-vscode"
+                "esbenp.prettier-vscode",
+                "open-southeners.laravel-pint",
+                "sanderronde.phpstan-vscode",
+                "kilocode.kilo-code"
             ],
             "settings": {
                 "php.validate.executablePath": "/usr/bin/php8.4",
