@@ -6,10 +6,14 @@ namespace App\Services\User;
 
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Repositories\PartnerRepositoryContract;
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Helpers\Notify;
 use App\Models\PartnerClosure;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Tasks\User\AwardUserRankBonusTask;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +46,7 @@ final class UserRankServices
         private readonly PartnerRepositoryContract $partnerRepository,
         private readonly ItcPackageRepositoryContract $itcPackageRepository,
         private readonly AwardUserRankBonusTask $awardUserRankBonusTask,
+        private readonly BusinessActivityLogger $activityLogger,
     ) {
         //
     }
@@ -71,6 +76,21 @@ final class UserRankServices
         if ($withBonus && $newRank > $oldRank) {
             $this->awardUserRankBonusTask->run($user, $newRank);
             Notify::rank($user, $newRank);
+
+            $this->activityLogger->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PartnerRankIncreased,
+                userId: $user->id,
+                subject: $user,
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'old_rank' => $oldRank,
+                    'new_rank' => $newRank,
+                    'bonus_awarded' => true,
+                ],
+                causer: $user,
+                logName: 'partners',
+                context: 'rank',
+            ));
         }
 
         $user->update(['rank' => $newRank]);
