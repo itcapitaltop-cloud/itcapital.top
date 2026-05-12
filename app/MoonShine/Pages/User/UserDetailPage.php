@@ -12,6 +12,7 @@ use App\Models\ItcPackage;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\Partner;
+use App\Models\PartnerClosure;
 use App\Models\PartnerLevelPercent;
 use App\Models\Transaction;
 use App\Models\User;
@@ -22,6 +23,7 @@ use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentCompone
 use App\MoonShine\Components\StatisticLinearPartner;
 use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\ComponentAttributeBag;
@@ -38,6 +40,7 @@ use MoonShine\Decorations\Heading;
 use MoonShine\Decorations\Tab;
 use MoonShine\Decorations\Tabs;
 use MoonShine\Fields\Date;
+use MoonShine\Fields\DateRange;
 use MoonShine\Fields\Email;
 use MoonShine\Fields\Enum;
 use MoonShine\Fields\Field;
@@ -52,6 +55,7 @@ use MoonShine\Fields\Switcher;
 use MoonShine\Fields\Template;
 use MoonShine\Fields\Text;
 use MoonShine\Fields\Url;
+use MoonShine\Fields\Range;
 use MoonShine\Http\Requests\MoonShineFormRequest;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\Pages\Crud\DetailPage;
@@ -533,6 +537,89 @@ class UserDetailPage extends DetailPage
             ->name('balance-form')
             ->submit('Сохранить');
 
+        $referralDepositsDateRange = request('referral_deposits_date');
+        $referralDepositsLines = request('referral_deposits_lines', []);
+
+        $referralDepositsQuery = Transaction::query()
+            ->select('transactions.*', 'partner_closures.depth as line')
+            ->join('partner_closures', 'transactions.user_id', '=', 'partner_closures.descendant_id')
+            ->where('partner_closures.ancestor_id', $item->id)
+            ->where('transactions.trx_type', TrxTypeEnum::DEPOSIT)
+            ->whereNotNull('transactions.accepted_at')
+            ->whereHas('user')
+            ->with('user');
+
+        if ($referralDepositsDateRange) {
+            $dates = $referralDepositsDateRange;
+            if (!empty($dates['from'])) {
+
+                $referralDepositsQuery->whereDate('transactions.accepted_at', '>=', Carbon::parse($dates['from'])->startOfDay());
+            }
+
+            if (!empty($dates['to'])) {
+                $referralDepositsQuery->whereDate('transactions.accepted_at', '<=', Carbon::parse($dates['to'])->endOfDay());
+            }
+        }
+
+        if (!empty($referralDepositsLines)) {
+            $referralDepositsQuery->whereIn('partner_closures.depth', $referralDepositsLines);
+        }
+
+        $referralDeposits = $referralDepositsQuery->orderByDesc('transactions.accepted_at')->get();
+        $referralDepositsTotalSum = $referralDeposits->sum('amount');
+
+        $availableDepths = PartnerClosure::query()
+            ->where('ancestor_id', $item->id)
+            ->distinct()
+            ->pluck('depth')
+            ->sort()
+            ->values()
+            ->filter(fn($depth) => $depth > 0)
+            ->mapWithKeys(fn($depth) => [$depth => "Линия $depth"])
+            ->toArray();
+
+        $referralDepositsTab = Tab::make(
+            'Статистика вводов рефералов',
+            [
+                Block::make([
+                    FormBuilder::make()
+                        ->method('GET')
+                        ->fields([
+                            Hidden::make('resourceItem')->fill($item->id),
+                            DateRange::make('Фильтр по датам', 'referral_deposits_date')
+                                ->fill($referralDepositsDateRange),
+                            Select::make('Линии', 'referral_deposits_lines')
+                                ->multiple()
+                                ->searchable()
+                                ->options($availableDepths)
+                                ->fill($referralDepositsLines),
+                            Hidden::make('tab')->fill('referral_deposits'),
+                        ])
+                        ->submit('Фильтровать', attributes: ['class' => 'btn-primary'])
+                        ->buttons([
+                            ActionButton::make('Сбросить', to_page(page: new UserDetailPage(), resource: new UserResource(), params: ['resourceItem' => $item->id, 'tab' => 'referral_deposits']))
+                                ->secondary()
+                        ]),
+                ]),
+                Divider::make(),
+                Block::make([
+                    Heading::make("Общая сумма: " . number_format((float)$referralDepositsTotalSum, 2, '.', ' ') . " $")->h(3),
+                    TableBuilder::make()
+                        ->withNotFound()
+                        ->fields([
+                            Text::make('Пользователь', 'user.username', formatted: fn($trx) => $trx->user?->username ?? 'Н/Д'),
+                            Text::make('Email', 'user.email', formatted: fn($trx) => $trx->user?->email ?? 'Н/Д'),
+                            Text::make('Линия', 'line'),
+                            Text::make('Сумма', 'amount', formatted: fn($trx) => number_format((float)$trx->amount, 2, '.', ' ') . " $"),
+                            Date::make('Дата одобрения', 'accepted_at')->format('d.m.Y H:i:s'),
+                        ])
+                        ->cast(ModelCast::make(Transaction::class))
+                        ->items($referralDeposits)
+                ])
+            ]
+        )->name('referral_deposits')
+            ->active(fn() => $activeTab === 'referral_deposits');
+
         $in = Transaction::query()
             ->where('user_id', $item->id)
             ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
@@ -782,6 +869,7 @@ class UserDetailPage extends DetailPage
                     ]
                 )->name('referrals')
                     ->active(fn () => $activeTab === 'referrals'),
+                $referralDepositsTab,
                 Tab::make('Настройка рангов', [
                     // Форма с чекбоксом и полем "Ранг"
                     Block::make([
