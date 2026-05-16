@@ -1,0 +1,51 @@
+name: Deploy to Dev
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Dev Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          log-public-key: false
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.DEV_SERVER_PORT }} -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to dev server
+        env:
+          SERVER_HOST: ${{ secrets.DEV_SERVER_HOST }}
+          SERVER_USER: ${{ secrets.DEV_SERVER_USER }}
+          SERVER_PATH: ${{ secrets.DEV_SERVER_PATH }}
+          SERVER_PORT: ${{ secrets.DEV_SERVER_PORT }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -p ${SERVER_PORT}" \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude 'vendor' \
+            --exclude 'storage' \
+            --exclude 'bootstrap/cache' \
+            --exclude '.env' \
+            --exclude '.env.example' \
+            --exclude 'public/build' \
+            --exclude 'public/hot' \
+            ./ $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
+
+          ssh -p ${SERVER_PORT} $SERVER_USER@$SERVER_HOST "cd $SERVER_PATH && bash deploy-dev.sh"
