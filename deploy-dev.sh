@@ -15,8 +15,8 @@ NC='\033[0m'
 # Configuration
 PROJECT_PATH="/var/www/itcapital"
 COMPOSE_FILE="docker-compose.prod.yml"
-CONTAINER_NAME="itcapital-dev-app"
-DB_CONTAINER_NAME="itcapital-dev-pgdb"
+CONTAINER_NAME="itcapital-app"
+DB_CONTAINER_NAME="itcapital-pgdb"
 SQL_DUMP_FILE="itc.sql"
 
 # Parse command line arguments
