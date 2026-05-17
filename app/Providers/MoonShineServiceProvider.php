@@ -142,7 +142,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     {
         parent::boot();
 
-        moonShineAssets()->add([
+        $assets = [
             '/vendor/moonshine/css/moonshine-overrides.css',
             '/vendor/moonshine/js/multi-sort.js',
             '/vendor/moonshine/js/copy-tooltip.js',
@@ -157,8 +157,13 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             '/vendor/moonshine/js/set-names-for-override-percents-fields.js',
             '/vendor/moonshine/js/set-names-for-requirements-fields.js',
             '/vendor/moonshine/js/set-names-for-common-percents-fields.js',
-            Vite::asset('resources/css/app.css'),
-        ]);
+        ];
+
+        if (! $this->app->runningInConsole()) {
+            $assets[] = Vite::asset('resources/css/app.css');
+        }
+
+        moonShineAssets()->add($assets);
     }
 
     private function canSeeResource(string $resourceClass): Closure
