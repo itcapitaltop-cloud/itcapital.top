@@ -57,6 +57,7 @@ return [
         'became_referral_of_user' => '用户已成为 @:username 的推荐人',
         'partner_regular_bonus_received' => '已从第 :line 线推荐人 @:username 获得常规奖金 :amount ITC',
         'partner_start_bonus_received' => '已从第 :line 线推荐人 @:username 获得启动奖金 :amount ITC',
+        'partner_rank_increased' => '伙伴等级已从 :old_rank 提升到 :new_rank',
         'staking_regular_bonus_received' => '已从推荐人 @:username 获得质押常规奖金 :amount ITC',
         'staking_start_bonus_received' => '已从推荐人 @:username 获得质押启动奖金 :amount ITC',
         'partner_to_main_transferred' => '已将 :amount ITC 从伙伴余额转入主余额',

@@ -11,6 +11,7 @@
         "php": "^8.4",
         "ext-pdo": "*",
         "anhskohbo/no-captcha": "^3.7",
+        "binarytorch/larecipe": "^2.9",
         "brick/money": "^0.9.0",
         "google/apiclient": "^2.18",
         "jackiedo/dotenv-editor": "^1.1",

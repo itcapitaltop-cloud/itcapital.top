@@ -13,6 +13,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use LeMaX10\SimpleActions\Action;
 
 final class ProgressBarAction extends Action
@@ -21,9 +22,20 @@ final class ProgressBarAction extends Action
     {
         $user = is_null($userId) ? Auth::user() : User::query()->find($userId);
         $next = max(1, $user->rank + 1);
+        $manualFillLines = [];
 
         // Требования ТОЛЬКО для следующего ранга (R+1)
         $reqs = PartnerRankRequirement::whereHas('rank', fn ($q) => $q->where('rank', $next))->get();
+
+        if ($user->overridden_rank) {
+            $manualFillLines = PartnerRankRequirement::query()
+                ->whereNotNull('line')
+                ->whereHas('rank', fn ($q) => $q->where('rank', '<', $user->rank))
+                ->pluck('line')
+                ->unique()
+                ->map(fn ($line) => (int) $line)
+                ->all();
+        }
 
         $bars = [];
 
@@ -105,28 +117,100 @@ final class ProgressBarAction extends Action
             ->pluck('total', 'line'); // [line => cum(1..R+1)]
 
         // Прогресс по линиям: current = сколько уже НАБРАНО в пределах R+1
-        foreach ($reqs->whereNotNull('line') as $r) {
+        $lineReqs = $reqs->whereNotNull('line');
+
+        foreach ($lineReqs as $r) {
             $line = $r->line;
             $target = $r->required_turnover; // требование следующего ранга (R+1)
 
-            // что уже набрано: стартовая база (если есть) + оборот с fromDate
-            $actual = ($lineBases[$line] ?? 0) + $this->calcTurnoverByLine(
+            // При ручном ранге сохраняем излишек до override и докидываем недостающую базу.
+            $actual = $this->calcEffectiveTurnoverByLine(
                 userId: $user->id,
                 line: $line,
+                baseAmount: (float) ($lineBases[$line] ?? 0),
                 fromDate: $fromDate instanceof Carbon ? $fromDate->toDateTimeString() : $fromDate,
             );
 
-            // current = target - (cum(1..R+1) - actual)  == target + actual - cum(1..R+1)
-            $current = $target + $actual - ($cumToNextByLine[$line] ?? 0);
+            $cumulativeToNext = (float) ($cumToNextByLine[$line] ?? 0);
+
+            if ($user->overridden_rank) {
+                $factualTurnover = $this->calcTurnoverByLine($user->id, $line);
+                $displayTarget = (float) $target;
+                $topUp = in_array((int) $line, $manualFillLines, true)
+                    ? max(0.0, $displayTarget - $factualTurnover)
+                    : 0.0;
+                $current = $factualTurnover + $topUp;
+            } else {
+                $factualTurnover = $actual;
+                $topUp = 0.0;
+                $current = $factualTurnover;
+                $displayTarget = $target;
+            }
+
+            $current = max(0.0, (float) $current);
+
+            Log::debug('[ProgressBarAction.handle] line progress calculated', [
+                'user_id' => $user->id,
+                'line' => $line,
+                'target' => (float) $target,
+                'display_target' => (float) $displayTarget,
+                'cumulative_to_next' => $cumulativeToNext,
+                'base_amount' => (float) ($lineBases[$line] ?? 0),
+                'effective_amount' => $actual,
+                'factual_turnover' => $factualTurnover,
+                'top_up' => $topUp,
+                'current' => $current,
+                'overridden_rank' => (bool) $user->overridden_rank,
+            ]);
 
             $bars[] = [
                 'label' => __('livewire_partners_line_income_label', ['line' => $line]),
                 'current' => $current,
-                'target' => $target,
+                'target' => $displayTarget,
+                'factual_current' => $factualTurnover,
+                'top_up' => $topUp,
             ];
         }
 
         return $bars;
+    }
+
+    private function calcEffectiveTurnoverByLine(int $userId, int $line, float $baseAmount, ?string $fromDate = null): float
+    {
+        $allAmount = $this->calcTurnoverByLine($userId, $line);
+
+        if (! $fromDate) {
+            $effectiveAmount = $baseAmount + $allAmount;
+
+            Log::debug('[ProgressBarAction.calcEffectiveTurnoverByLine] progress without start date', [
+                'user_id' => $userId,
+                'line' => $line,
+                'base_amount' => $baseAmount,
+                'before_amount' => $allAmount,
+                'since_amount' => 0.0,
+                'all_amount' => $allAmount,
+                'effective_amount' => $effectiveAmount,
+            ]);
+
+            return $effectiveAmount;
+        }
+
+        $sinceAmount = $this->calcTurnoverByLine($userId, $line, $fromDate);
+        $beforeAmount = max(0.0, $allAmount - $sinceAmount);
+
+        $effectiveAmount = $baseAmount + $allAmount;
+
+        Log::debug('[ProgressBarAction.calcEffectiveTurnoverByLine] overridden rank progress', [
+            'user_id' => $userId,
+            'line' => $line,
+            'base_amount' => $baseAmount,
+            'before_amount' => $beforeAmount,
+            'since_amount' => $sinceAmount,
+            'all_amount' => $allAmount,
+            'effective_amount' => $effectiveAmount,
+        ]);
+
+        return $effectiveAmount;
     }
 
     private function calcTurnoverByLine(int $userId, int $line, ?string $fromDate = null): float

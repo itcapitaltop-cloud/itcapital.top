@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "laravel-specialist": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/laravel-specialist/SKILL.md",
+      "computedHash": "d58e2ed3488398cb94a039f25b9d270e55dc434e16102abff9035608bec3db90"
+    },
+    "livewire-development": {
+      "source": "laravel/boost",
+      "sourceType": "github",
+      "skillPath": "tests/Fixtures/vendor-skills/livewire-development/SKILL.md",
+      "computedHash": "8f107c3d9edaa8e99563f7de7440272ff64586558514724a6ac1e15c8b93c91e"
+    },
+    "pest-testing": {
+      "source": "spatie/freek.dev",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/pest-testing/SKILL.md",
+      "computedHash": "16b9ee01b7eb3f527cd0c1cb3ec4ea22099211f6529534ba7b8b646cfec38d5b"
+    }
+  }
+}
