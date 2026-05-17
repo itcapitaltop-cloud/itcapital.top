@@ -234,6 +234,47 @@ docker_exec php artisan vendor:publish --tag=laravel-assets --force --ansi
 echo -e "${GREEN}✅ Vendor assets published${NC}"
 echo ""
 
+# Step 10.2: Verify custom public assets synced by deployment
+echo -e "${YELLOW}🔎 Step 10.2: Verifying MoonShine custom assets...${NC}"
+CRITICAL_PUBLIC_ASSETS=(
+    "public/vendor/moonshine/assets/main.css"
+    "public/vendor/moonshine/css/moonshine-overrides.css"
+    "public/vendor/moonshine/js/multi-sort.js"
+    "public/vendor/moonshine/js/copy-tooltip.js"
+    "public/vendor/moonshine/js/moonshine-auto-click-itc-packages.js"
+    "public/vendor/moonshine/js/paginator-top.js"
+    "public/vendor/moonshine/js/show-eye-in-password-field.js"
+    "public/vendor/moonshine/js/filters-search-preserver.js"
+    "public/vendor/moonshine/js/show-overflow-popup.js"
+    "public/vendor/moonshine/js/paginator-trim.js"
+    "public/vendor/moonshine/js/set-names-for-override-percents-fields.js"
+    "public/vendor/moonshine/js/set-names-for-requirements-fields.js"
+    "public/vendor/moonshine/js/set-names-for-common-percents-fields.js"
+    "public/vendor/moonshine/Logotype2.png"
+)
+MISSING_PUBLIC_ASSETS=false
+
+for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
+    if docker_exec test -f "$asset"; then
+        echo -e "${GREEN}✅ $asset${NC}"
+    else
+        echo -e "${RED}❌ Missing $asset${NC}"
+        MISSING_PUBLIC_ASSETS=true
+    fi
+done
+
+if [ "$MISSING_PUBLIC_ASSETS" = true ]; then
+    echo -e "${RED}❌ Required MoonShine public assets are missing after deploy.${NC}"
+    echo -e "${YELLOW}The deployed tree is incomplete or public/vendor/moonshine was not synced.${NC}"
+    docker_exec ls -la public/vendor/moonshine 2>/dev/null || true
+    docker_exec ls -la public/vendor/moonshine/js 2>/dev/null || true
+    docker_exec ls -la public/vendor/moonshine/css 2>/dev/null || true
+    exit 1
+fi
+
+echo -e "${GREEN}✅ MoonShine custom assets verified${NC}"
+echo ""
+
 # Step 11: Build frontend assets
 echo -e "${YELLOW}🏗️  Step 11: Building frontend assets...${NC}"
 if [ -f public/build/manifest.json ]; then
