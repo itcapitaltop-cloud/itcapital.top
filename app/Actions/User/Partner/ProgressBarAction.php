@@ -8,6 +8,7 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\PartnerClosure;
+use App\Models\PartnerRank;
 use App\Models\PartnerRankRequirement;
 use App\Models\User;
 use Carbon\Carbon;
@@ -21,11 +22,13 @@ final class ProgressBarAction extends Action
     protected function handle(?int $userId = null): array
     {
         $user = is_null($userId) ? Auth::user() : User::query()->find($userId);
+        $maxRank = (int) PartnerRank::query()->max('rank');
         $next = max(1, $user->rank + 1);
+        $targetRank = $maxRank > 0 ? min($next, $maxRank) : $next;
         $manualFillLines = [];
 
-        // Требования ТОЛЬКО для следующего ранга (R+1)
-        $reqs = PartnerRankRequirement::whereHas('rank', fn ($q) => $q->where('rank', $next))->get();
+        // Для максимального ранга показываем текущую статистику по линиям на шкале максимального ранга.
+        $reqs = PartnerRankRequirement::whereHas('rank', fn ($q) => $q->where('rank', $targetRank))->get();
 
         if ($user->overridden_rank) {
             $manualFillLines = PartnerRankRequirement::query()
@@ -108,10 +111,10 @@ final class ProgressBarAction extends Action
             ];
         }
 
-        // Сумма требований по каждой линии от ранга 1 до R+1 (кумулятивно)
+        // Сумма требований по каждой линии от ранга 1 до целевого ранга (кумулятивно)
         $cumToNextByLine = PartnerRankRequirement::query()
             ->whereNotNull('line')
-            ->whereHas('rank', fn ($q) => $q->where('rank', '<=', $next))
+            ->whereHas('rank', fn ($q) => $q->where('rank', '<=', $targetRank))
             ->selectRaw('line, SUM(required_turnover) as total')
             ->groupBy('line')
             ->pluck('total', 'line'); // [line => cum(1..R+1)]
