@@ -12,6 +12,10 @@ final class VerifyRecaptcha
 {
     public function handle(Request $request, Closure $next)
     {
+        if (app()->environment(['local', 'dev'])) {
+            return $next($request);
+        }
+
         $rules = ['g-recaptcha-response' => 'required|captcha'];
 
         $messages = [                         // <‑‑‑ добавили
@@ -21,7 +25,7 @@ final class VerifyRecaptcha
 
         $validator = Validator::make($request->all(), $rules, $messages);
 
-        if ($validator->fails() && ! app()->environment('local')) {
+        if ($validator->fails()) {
             return back()
                 ->withErrors($validator)
                 ->withInput($request->except('password'));

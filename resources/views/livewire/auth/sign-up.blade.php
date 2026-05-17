@@ -66,10 +66,12 @@
                     {{ __('livewire_sign_up_password_confirm_label') }}
                 </x-ui.input>
 
-                <div wire:ignore>
-                    {!! NoCaptcha::renderJs() !!}
-                    {!! NoCaptcha::display(['data-callback' => 'onCaptchaSuccess']) !!}
-                </div>
+                @unless (app()->environment(['local', 'dev']))
+                    <div wire:ignore>
+                        {!! NoCaptcha::renderJs() !!}
+                        {!! NoCaptcha::display(['data-callback' => 'onCaptchaSuccess']) !!}
+                    </div>
+                @endunless
             </div>
 
             <div class="mt-[34px]">
@@ -126,4 +128,3 @@
         });
     });
 </script>
-
