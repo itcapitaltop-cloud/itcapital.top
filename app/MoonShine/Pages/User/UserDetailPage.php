@@ -244,7 +244,7 @@ class UserDetailPage extends DetailPage
                     ->customAttributes(
                         [
                             'x-model' => 'percent',
-                            'x-on:change' => "$wire.set('percent', $event.target.value)",
+                            'x-on:change' => '$wire.set(\'percent\', $event.target.value)',
                             'step' => 'any',
                         ])
                     ->required(),
