@@ -23,6 +23,7 @@ use App\Repositories\GoogleSheetsUploaderRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -66,6 +67,17 @@ class AppServiceProvider extends ServiceProvider
             $this->app['request']->server->set('HTTPS', 'on');
             URL::forceScheme('https');
         }
+
+        Gate::define('viewLogViewer', function ($user = null) {
+            if (class_exists(\MoonShine\Permissions\Models\MoonshineUser::class)) {
+                $guard = config('moonshine.auth.guard', 'moonshine');
+                $moonshineUser = auth($guard)->user();
+
+                return $moonshineUser && $moonshineUser->isSuperUser();
+            }
+
+            return $user && $user->isAdmin();
+        });
 
         View::composer('*', function (\Illuminate\View\View $view) {
             $view->with('isAuthPage', request()->routeIs(

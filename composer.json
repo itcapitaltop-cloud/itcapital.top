@@ -26,6 +26,7 @@
         "moonshine/ckeditor": "^2.0",
         "moonshine/moonshine": "^2.23.5",
         "moonshine/permissions": "^1.0",
+        "opcodesio/log-viewer": "^3.24",
         "phpoffice/phpspreadsheet": "^4.2",
         "simplesoftwareio/simple-qrcode": "*",
         "spatie/db-dumper": "^3.7",

@@ -21,6 +21,11 @@ final class ProgressBarAction extends Action
 {
     protected function handle(?int $userId = null): array
     {
+        Log::debug('[ProgressBarAction::handle] START', [
+            'userId' => $userId,
+            'user_rank' => $user->rank ?? null,
+            'extended_lines' => $user->extended_lines ?? null,
+        ]);
         $user = is_null($userId) ? Auth::user() : User::query()->find($userId);
         $maxRank = (int) PartnerRank::query()->max('rank');
         $next = max(1, $user->rank + 1);
@@ -194,6 +199,11 @@ final class ProgressBarAction extends Action
                 'top_up' => $topUp,
             ];
         }
+
+        Log::debug('[ProgressBarAction::handle] END', [
+            'bars_count' => count($bars),
+            'bars' => $bars,
+        ]);
 
         return $bars;
     }

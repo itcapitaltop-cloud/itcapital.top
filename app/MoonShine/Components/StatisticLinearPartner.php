@@ -7,6 +7,7 @@ namespace App\MoonShine\Components;
 use App\Actions\User\Partner\ProgressBarAction;
 use App\Models\PartnerRank;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use MoonShine\Components\MoonShineComponent;
 
 /**
@@ -26,8 +27,17 @@ final class StatisticLinearPartner extends MoonShineComponent
      */
     protected function viewData(): array
     {
+        Log::debug('[StatisticLinearPartner::viewData] START', [
+            'userId' => $this->userId,
+        ]);
+
         $user = User::query()->findOrFail($this->userId);
         $maxRank = (int) PartnerRank::query()->max('rank');
+
+        Log::debug('[StatisticLinearPartner::viewData] END', [
+            'progressBars_count' => count($progressBars),
+            'progressBars' => $progressBars,
+        ]);
 
         return [
             'nextRank' => $user->rank + 1 <= $maxRank ? $user->rank + 1 : null,
