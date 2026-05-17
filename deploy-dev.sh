@@ -246,7 +246,7 @@ CRITICAL_PUBLIC_ASSETS=(
     "public/vendor/moonshine/js/set-names-for-common-percents-fields.js"
     "public/vendor/moonshine/Logotype2.png"
 )
-MOONSHINE_CUSTOM_ASSET_SOURCE="resources/moonshine-public/vendor/moonshine"
+MOONSHINE_CUSTOM_ASSET_SOURCE="resources/moonshine-public/moonshine"
 
 if ! docker_exec test -d "$MOONSHINE_CUSTOM_ASSET_SOURCE"; then
     echo -e "${RED}❌ Missing MoonShine custom asset source: $MOONSHINE_CUSTOM_ASSET_SOURCE${NC}"
