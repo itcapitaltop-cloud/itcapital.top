@@ -228,8 +228,8 @@ docker_exec php artisan storage:link || echo -e "${YELLOW}⚠️  Link already e
 echo -e "${GREEN}✅ Storage link verified${NC}"
 echo ""
 
-# Step 10.1: Preserve custom public assets before vendor publish
-echo -e "${YELLOW}🎨 Step 10.1: Preserving MoonShine custom assets...${NC}"
+# Step 10.1: Prepare custom public assets list
+echo -e "${YELLOW}🎨 Step 10.1: Preparing MoonShine custom assets...${NC}"
 CRITICAL_PUBLIC_ASSETS=(
     "public/vendor/moonshine/assets/main.css"
     "public/vendor/moonshine/css/moonshine-overrides.css"
@@ -246,17 +246,14 @@ CRITICAL_PUBLIC_ASSETS=(
     "public/vendor/moonshine/js/set-names-for-common-percents-fields.js"
     "public/vendor/moonshine/Logotype2.png"
 )
-MOONSHINE_CUSTOM_ASSET_BACKUP="/tmp/moonshine-custom-assets"
-docker_exec rm -rf "$MOONSHINE_CUSTOM_ASSET_BACKUP"
-docker_exec mkdir -p "$MOONSHINE_CUSTOM_ASSET_BACKUP"
+MOONSHINE_CUSTOM_ASSET_SOURCE="resources/moonshine-public/vendor/moonshine"
 
-for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
-    if docker_exec test -f "$asset"; then
-        docker_exec mkdir -p "$MOONSHINE_CUSTOM_ASSET_BACKUP/$(dirname "$asset")"
-        docker_exec cp "$asset" "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset"
-    fi
-done
-echo -e "${GREEN}✅ MoonShine custom assets preserved${NC}"
+if ! docker_exec test -d "$MOONSHINE_CUSTOM_ASSET_SOURCE"; then
+    echo -e "${RED}❌ Missing MoonShine custom asset source: $MOONSHINE_CUSTOM_ASSET_SOURCE${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ MoonShine custom asset source found${NC}"
 echo ""
 
 # Step 10.2: Publish vendor assets
@@ -267,12 +264,7 @@ echo ""
 
 # Step 10.3: Restore and verify custom public assets synced by deployment
 echo -e "${YELLOW}🔎 Step 10.3: Restoring and verifying MoonShine custom assets...${NC}"
-for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
-    if docker_exec test -f "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset"; then
-        docker_exec mkdir -p "$(dirname "$asset")"
-        docker_exec cp "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset" "$asset"
-    fi
-done
+docker_exec cp -R "$MOONSHINE_CUSTOM_ASSET_SOURCE/." "public/vendor/moonshine/"
 
 MISSING_PUBLIC_ASSETS=false
 
