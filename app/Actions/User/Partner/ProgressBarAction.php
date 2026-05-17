@@ -35,6 +35,13 @@ final class ProgressBarAction extends Action
         // Для максимального ранга показываем текущую статистику по линиям на шкале максимального ранга.
         $reqs = PartnerRankRequirement::whereHas('rank', fn ($q) => $q->where('rank', $targetRank))->get();
 
+        Log::debug('[ProgressBarAction] After reqs query', [
+            'targetRank' => $targetRank,
+            'reqs_count' => $reqs->count(),
+            'reqs' => $reqs->toArray(),
+            'personal_line' => $reqs->firstWhere('line', null),
+        ]);
+
         if ($user->overridden_rank) {
             $manualFillLines = PartnerRankRequirement::query()
                 ->whereNotNull('line')
@@ -69,6 +76,9 @@ final class ProgressBarAction extends Action
         }
 
         if ($personal = $reqs->firstWhere('line', null)) {
+            Log::debug('[ProgressBarAction] Personal deposit found', [
+                'personal' => $personal,
+            ]);
             $baseQuery = ItcPackage::query()
                 ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
                 ->where('transactions.user_id', $user->id)
@@ -142,6 +152,12 @@ final class ProgressBarAction extends Action
                     'required_turnover' => null,
                 ]);
         }
+
+        Log::debug('[ProgressBarAction] Before lineReqs foreach', [
+            'lineReqs_count' => $lineReqs->count(),
+            'lineReqs' => $lineReqs->toArray(),
+            'cumToNextByLine' => $cumToNextByLine->toArray(),
+        ]);
 
         foreach ($lineReqs as $r) {
             $line = $r->line;
