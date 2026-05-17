@@ -16,6 +16,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build frontend assets
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npm run build
+
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -44,7 +55,6 @@ jobs:
             --exclude 'bootstrap/cache' \
             --exclude '.env' \
             --exclude '.env.example' \
-            --exclude 'public/build' \
             --exclude 'public/hot' \
             ./ $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
 

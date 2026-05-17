@@ -230,7 +230,9 @@ echo ""
 
 # Step 11: Build frontend assets
 echo -e "${YELLOW}🏗️  Step 11: Building frontend assets...${NC}"
-if docker_exec test -f "package.json"; then
+if [ -f public/build/manifest.json ]; then
+    echo -e "${GREEN}✅ Frontend assets already built by GitHub Actions${NC}"
+elif docker_exec test -f "package.json"; then
     docker_exec npm ci --include=dev
     docker_exec npm run build
     echo -e "${GREEN}✅ Frontend assets built${NC}"
@@ -341,4 +343,3 @@ echo -e "${YELLOW}📝 Recent logs:${NC}"
 docker logs --tail=20 "$CONTAINER_NAME"
 echo ""
 echo -e "${GREEN}🎉 Ready for production!${NC}"
-
