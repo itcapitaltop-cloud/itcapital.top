@@ -228,6 +228,12 @@ docker_exec php artisan storage:link || echo -e "${YELLOW}⚠️  Link already e
 echo -e "${GREEN}✅ Storage link verified${NC}"
 echo ""
 
+# Step 10.1: Publish vendor assets
+echo -e "${YELLOW}🎨 Step 10.1: Publishing vendor assets...${NC}"
+docker_exec php artisan vendor:publish --tag=laravel-assets --force --ansi
+echo -e "${GREEN}✅ Vendor assets published${NC}"
+echo ""
+
 # Step 11: Build frontend assets
 echo -e "${YELLOW}🏗️  Step 11: Building frontend assets...${NC}"
 if [ -f public/build/manifest.json ]; then
