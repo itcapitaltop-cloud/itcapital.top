@@ -79,6 +79,17 @@ class AppServiceProvider extends ServiceProvider
             return $user && $user->isAdmin();
         });
 
+        Gate::define('viewPulse', function ($user = null) {
+            if (class_exists(\MoonShine\Permissions\Models\MoonshineUser::class)) {
+                $guard = config('moonshine.auth.guard', 'moonshine');
+                $moonshineUser = auth($guard)->user();
+
+                return $moonshineUser && $moonshineUser->isSuperUser();
+            }
+
+            return $user && $user->isAdmin();
+        });
+
         View::composer('*', function (\Illuminate\View\View $view) {
             $view->with('isAuthPage', request()->routeIs(
                 'login',

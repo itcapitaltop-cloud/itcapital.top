@@ -31,6 +31,7 @@ WORKDIR /var/www/html
 
 COPY supervisord.conf /etc/supervisord.conf
 COPY app.ini /etc/supervisor.d/app.ini
+COPY pulse.ini /etc/supervisor.d/pulse.ini
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

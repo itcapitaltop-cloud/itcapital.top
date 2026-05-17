@@ -317,6 +317,10 @@ if docker_exec php -r "echo ini_get('opcache.enable');" 2>/dev/null | grep -q "1
     docker_exec supervisorctl restart php-fpm || true
 fi
 
+# Step 12.1: Restart Pulse ingest worker
+echo -e "${YELLOW}🔄 Step 12.1: Restarting Pulse ingest worker...${NC}"
+docker_exec php artisan pulse:restart || echo -e "${YELLOW}⚠️  Pulse restart skipped (may not be running)${NC}"
+
 echo -e "${GREEN}✅ Configuration cached${NC}"
 echo ""
 
