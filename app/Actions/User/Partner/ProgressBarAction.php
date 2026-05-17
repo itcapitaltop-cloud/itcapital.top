@@ -122,6 +122,22 @@ final class ProgressBarAction extends Action
         // Прогресс по линиям: current = сколько уже НАБРАНО в пределах R+1
         $lineReqs = $reqs->whereNotNull('line');
 
+        if ($lineReqs->isEmpty()) {
+            $maxDepth = $user->extended_lines ? 20 : 5;
+
+            $lineReqs = PartnerClosure::query()
+                ->where('ancestor_id', $user->id)
+                ->whereBetween('depth', [1, $maxDepth])
+                ->select('depth')
+                ->distinct()
+                ->orderBy('depth')
+                ->pluck('depth')
+                ->map(fn ($line) => (object) [
+                    'line' => (int) $line,
+                    'required_turnover' => null,
+                ]);
+        }
+
         foreach ($lineReqs as $r) {
             $line = $r->line;
             $target = $r->required_turnover; // требование следующего ранга (R+1)
@@ -135,6 +151,10 @@ final class ProgressBarAction extends Action
             );
 
             $cumulativeToNext = (float) ($cumToNextByLine[$line] ?? 0);
+
+            if ((float) $target <= 0.0) {
+                $target = max(1.0, $actual);
+            }
 
             if ($user->overridden_rank) {
                 $factualTurnover = $this->calcTurnoverByLine($user->id, $line);
