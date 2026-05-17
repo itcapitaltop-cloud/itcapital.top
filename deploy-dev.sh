@@ -228,14 +228,8 @@ docker_exec php artisan storage:link || echo -e "${YELLOW}⚠️  Link already e
 echo -e "${GREEN}✅ Storage link verified${NC}"
 echo ""
 
-# Step 10.1: Publish vendor assets
-echo -e "${YELLOW}🎨 Step 10.1: Publishing vendor assets...${NC}"
-docker_exec php artisan vendor:publish --tag=laravel-assets --force --ansi
-echo -e "${GREEN}✅ Vendor assets published${NC}"
-echo ""
-
-# Step 10.2: Verify custom public assets synced by deployment
-echo -e "${YELLOW}🔎 Step 10.2: Verifying MoonShine custom assets...${NC}"
+# Step 10.1: Preserve custom public assets before vendor publish
+echo -e "${YELLOW}🎨 Step 10.1: Preserving MoonShine custom assets...${NC}"
 CRITICAL_PUBLIC_ASSETS=(
     "public/vendor/moonshine/assets/main.css"
     "public/vendor/moonshine/css/moonshine-overrides.css"
@@ -252,6 +246,34 @@ CRITICAL_PUBLIC_ASSETS=(
     "public/vendor/moonshine/js/set-names-for-common-percents-fields.js"
     "public/vendor/moonshine/Logotype2.png"
 )
+MOONSHINE_CUSTOM_ASSET_BACKUP="/tmp/moonshine-custom-assets"
+docker_exec rm -rf "$MOONSHINE_CUSTOM_ASSET_BACKUP"
+docker_exec mkdir -p "$MOONSHINE_CUSTOM_ASSET_BACKUP"
+
+for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
+    if docker_exec test -f "$asset"; then
+        docker_exec mkdir -p "$MOONSHINE_CUSTOM_ASSET_BACKUP/$(dirname "$asset")"
+        docker_exec cp "$asset" "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset"
+    fi
+done
+echo -e "${GREEN}✅ MoonShine custom assets preserved${NC}"
+echo ""
+
+# Step 10.2: Publish vendor assets
+echo -e "${YELLOW}🎨 Step 10.2: Publishing vendor assets...${NC}"
+docker_exec php artisan vendor:publish --tag=laravel-assets --force --ansi
+echo -e "${GREEN}✅ Vendor assets published${NC}"
+echo ""
+
+# Step 10.3: Restore and verify custom public assets synced by deployment
+echo -e "${YELLOW}🔎 Step 10.3: Restoring and verifying MoonShine custom assets...${NC}"
+for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
+    if docker_exec test -f "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset"; then
+        docker_exec mkdir -p "$(dirname "$asset")"
+        docker_exec cp "$MOONSHINE_CUSTOM_ASSET_BACKUP/$asset" "$asset"
+    fi
+done
+
 MISSING_PUBLIC_ASSETS=false
 
 for asset in "${CRITICAL_PUBLIC_ASSETS[@]}"; do
