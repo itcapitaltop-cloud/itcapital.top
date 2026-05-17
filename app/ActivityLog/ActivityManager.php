@@ -107,6 +107,11 @@ final class ActivityManager
             ActivityEventTypeEnum::StakingPackagePurchased => __('activity/feed.business.staking_package_purchased', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingPackageToppedUp => __('activity/feed.business.staking_package_topped_up', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingProfitAccrued => __('activity/feed.business.staking_profit_accrued', ['uuid' => $packageUuid, 'profit' => $profit, 'rate' => $stakingExchangeRate]),
+            ActivityEventTypeEnum::PromoCodeApplied => __('activity/feed.business.promo_code_applied', [
+                'promo_code' => (string) ($activity->getExtraProperty('promo_code') ?? ''),
+                'original_threshold' => $this->formatAmount($activity->getExtraProperty('original_threshold', '0')),
+                'effective_threshold' => $this->formatAmount($activity->getExtraProperty('effective_threshold', '0')),
+            ]),
         };
     }
 

@@ -12,6 +12,7 @@ use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\NewsResource;
+use App\MoonShine\Resources\PromoCodeResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
@@ -85,6 +86,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             new AdminUserResource(),
             new MoonShineUserRoleResource(),
             new ActivityLogResource(),
+            new PromoCodeResource(),
         ];
     }
 

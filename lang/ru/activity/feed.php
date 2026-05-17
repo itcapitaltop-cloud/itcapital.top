@@ -66,6 +66,7 @@ return [
         'regular_bonus_transferred_to_partner' => 'Сумма :amount ITC переведена с баланса регулярной премии на партнерский баланс',
         'staking_package_purchased' => 'Куплен пакет стейкинга :uuid на :amount коинов:rate',
         'staking_package_topped_up' => 'В пакет стейкинга :uuid добавлено :amount коинов:rate',
+        'promo_code_applied' => 'Применён промокод :promo_code, порог снижен с :original_threshold ITC до :effective_threshold ITC',
         'staking_profit_accrued' => 'Получена доходность :profit коинов на пакет стейкинга :uuid:rate',
     ],
 ];

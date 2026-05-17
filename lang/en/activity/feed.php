@@ -67,5 +67,6 @@ return [
         'staking_package_purchased' => 'Staking package :uuid purchased for :amount ITC:rate',
         'staking_package_topped_up' => ':amount ITC added to staking package :uuid:rate',
         'staking_profit_accrued' => 'Yield of :profit ITC accrued to staking package :uuid:rate',
+        'promo_code_applied' => 'Promo code :promo_code applied, threshold lowered from :original_threshold ITC to :effective_threshold ITC',
     ],
 ];

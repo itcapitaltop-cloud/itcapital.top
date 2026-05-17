@@ -26,12 +26,29 @@
 
                     <x-bg.section-slim class="!px-1 !py-2">
                         <form wire:submit="buyPackage" x-on:bought.window="isModalBuyPackageActive = false">
-                            <x-ui.input name="amount" placeholder="{{ __('livewire_itc_minimum_itc_placeholder') }}"
+                            <x-ui.input name="amount" placeholder="{{ $this->minimumAmountPlaceholder() }}"
                                 validate="number" input-class="py-[5px] px-[12px]">
                                 {{ __('livewire_account_common_buy_amount_label') }}
                             </x-ui.input>
 
-                            <x-ui.submit-button action="buyPackage" class="w-full mt-8">
+                            <x-ui.input name="promoCode" placeholder="{{ __('livewire_itc_promo_code_placeholder') }}"
+                                class="mt-4 mb-5" input-class="py-[5px] px-[12px]">
+                                {{ __('livewire_itc_promo_code_label') }}
+                            </x-ui.input>
+
+                            <x-ui.button wire:click="applyPromoCode" class="w-full mt-2" type="button">
+                                {{ __('livewire_itc_promo_code_apply') }}
+                            </x-ui.button>
+
+                            @if ($appliedPromoCodeId)
+                                <div class="mt-3 p-3 bg-green-900/30 border border-green-500/30 rounded-lg">
+                                    <p class="text-green-400 text-sm">
+                                        {{ __('livewire_itc_promo_code_applied_success', ['amount' => $appliedPromoCodeDiscount]) }}
+                                    </p>
+                                </div>
+                            @endif
+
+                            <x-ui.submit-button action="buyPackage" class="w-full mt-4">
                                 {{ __('buy') }}
                             </x-ui.submit-button>
                         </form>

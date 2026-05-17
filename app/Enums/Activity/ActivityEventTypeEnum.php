@@ -39,4 +39,6 @@ enum ActivityEventTypeEnum: string
     case StakingPackagePurchased = 'staking_package_purchased';
     case StakingPackageToppedUp = 'staking_package_topped_up';
     case StakingProfitAccrued = 'staking_profit_accrued';
+
+    case PromoCodeApplied = 'promo_code_applied';
 }

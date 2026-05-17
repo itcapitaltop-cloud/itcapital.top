@@ -6,6 +6,7 @@ use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Activity\WriteBusinessActivityData;
+use App\Dto\PromoCodes\PackagePromoCodeValidationResult;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
@@ -21,10 +22,12 @@ use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitWithdraw;
 use App\Models\PackageProfitWithReinvestLink;
+use App\Models\PromoCode;
 use App\Models\ReinvestToPackageBody;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ActivityLog\BusinessActivityLogger;
+use App\Services\PromoCodes\PackagePromoCodeService;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -44,8 +47,25 @@ use RuntimeException;
 
 class Packages extends Component
 {
-    #[Validate(['required', 'numeric', 'min:100'])]
+    #[Validate(['required', 'numeric'])]
     public string $amount = '';
+
+    public string $promoCode = '';
+
+    public ?int $appliedPromoCodeId = null;
+
+    public string $appliedPromoCodeDiscount = '';
+
+    public function minimumAmountPlaceholder(): string
+    {
+        if ($this->appliedPromoCodeId !== null) {
+            return __('livewire_itc_minimum_itc_with_promo', [
+                'amount' => $this->appliedPromoCodeDiscount,
+            ]);
+        }
+
+        return __('livewire_itc_minimum_itc_placeholder');
+    }
 
     #[Locked]
     public string $mainBalance = '1000';
@@ -456,51 +476,209 @@ class Packages extends Component
         );
     }
 
-    public function buyPackage(TransactionRepositoryContract $transactionRepo): void
+    public function updatedPromoCode(string $value): void
     {
-        $this->validate();
+        if ($value === '') {
+            $this->appliedPromoCodeId = null;
+            $this->appliedPromoCodeDiscount = '';
+            $this->resetValidation('promoCode');
+        }
+    }
 
-        $transactionRepo->checkBalanceAndStore(new CreateTransactionDto(
-            userId: Auth::id(),
-            trxType: TrxTypeEnum::BUY_PACKAGE,
-            balanceType: BalanceTypeEnum::MAIN,
-            amount: $this->amount,
-            acceptedAt: Carbon::now(),
-            prefix: 'ITC-',
-        ), function (Transaction $trx) {
-            $package = ItcPackage::query()->create([
-                'uuid' => $trx->uuid,
-                'work_to' => Carbon::now()->addWeeks(30),
-                'type' => PackageTypeEnum::STANDARD,
-                'month_profit_percent' => '8.2',
+    public function applyPromoCode(PackagePromoCodeService $promoCodeService): void
+    {
+        $this->appliedPromoCodeId = null;
+        $this->appliedPromoCodeDiscount = '';
+        $this->resetValidation('promoCode');
+
+        if (trim($this->promoCode) === '') {
+            return;
+        }
+
+        $user = User::query()->findOrFail(Auth::id());
+
+        $result = $promoCodeService->validateForPurchase(
+            user: $user,
+            packageType: PackageTypeEnum::STANDARD,
+            amount: (string) ($this->amount ?: '100'),
+            code: $this->promoCode,
+        );
+
+        if (! $result->isValid()) {
+            $this->addError(
+                'promoCode',
+                $this->promoCodeValidationMessage($result->errorCode, $result->effectiveMinimumAmount)
+            );
+
+            return;
+        }
+
+        $this->appliedPromoCodeId = $result->promoCode->id;
+        $this->appliedPromoCodeDiscount = round((float) $result->effectiveMinimumAmount, 2) . ' ITC';
+    }
+
+    public function buyPackage(TransactionRepositoryContract $transactionRepo, PackagePromoCodeService $promoCodeService): void
+    {
+        $this->validate([
+            'amount' => ['required', 'numeric'],
+            'promoCode' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $user = User::query()->findOrFail(Auth::id());
+
+        Log::debug('[Packages.buyPackage] start', [
+            'user_id' => $user->id,
+            'amount' => $this->amount,
+            'package_type' => PackageTypeEnum::STANDARD->value,
+            'has_promo_code' => trim($this->promoCode) !== '',
+        ]);
+
+        $promoCodeValidation = null;
+
+        if ($this->appliedPromoCodeId !== null && trim($this->promoCode) !== '') {
+            $promoCode = PromoCode::query()->find($this->appliedPromoCodeId);
+
+            if ($promoCode !== null && $promoCode->code === $this->promoCode) {
+                $effectiveMinimum = $promoCode->reduced_minimum_amount;
+                $promoCodeValidation = new PackagePromoCodeValidationResult(
+                    promoCode: $promoCode,
+                    effectiveMinimumAmount: $effectiveMinimum,
+                );
+            }
+        }
+
+        if ($promoCodeValidation === null && trim($this->promoCode) !== '') {
+            $promoCodeValidation = $promoCodeService->validateForPurchase(
+                user: $user,
+                packageType: PackageTypeEnum::STANDARD,
+                amount: $this->amount,
+                code: $this->promoCode,
+            );
+        }
+
+        if ($promoCodeValidation === null || ! $promoCodeValidation->isValid()) {
+            if ($promoCodeValidation !== null) {
+                Log::warning('[Packages.buyPackage] promo code validation failed', [
+                    'user_id' => $user->id,
+                    'promo_code_id' => $promoCodeValidation->promoCode?->id,
+                    'error_code' => $promoCodeValidation->errorCode,
+                    'effective_minimum_amount' => $promoCodeValidation->effectiveMinimumAmount,
+                ]);
+
+                $this->addError(
+                    $promoCodeValidation->errorCode === PackagePromoCodeService::ERROR_AMOUNT_BELOW_THRESHOLD ? 'amount' : 'promoCode',
+                    $this->promoCodeValidationMessage($promoCodeValidation->errorCode, $promoCodeValidation->effectiveMinimumAmount)
+                );
+            }
+
+            return;
+        }
+
+        $redeemedPromoCodeId = null;
+
+        try {
+            $transactionRepo->checkBalanceAndStore(new CreateTransactionDto(
+                userId: $user->id,
+                trxType: TrxTypeEnum::BUY_PACKAGE,
+                balanceType: BalanceTypeEnum::MAIN,
+                amount: $this->amount,
+                acceptedAt: Carbon::now(),
+                prefix: 'ITC-',
+            ), function (Transaction $trx) use ($promoCodeService, $promoCodeValidation, $user, &$redeemedPromoCodeId) {
+                $package = ItcPackage::query()->create([
+                    'uuid' => $trx->uuid,
+                    'work_to' => Carbon::now()->addWeeks(30),
+                    'type' => PackageTypeEnum::STANDARD,
+                    'month_profit_percent' => '8.2',
+                ]);
+
+                if ($promoCodeValidation->promoCode !== null) {
+                    $redeemedPromoCode = $promoCodeService->redeem($promoCodeValidation->promoCode, $user, PackageTypeEnum::STANDARD);
+                    $redeemedPromoCodeId = $redeemedPromoCode->promo_code_id;
+
+                    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                        type: ActivityEventTypeEnum::PromoCodeApplied,
+                        userId: $trx->user_id,
+                        subject: $redeemedPromoCode,
+                        feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                        properties: [
+                            'promo_code_id' => $redeemedPromoCode->promo_code_id,
+                            'promo_code' => $promoCodeValidation->promoCode->code,
+                            'original_threshold' => '100.00000000',
+                            'effective_threshold' => $promoCodeValidation->promoCode->reduced_minimum_amount,
+                        ],
+                        causer: Auth::user(),
+                        logName: 'packages',
+                        context: 'account',
+                    ));
+                }
+
+                app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+                    type: ActivityEventTypeEnum::PackagePurchased,
+                    userId: $trx->user_id,
+                    subject: $package,
+                    feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
+                    properties: [
+                        'amount' => (string) $trx->amount,
+                        'package_uuid' => $package->uuid,
+                        'package_type' => $package->type->value,
+                        'promo_code_id' => $redeemedPromoCodeId,
+                    ],
+                    causer: Auth::user(),
+                    logName: 'packages',
+                    context: 'account',
+                ));
+
+                app(StartBonusAccrualContract::class)
+                    ->accrue($trx->user_id, (float) $trx->amount);
+
+                Artisan::call('user:use-rank');
+            });
+        } catch (InvalidAmountException $exception) {
+            Log::warning('[Packages.buyPackage] insufficient balance', [
+                'user_id' => $user->id,
+                'amount' => $this->amount,
+                'promo_code_id' => $promoCodeValidation->promoCode?->id,
             ]);
 
-            app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
-                type: ActivityEventTypeEnum::PackagePurchased,
-                userId: $trx->user_id,
-                subject: $package,
-                feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
-                properties: [
-                    'amount' => (string) $trx->amount,
-                    'package_uuid' => $package->uuid,
-                    'package_type' => $package->type->value,
-                ],
-                causer: Auth::user(),
-                logName: 'packages',
-                context: 'account',
-            ));
+            throw $exception;
+        } catch (\Throwable $throwable) {
+            Log::error('[Packages.buyPackage] package purchase failed', [
+                'user_id' => $user->id,
+                'amount' => $this->amount,
+                'promo_code_id' => $promoCodeValidation->promoCode?->id,
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
 
-            app(StartBonusAccrualContract::class)
-                ->accrue($trx->user_id, (float) $trx->amount);
+            throw $throwable;
+        }
 
-            Artisan::call('user:use-rank');
-        });
+        Notify::packageBought($user, 'STANDARD', $this->amount);
 
-        $u = User::where('id', Auth::id())->first();
-
-        Notify::packageBought($u, 'STANDARD', $this->amount);
+        Log::info('[Packages.buyPackage] purchased', [
+            'user_id' => $user->id,
+            'amount' => $this->amount,
+            'package_type' => PackageTypeEnum::STANDARD->value,
+            'promo_code_id' => $redeemedPromoCodeId,
+        ]);
 
         $this->dispatch('bought');
+
+        $this->reset('promoCode', 'appliedPromoCodeId', 'appliedPromoCodeDiscount');
+    }
+
+    private function promoCodeValidationMessage(?string $errorCode, string $effectiveMinimumAmount): string
+    {
+        return match ($errorCode) {
+            PackagePromoCodeService::ERROR_USED => __('livewire_itc_promo_code_used'),
+            PackagePromoCodeService::ERROR_PACKAGE_TYPE_MISMATCH => __('livewire_itc_promo_code_package_type_mismatch'),
+            PackagePromoCodeService::ERROR_AMOUNT_BELOW_THRESHOLD => __('livewire_itc_promo_code_amount_below_threshold', [
+                'amount' => round((float) $effectiveMinimumAmount, 2),
+            ]),
+            PackagePromoCodeService::ERROR_UNSUPPORTED_PACKAGE_TYPE => __('livewire_itc_promo_code_unsupported_package_type'),
+            default => __('livewire_itc_promo_code_invalid'),
+        };
     }
 
     public function createPackage(TransactionRepositoryContract $transactionRepo): void

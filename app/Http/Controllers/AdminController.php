@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\PromoCodes\GeneratePromoCodeAction;
 use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
@@ -36,9 +37,11 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
+use MoonShine\Permissions\Models\MoonshineUser;
 use RuntimeException;
 use Throwable;
 
@@ -141,6 +144,64 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()
             ->toast('Отредактировано', ToastType::SUCCESS)
             ->redirect(request()->headers->get('referer'));
+    }
+
+    public function generatePromoCode(MoonShineRequest $request): RedirectResponse
+    {
+        $admin = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+        $admin = $admin instanceof MoonshineUser ? $admin : null;
+
+        Log::debug('[AdminController.generatePromoCode] start', [
+            'admin_id' => $admin?->id,
+            'package_type' => $request->input('package_type'),
+            'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
+        ]);
+
+        $validator = validator($request->all(), [
+            'package_type' => [
+                'required',
+                Rule::enum(PackageTypeEnum::class)->except([
+                    PackageTypeEnum::ARCHIVE,
+                    PackageTypeEnum::STAKING,
+                ]),
+            ],
+            'reduced_minimum_amount' => ['required', 'numeric', 'min:0', 'lt:100'],
+        ]);
+
+        if ($validator->fails()) {
+            Log::warning('[AdminController.generatePromoCode] validation failed', [
+                'admin_id' => $admin?->id,
+                'errors' => $validator->errors()->keys(),
+            ]);
+
+            return back()->withErrors($validator)->withInput();
+        }
+
+        try {
+            $promoCode = GeneratePromoCodeAction::make()->run(
+                PackageTypeEnum::from((string) $request->input('package_type')),
+                (string) $request->input('reduced_minimum_amount'),
+                $admin,
+            );
+        } catch (Throwable $throwable) {
+            Log::error('[AdminController.generatePromoCode] generation failed', [
+                'admin_id' => $admin?->id,
+                'package_type' => $request->input('package_type'),
+                'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+
+            return back()->with('error', 'Не удалось сгенерировать промокод: ' . $throwable->getMessage());
+        }
+
+        Log::info('[AdminController.generatePromoCode] generated', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCode->id,
+            'package_type' => $promoCode->package_type->value,
+        ]);
+
+        return back()->with('success', 'Промокод создан: ' . $promoCode->code);
     }
 
     public function updateItcPackage(string $uuid, MoonShineRequest $request)

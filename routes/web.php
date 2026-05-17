@@ -117,6 +117,7 @@ Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])
 Route::controller(AdminController::class)->middleware(Authenticate::class)->prefix('itcapitalmoonshineadminpanel')->group(function () {
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
     Route::post('itc-packages/profits/recalculate', 'recalculate');
+    Route::post('promo-codes/generate', 'generatePromoCode')->name('admin.promo-codes.generate');
     Route::post('itc-staking/change/percentage', [ItcStakingController::class, 'changePercentage']);
     Route::post('itc-staking/change/start-bonus-percentage', [ItcStakingController::class, 'changeStartBonusPercentage'])->name('admin.itc-staking.change-start-bonus-percentage');
     Route::post('itc-staking/change/regular-percentage', [ItcStakingController::class, 'changeRegularPercentage'])->name('admin.itc-staking.change-regular-percentage');

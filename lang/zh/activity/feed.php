@@ -66,6 +66,7 @@ return [
         'regular_bonus_transferred_to_partner' => '已将 :amount ITC 从常规奖金余额转入伙伴余额',
         'staking_package_purchased' => '已购买质押套餐 :uuid，金额 :amount ITC:rate',
         'staking_package_topped_up' => '已向质押套餐 :uuid 添加 :amount ITC:rate',
+        'promo_code_applied' => '已应用促销码 :promo_code，门槛从 :original_threshold ITC 降至 :effective_threshold ITC',
         'staking_profit_accrued' => '质押套餐 :uuid 已获得收益 :profit ITC:rate',
     ],
 ];
