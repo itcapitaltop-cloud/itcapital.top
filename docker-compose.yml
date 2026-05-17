@@ -62,7 +62,9 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - net
+      net:
+        aliases:
+          - redis
     restart: unless-stopped
 
 networks:
