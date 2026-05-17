@@ -33,6 +33,7 @@ final class StatisticLinearPartner extends MoonShineComponent
 
         $user = User::query()->findOrFail($this->userId);
         $maxRank = (int) PartnerRank::query()->max('rank');
+        $progressBars = ProgressBarAction::make()->run($this->userId);
 
         Log::debug('[StatisticLinearPartner::viewData] END', [
             'progressBars_count' => count($progressBars),
@@ -41,7 +42,7 @@ final class StatisticLinearPartner extends MoonShineComponent
 
         return [
             'nextRank' => $user->rank + 1 <= $maxRank ? $user->rank + 1 : null,
-            'progressBars' => ProgressBarAction::make()->run($this->userId),
+            'progressBars' => $progressBars,
         ];
     }
 }
