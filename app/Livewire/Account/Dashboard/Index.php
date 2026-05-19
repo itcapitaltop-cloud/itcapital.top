@@ -36,8 +36,9 @@ class Index extends Component
                         ->orWhereDoesntHave('zeroing');
                 })
                 ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+                ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
                 ->get()
-                ->sum(fn ($p) => (float) $p->transaction->amount + (float) $p->reinvest_profits_sum_amount),
+                ->sum(fn ($p) => (float) $p->transaction->amount + (float) $p->reinvest_profits_sum_amount + (float) $p->partner_transfers_sum_amount),
 
             'transactions' => Transaction::query()
                 ->with([
