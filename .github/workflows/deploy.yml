@@ -28,6 +28,18 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.SERVER_PORT }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
+      - name: 🏗️ Build frontend assets
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install frontend dependencies
+        run: npm ci --include=dev --no-audit --no-fund
+
+      - name: 🏗️ Compile frontend assets
+        run: npm run build
+
       - name: 🚀 Deploy to server
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -36,6 +48,7 @@ jobs:
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
         run: |
           echo "🚀 Starting deployment to $SERVER_HOST:$SERVER_PORT"
+          SSH_OPTS="-p ${SERVER_PORT} -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes"
 
           # Check if Dockerfile changed
           DOCKERFILE_CHANGED=false
@@ -46,7 +59,7 @@ jobs:
 
           # Sync files to server (excluding sensitive files)
           rsync -avz --delete \
-            -e "ssh -p ${SERVER_PORT}" \
+            -e "ssh ${SSH_OPTS}" \
             --exclude '.git' \
             --exclude '.github' \
             --exclude 'node_modules' \
@@ -55,18 +68,17 @@ jobs:
             --exclude 'bootstrap/cache' \
             --exclude '.env' \
             --exclude '.env.example' \
-            --exclude 'public/build' \
             --exclude 'public/hot' \
             ./ $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
 
           # Mark if Dockerfile changed
           if [ "$DOCKERFILE_CHANGED" = true ]; then
-            ssh -p ${SERVER_PORT} $SERVER_USER@$SERVER_HOST "touch $SERVER_PATH/.dockerfile_changed"
+            ssh ${SSH_OPTS} $SERVER_USER@$SERVER_HOST "touch $SERVER_PATH/.dockerfile_changed"
           fi
 
           # Run deployment script on server
           echo "⏱️  Starting deployment on server (this may take 2-5 minutes)..."
-          ssh -p ${SERVER_PORT} $SERVER_USER@$SERVER_HOST "cd $SERVER_PATH && bash deploy-production.sh"
+          ssh ${SSH_OPTS} $SERVER_USER@$SERVER_HOST "cd $SERVER_PATH && bash deploy-production.sh"
 
       - name: ✅ Deployment successful
         run: |
