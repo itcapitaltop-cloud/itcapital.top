@@ -32,7 +32,7 @@
                             </x-ui.input>
 
                             <x-ui.input name="promoCode" placeholder="{{ __('livewire_itc_promo_code_placeholder') }}"
-                                class="mt-4 mb-5" input-class="py-[5px] px-[12px]">
+                                class="mt-8 mb-5" input-class="py-[5px] px-[12px]">
                                 {{ __('livewire_itc_promo_code_label') }}
                             </x-ui.input>
 
