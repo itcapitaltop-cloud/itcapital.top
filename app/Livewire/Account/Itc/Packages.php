@@ -6,7 +6,6 @@ use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Activity\WriteBusinessActivityData;
-use App\Dto\PromoCodes\PackagePromoCodeValidationResult;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
@@ -478,11 +477,9 @@ class Packages extends Component
 
     public function updatedPromoCode(string $value): void
     {
-        if ($value === '') {
-            $this->appliedPromoCodeId = null;
-            $this->appliedPromoCodeDiscount = '';
-            $this->resetValidation('promoCode');
-        }
+        $this->appliedPromoCodeId = null;
+        $this->appliedPromoCodeDiscount = '';
+        $this->resetValidation('promoCode');
     }
 
     public function applyPromoCode(PackagePromoCodeService $promoCodeService): void
@@ -533,28 +530,16 @@ class Packages extends Component
             'has_promo_code' => trim($this->promoCode) !== '',
         ]);
 
-        $promoCodeValidation = null;
+        $appliedPromoCode = $this->appliedPromoCodeId === null
+            ? null
+            : PromoCode::query()->find($this->appliedPromoCodeId);
 
-        if ($this->appliedPromoCodeId !== null && trim($this->promoCode) !== '') {
-            $promoCode = PromoCode::query()->find($this->appliedPromoCodeId);
-
-            if ($promoCode !== null && $promoCode->code === $this->promoCode) {
-                $effectiveMinimum = $promoCode->reduced_minimum_amount;
-                $promoCodeValidation = new PackagePromoCodeValidationResult(
-                    promoCode: $promoCode,
-                    effectiveMinimumAmount: $effectiveMinimum,
-                );
-            }
-        }
-
-        if ($promoCodeValidation === null && trim($this->promoCode) !== '') {
-            $promoCodeValidation = $promoCodeService->validateForPurchase(
-                user: $user,
-                packageType: PackageTypeEnum::STANDARD,
-                amount: $this->amount,
-                code: $this->promoCode,
-            );
-        }
+        $promoCodeValidation = $promoCodeService->validateForPurchase(
+            user: $user,
+            packageType: PackageTypeEnum::STANDARD,
+            amount: $this->amount,
+            code: $appliedPromoCode?->code,
+        );
 
         if ($promoCodeValidation === null || ! $promoCodeValidation->isValid()) {
             if ($promoCodeValidation !== null) {
