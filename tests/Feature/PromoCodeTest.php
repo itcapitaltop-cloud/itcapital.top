@@ -51,6 +51,7 @@ it('redeems a valid promo code once during package purchase', function () {
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'PROMO50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasNoErrors();
 
@@ -63,6 +64,28 @@ it('redeems a valid promo code once during package purchase', function () {
 
     expect($transaction)->not->toBeNull()
         ->and((string) $transaction->amount)->toBe('50.00000000')
+        ->and(ItcPackage::query()->where('uuid', $transaction->uuid)->exists())->toBeTrue();
+});
+
+it('allows package purchase without a promo code', function () {
+    $user = User::factory()->create();
+    fundMainBalance($user);
+
+    $this->actingAs($user);
+
+    Livewire::test(ItcPackages::class)
+        ->set('amount', '100')
+        ->set('promoCode', '')
+        ->call('buyPackage')
+        ->assertHasNoErrors();
+
+    $transaction = Transaction::query()
+        ->where('user_id', $user->id)
+        ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
+        ->first();
+
+    expect($transaction)->not->toBeNull()
+        ->and((string) $transaction->amount)->toBe('100.00000000')
         ->and(ItcPackage::query()->where('uuid', $transaction->uuid)->exists())->toBeTrue();
 });
 
@@ -83,6 +106,7 @@ it('allows different users to use the same promo code', function () {
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'MULTI50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasNoErrors();
 
@@ -91,6 +115,7 @@ it('allows different users to use the same promo code', function () {
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'MULTI50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasNoErrors();
 
@@ -114,12 +139,14 @@ it('rejects same user reusing a promo code for the same package type', function 
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'ONCE50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasNoErrors();
 
     Livewire::test(ItcPackages::class)
         ->set('amount', '60')
         ->set('promoCode', 'ONCE50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasErrors(['promoCode']);
 
@@ -145,6 +172,7 @@ it('allows same user to use promo code for different package types', function ()
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'SAME50')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasErrors(['promoCode']);
 
@@ -164,7 +192,7 @@ it('rejects invalid and mismatched promo codes without creating a package', func
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', $code)
-        ->call('buyPackage')
+        ->call('applyPromoCode')
         ->assertHasErrors(['promoCode']);
 
     expect(Transaction::query()
@@ -195,6 +223,7 @@ it('rejects package purchase below the promo reduced threshold', function () {
     Livewire::test(ItcPackages::class)
         ->set('amount', '50')
         ->set('promoCode', 'MIN75')
+        ->call('applyPromoCode')
         ->call('buyPackage')
         ->assertHasErrors(['amount']);
 
