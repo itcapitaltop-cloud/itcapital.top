@@ -10,7 +10,6 @@ use App\Models\PartnerLevelPercent;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserLevelPercentOverride;
-use App\Repositories\StartBonusAccrualContractpository;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -92,7 +91,7 @@ it('процент зависит от ранга', function () {
         'depth' => 1,
     ]);
 
-    app(StartBonusAccrualContractpository::class)->accrue($buyer->id, 200.00);
+    app(StartBonusAccrualContract::class)->accrue($buyer->id, 200.00);
 
     $this->assertDatabaseHas('transactions', [
         'user_id' => $ancestor->id,
@@ -221,7 +220,7 @@ it('расширенные линии гейтинга на линии 6 и вы
         'depth' => 6,
     ]);
 
-    app(StartBonusAccrualContractpository::class)->accrue($buyer->id, 100.00);
+    app(StartBonusAccrualContract::class)->accrue($buyer->id, 100.00);
 
     $this->assertDatabaseMissing('transactions', [
         'user_id' => $ancestorNoExt->id,
@@ -269,7 +268,7 @@ it('использует персональный оверрайд процен�
         'depth' => 1,
     ]);
 
-    app(StartBonusAccrualContractpository::class)->accrue($buyer->id, 100.00);
+    app(StartBonusAccrualContract::class)->accrue($buyer->id, 100.00);
 
     // Должен использоваться персональный оверрайд 7%, а не глобальный 5%
     // 7% of 100 = 7.00
@@ -322,7 +321,7 @@ it('правильно считает стартовую премию для р�
     ]);
 
     $packageAmount = 1000.00;
-    app(StartBonusAccrualContractpository::class)->accrue($buyer->id, $packageAmount);
+    app(StartBonusAccrualContract::class)->accrue($buyer->id, $packageAmount);
 
     // Проверяем, что транзакция создана с правильной суммой
     // 1000 * 2.5% = 25.00
@@ -380,10 +379,10 @@ it('не начисляет стартовую премию для ранга 20
         'depth' => 20,
     ]);
 
-    app(StartBonusAccrualContractpository::class)->accrue($buyer->id, 1000.00);
+    app(StartBonusAccrualContract::class)->accrue($buyer->id, 1000.00);
 
     // Проверяем, что транзакция НЕ создана, так как extended_lines = false
-    // В StartBonusAccrualContractpository для линий 6-20 проверяется extended_lines
+    // В StartBonusAccrualContract для линий 6-20 проверяется extended_lines
     $this->assertDatabaseMissing('transactions', [
         'user_id' => $ancestor->id,
         'trx_type' => TrxTypeEnum::START_BONUS_ACCRUAL->value,

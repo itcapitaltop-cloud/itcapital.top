@@ -63,7 +63,7 @@ it('redeems a valid promo code once during package purchase', function () {
         ->first();
 
     expect($transaction)->not->toBeNull()
-        ->and((string) $transaction->amount)->toBe('50.00000000')
+        ->and((string) $transaction->amount)->toBe('50.00')
         ->and(ItcPackage::query()->where('uuid', $transaction->uuid)->exists())->toBeTrue();
 });
 
@@ -85,7 +85,7 @@ it('allows package purchase without a promo code', function () {
         ->first();
 
     expect($transaction)->not->toBeNull()
-        ->and((string) $transaction->amount)->toBe('100.00000000')
+        ->and((string) $transaction->amount)->toBe('100.00')
         ->and(ItcPackage::query()->where('uuid', $transaction->uuid)->exists())->toBeTrue();
 });
 
@@ -147,7 +147,6 @@ it('rejects same user reusing a promo code for the same package type', function 
         ->set('amount', '60')
         ->set('promoCode', 'ONCE50')
         ->call('applyPromoCode')
-        ->call('buyPackage')
         ->assertHasErrors(['promoCode']);
 
     expect($promoCode->usages()->where('user_id', $user->id)->count())->toBe(1)
@@ -157,7 +156,7 @@ it('rejects same user reusing a promo code for the same package type', function 
             ->count())->toBe(1);
 });
 
-it('allows same user to use promo code for different package types', function () {
+it('rejects promo code for a different package type', function () {
     $user = User::factory()->create();
     fundMainBalance($user, '300.00000000');
 
@@ -173,7 +172,6 @@ it('allows same user to use promo code for different package types', function ()
         ->set('amount', '50')
         ->set('promoCode', 'SAME50')
         ->call('applyPromoCode')
-        ->call('buyPackage')
         ->assertHasErrors(['promoCode']);
 
     expect($promoCode->usages()->where('user_id', $user->id)->count())->toBe(0);

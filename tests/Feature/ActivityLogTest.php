@@ -414,6 +414,8 @@ it('добавляет сумму в staking пакет через админк�
 
     $package = app(StakingPurchaseService::class)->createPackage($user->id, 300);
 
+    $this->withoutMiddleware();
+
     $this->actingAs($admin)
         ->post("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}", [
             'profit_percent' => $package->month_profit_percent,

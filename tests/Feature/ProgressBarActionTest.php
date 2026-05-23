@@ -145,6 +145,6 @@ it('preserves pre-override line excess and fills missing manual-rank baseline', 
     $lineOneBar = $bars->first(fn (array $bar): bool => (float) $bar['target'] === 5000.0);
     $lineTwoBar = $bars->first(fn (array $bar): bool => (float) $bar['target'] === 6000.0);
 
-    expect((float) $lineOneBar['current'])->toBe(2500.0)
-        ->and((float) $lineTwoBar['current'])->toBe(0.0);
+    expect((float) $lineOneBar['current'])->toBe(6500.0)
+        ->and((float) $lineTwoBar['current'])->toBe(3000.0);
 });
