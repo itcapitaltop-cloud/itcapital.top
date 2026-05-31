@@ -579,12 +579,16 @@ class UserResource extends ModelResource
             'requested_duration' => $request->input('duration'),
         ]);
 
+        $shouldRecalculateRanks = false;
+
         if ($packageType === PackageTypeEnum::STAKING) {
             $package = CreateStakingPackageAction::make()
                 ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'), $packageDefinition->id);
 
             new StakingAccrualService()
                 ->accrueAdminTopUpBonus($package, (float) $request->input('amount'), $userId);
+
+            $shouldRecalculateRanks = true;
         } else {
             $isPresent = $packageType === PackageTypeEnum::PRESENT;
             $durationMonths = $isPresent
@@ -632,12 +636,18 @@ class UserResource extends ModelResource
                 skipBalance: $isPresent
             );
 
+            $shouldRecalculateRanks = ! $isPresent;
+
             Log::info('[UserResource.createPackage] package creation completed', [
                 'admin_id' => auth()->id(),
                 'target_user_id' => $userId,
                 'package_type' => $packageType->value,
                 'package_definition_id' => $packageDefinition->id,
             ]);
+        }
+
+        if ($shouldRecalculateRanks) {
+            Artisan::call('user:use-rank');
         }
 
         $url = to_page(
