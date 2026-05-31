@@ -80,8 +80,7 @@ final class ActivityFeedService
         ?int $limit = 200,
         ?CarbonInterface $dateFrom = null,
         ?CarbonInterface $dateTo = null,
-    ): array
-    {
+    ): array {
         return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $limit)
             ->when($dateFrom !== null, fn (Builder $query) => $query->where('created_at', '>=', $dateFrom))
             ->when($dateTo !== null, fn (Builder $query) => $query->where('created_at', '<=', $dateTo))
@@ -157,6 +156,41 @@ final class ActivityFeedService
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * @return array<int, array{action:string,admin_login:string,old_values:string,new_values:string,date:string}>
+     */
+    public function globalAdminFeed(?int $limit = 200): array
+    {
+        $query = BusinessActivity::query()
+            ->forFeed(ActivityFeedTypeEnum::GlobalAdmin)
+            ->with('causer')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query
+            ->get()
+            ->map(fn (BusinessActivity $activity): array => $this->globalAdminFeedRow($activity))
+            ->toArray();
+    }
+
+    /**
+     * @return array{action:string,admin_login:string,old_values:string,new_values:string,date:string}
+     */
+    public function globalAdminFeedRow(BusinessActivity $activity): array
+    {
+        return [
+            'action' => $this->adminActionLabel($activity),
+            'admin_login' => $this->activityAdminLogin($activity),
+            'old_values' => $this->formatActivityValues((array) $activity->getExtraProperty('old_values', [])),
+            'new_values' => $this->formatActivityValues((array) $activity->getExtraProperty('new_values', [])),
+            'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+        ];
     }
 
     /**
@@ -343,6 +377,12 @@ final class ActivityFeedService
         $actionType = LogActionTypeEnum::tryFrom($activity->description);
 
         if ($actionType !== null) {
+            if ($actionType === LogActionTypeEnum::UPSERT_TOKEN_RATE) {
+                return $activity->getExtraProperty('old_values') === []
+                    ? __('activity/log_action.create_token_rate')
+                    : __('activity/log_action.update_token_rate');
+            }
+
             $transactionActionLabel = $this->transactionAdminActionLabel($activity, $actionType);
 
             if ($transactionActionLabel !== null) {
@@ -464,5 +504,64 @@ final class ActivityFeedService
         }
 
         return (string) $value;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function formatActivityValues(array $values): string
+    {
+        if ($values === []) {
+            return '—';
+        }
+
+        return collect($values)
+            ->map(fn (mixed $value, string|int $key): string => $this->formatActivityKey($key) . ': ' . $this->formatActivityValue($value))
+            ->implode("\n");
+    }
+
+    private function formatActivityKey(string|int $key): string
+    {
+        return match ($key) {
+            'effective_from' => 'Дата',
+            'rate' => 'Курс',
+            default => (string) $key,
+        };
+    }
+
+    private function formatActivityValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '—';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Да' : 'Нет';
+        }
+
+        if (is_numeric($value)) {
+            return $this->formatAmount((string) $value);
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+    }
+
+    private function activityAdminLogin(BusinessActivity $activity): string
+    {
+        $causer = $activity->causer;
+
+        foreach (['username', 'login', 'email', 'name'] as $attribute) {
+            $value = data_get($causer, $attribute);
+
+            if (is_scalar($value) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return (string) ($activity->getExtraProperty('admin_login') ?? '');
     }
 }

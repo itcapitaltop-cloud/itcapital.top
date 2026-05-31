@@ -9,6 +9,7 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\ActivityLogResource;
 use App\MoonShine\Resources\AdminUserResource;
 use App\MoonShine\Resources\DepositResource;
+use App\MoonShine\Resources\GlobalAdminActivityResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\NewsResource;
@@ -87,6 +88,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             new AdminUserResource(),
             new MoonShineUserRoleResource(),
             new ActivityLogResource(),
+            new GlobalAdminActivityResource(),
             new PromoCodeResource(),
             new PackageDefinitionResource(),
         ];
@@ -129,6 +131,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
                 ->canSee($this->canSeeResource(NewsResource::class)),
             MenuItem::make('Админы', new AdminUserResource())
                 ->canSee($this->canSeeResource(AdminUserResource::class)),
+            MenuItem::make('Журнал действий', new GlobalAdminActivityResource())
+                ->canSee($this->canSeeResource(GlobalAdminActivityResource::class)),
             MenuItem::make('Роли', new MoonShineUserRoleResource())
                 ->canSee($this->canSeeResource(MoonShineUserRoleResource::class)),
             MenuItem::make('Документация', '/itcapitalmoonshineadminpanel/docs')

@@ -23,6 +23,7 @@ enum LogActionTypeEnum: string
     case EXTEND_PACKAGE_REINVEST_PROFIT = 'extend_package_reinvest_profit';
     case CLOSE_ITC_PACKAGE = 'close_itc_package';
     case UPDATE_REGULAR_BONUS = 'update_regular_bonus';
+    case UPSERT_TOKEN_RATE = 'upsert_token_rate';
 
     public function label(): string
     {
@@ -46,6 +47,7 @@ enum LogActionTypeEnum: string
             self::EXTEND_PACKAGE_REINVEST_PROFIT => __('activity/log_action.extend_package_reinvest_profit'),
             self::CLOSE_ITC_PACKAGE => __('activity/log_action.close_itc_package'),
             self::UPDATE_REGULAR_BONUS => __('activity/log_action.update_regular_bonus'),
+            self::UPSERT_TOKEN_RATE => __('activity/log_action.upsert_token_rate'),
         };
     }
 }
