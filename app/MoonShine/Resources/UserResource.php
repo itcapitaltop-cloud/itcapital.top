@@ -25,6 +25,7 @@ use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Package\PackageDefinitionResolver;
 use App\Services\Package\Staking\StakingAccrualService;
 use App\Services\User\UserRankServices;
 use Carbon\Carbon;
@@ -561,17 +562,46 @@ class UserResource extends ModelResource
     ): MoonShineJsonResponse {
         $itcRepo = app(ItcPackageRepositoryContract::class);
         $transactionRepo = app(TransactionRepositoryContract::class);
+        $packageDefinitionResolver = app(PackageDefinitionResolver::class);
 
         $userId = (int) $request->input('user_id');
+        $packageDefinition = $packageDefinitionResolver->resolveById((int) $request->input('package_definition_id'));
+        $packageType = $packageDefinition->type;
 
-        if ($request->input('packageType') === PackageTypeEnum::STAKING->value) {
+        Log::debug('[UserResource.createPackage] start', [
+            'admin_id' => auth()->id(),
+            'target_user_id' => $userId,
+            'package_definition_id' => $packageDefinition->id,
+            'package_slug' => $packageDefinition->slug,
+            'package_type' => $packageType->value,
+            'requested_amount' => $request->input('amount'),
+            'requested_percent' => $request->input('percent'),
+            'requested_duration' => $request->input('duration'),
+        ]);
+
+        if ($packageType === PackageTypeEnum::STAKING) {
             $package = CreateStakingPackageAction::make()
-                ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'));
+                ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'), $packageDefinition->id);
 
             new StakingAccrualService()
                 ->accrueAdminTopUpBonus($package, (float) $request->input('amount'), $userId);
         } else {
-            $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
+            $isPresent = $packageType === PackageTypeEnum::PRESENT;
+            $durationMonths = $isPresent
+                ? (int) $request->input('duration')
+                : $packageDefinition->duration_months;
+            $profitPercent = $request->input('percent') ?: $packageDefinition->default_profit_percent;
+
+            Log::debug('[UserResource.createPackage] resolved package definition', [
+                'admin_id' => auth()->id(),
+                'target_user_id' => $userId,
+                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+                'default_profit_percent' => $packageDefinition->default_profit_percent,
+                'selected_profit_percent' => $profitPercent,
+                'definition_duration_months' => $packageDefinition->duration_months,
+                'selected_duration_months' => $durationMonths,
+            ]);
 
             /* DTO транзакции */
             $dto = new CreateTransactionDto(
@@ -585,12 +615,13 @@ class UserResource extends ModelResource
 
             /* Данные пакета */
             $packageData = [
-                'type' => $request->input('packageType'),
-                'month_profit_percent' => $request->input('percent'),
+                'package_definition_id' => $packageDefinition->id,
+                'type' => $packageType,
+                'month_profit_percent' => $profitPercent,
                 'work_to' => $isPresent
-                    ? now()->addMonths((int) $request->input('duration'))
-                    : now()->addWeeks(30),
-                'duration_months' => $request->input('duration'),
+                    ? now()->addMonths($durationMonths)
+                    : now()->addMonths($durationMonths ?? 0),
+                'duration_months' => $durationMonths,
             ];
 
             /* Создание через репозиторий */
@@ -600,6 +631,13 @@ class UserResource extends ModelResource
                 transactionRepo: $transactionRepo,
                 skipBalance: $isPresent
             );
+
+            Log::info('[UserResource.createPackage] package creation completed', [
+                'admin_id' => auth()->id(),
+                'target_user_id' => $userId,
+                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+            ]);
         }
 
         $url = to_page(

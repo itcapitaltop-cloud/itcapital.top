@@ -25,6 +25,7 @@ use App\Models\User;
 use App\Models\UserSummary;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Package\PackageDefinitionResolver;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
@@ -146,7 +148,7 @@ class AdminController extends Controller
             ->redirect(request()->headers->get('referer'));
     }
 
-    public function generatePromoCode(MoonShineRequest $request): RedirectResponse
+    public function generatePromoCode(MoonShineRequest $request): MoonShineJsonResponse
     {
         $admin = auth(config('moonshine.auth.guard', 'moonshine'))->user();
         $admin = $admin instanceof MoonshineUser ? $admin : null;
@@ -165,8 +167,28 @@ class AdminController extends Controller
                     PackageTypeEnum::STAKING,
                 ]),
             ],
-            'reduced_minimum_amount' => ['required', 'numeric', 'min:0', 'lt:100'],
+            'reduced_minimum_amount' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $validator->after(function (Validator $validator) use ($request): void {
+            if ($validator->errors()->has('package_type') || $validator->errors()->has('reduced_minimum_amount')) {
+                return;
+            }
+
+            $packageType = PackageTypeEnum::from((string) $request->input('package_type'));
+            $packageDefinition = app(PackageDefinitionResolver::class)->resolve($packageType);
+            $reducedMinimumAmount = BigDecimal::of((string) $request->input('reduced_minimum_amount'));
+            $defaultMinimumAmount = BigDecimal::of($packageDefinition->min_start_amount);
+
+            if ($reducedMinimumAmount->isGreaterThanOrEqualTo($defaultMinimumAmount)) {
+                $validator->errors()->add(
+                    'reduced_minimum_amount',
+                    'Сумма сниженного порога должна быть меньше минимальной суммы тарифа ('
+                        . $packageDefinition->min_start_amount
+                        . ').'
+                );
+            }
+        });
 
         if ($validator->fails()) {
             Log::warning('[AdminController.generatePromoCode] validation failed', [
@@ -174,7 +196,8 @@ class AdminController extends Controller
                 'errors' => $validator->errors()->keys(),
             ]);
 
-            return back()->withErrors($validator)->withInput();
+            return MoonShineJsonResponse::make()
+                ->toast($validator->errors()->first(), ToastType::ERROR);
         }
 
         try {
@@ -192,7 +215,8 @@ class AdminController extends Controller
                 'message' => $throwable->getMessage(),
             ]);
 
-            return back()->with('error', 'Не удалось сгенерировать промокод: ' . $throwable->getMessage());
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось сгенерировать промокод: ' . $throwable->getMessage(), ToastType::ERROR);
         }
 
         Log::info('[AdminController.generatePromoCode] generated', [
@@ -201,7 +225,9 @@ class AdminController extends Controller
             'package_type' => $promoCode->package_type->value,
         ]);
 
-        return back()->with('success', 'Промокод создан: ' . $promoCode->code);
+        return MoonShineJsonResponse::make()
+            ->toast('Промокод создан: ' . $promoCode->code, ToastType::SUCCESS)
+            ->redirect($request->headers->get('referer'));
     }
 
     public function updateItcPackage(string $uuid, MoonShineRequest $request)

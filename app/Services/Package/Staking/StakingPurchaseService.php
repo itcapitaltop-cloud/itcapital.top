@@ -21,7 +21,7 @@ final class StakingPurchaseService
         private readonly StakingAccrualService $stakingAccrualService,
     ) {}
 
-    public function createPackage(int $userId, float $amountUsd, float $monthProfitPercent = 2.0): ItcPackage
+    public function createPackage(int $userId, float $amountUsd, ?float $monthProfitPercent = null): ItcPackage
     {
         return DB::transaction(function () use ($userId, $amountUsd, $monthProfitPercent): ItcPackage {
             $package = CreateStakingPackageAction::make()->run($userId, $amountUsd, $monthProfitPercent);
@@ -95,6 +95,7 @@ final class StakingPurchaseService
                     'amount' => (string) round($amountUsd, 2),
                     'package_uuid' => $package->uuid,
                     'package_type' => $package->type->value,
+                    'package_definition_id' => $package->package_definition_id,
                     'token_amount' => $tokenAmount,
                     'purchase_rate' => round($purchaseRate, 6),
                 ],

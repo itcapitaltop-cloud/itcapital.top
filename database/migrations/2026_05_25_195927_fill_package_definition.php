@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\Itc\PackageTypeEnum;
-use App\Models\Package\PackageDefinition;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,47 +11,69 @@ return new class extends Migration
      */
     public function up(): void
     {
-        PackageDefinition::query()
+        $now = now();
+
+        DB::table('package_definitions')
             ->insert([
                 [
-                    'id' => 1,
-                    'name' => 'standart',
-                    'min_start_amount' => 250,
-                    'default_profit_percent' => 5,
+                    'slug' => PackageTypeEnum::STANDARD->value,
+                    'type' => PackageTypeEnum::STANDARD->value,
+                    'name' => 'Standard',
+                    'min_start_amount' => '250.00',
+                    'default_profit_percent' => '5.00',
                     'duration_months' => 1,
-                    'type' => PackageTypeEnum::STANDARD,
+                    'sort_order' => 1,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ],
                 [
-                    'id' => 2,
-                    'name' => 'privilege',
-                    'default_profit_percent' => 8,
-                    'min_start_amount' => 2500,
+                    'slug' => PackageTypeEnum::PRIVILEGE->value,
+                    'type' => PackageTypeEnum::PRIVILEGE->value,
+                    'name' => 'Privilege',
+                    'default_profit_percent' => '8.00',
+                    'min_start_amount' => '2500.00',
                     'duration_months' => 6,
-                    'type' => PackageTypeEnum::PRIVILEGE,
+                    'sort_order' => 2,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ],
                 [
-                    'id' => 3,
-                    'name' => 'vip',
-                    'default_profit_percent' => 10,
-                    'min_start_amount' => 5000,
+                    'slug' => PackageTypeEnum::VIP->value,
+                    'type' => PackageTypeEnum::VIP->value,
+                    'name' => 'VIP',
+                    'default_profit_percent' => '10.00',
+                    'min_start_amount' => '5000.00',
                     'duration_months' => 8,
-                    'type' => PackageTypeEnum::VIP,
+                    'sort_order' => 3,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ],
                 [
-                    'id' => 4,
-                    'name' => 'present',
-                    'default_profit_percent' => 8.2,
-                    'min_start_amount' => 0,
+                    'slug' => PackageTypeEnum::PRESENT->value,
+                    'type' => PackageTypeEnum::PRESENT->value,
+                    'name' => 'Present',
+                    'default_profit_percent' => '8.20',
+                    'min_start_amount' => '0.00',
                     'duration_months' => 0,
-                    'type' => PackageTypeEnum::PRESENT,
+                    'sort_order' => 4,
+                    'is_active' => false,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ],
                 [
-                    'id' => 5,
-                    'name' => 'staking',
+                    'slug' => PackageTypeEnum::STAKING->value,
+                    'type' => PackageTypeEnum::STAKING->value,
+                    'name' => 'Staking',
                     'default_profit_percent' => 2,
                     'min_start_amount' => 0,
                     'duration_months' => 0,
-                    'type' => PackageTypeEnum::STAKING,
+                    'sort_order' => 5,
+                    'is_active' => false,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ],
             ]);
     }
@@ -61,6 +83,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        PackageDefinition::query()->whereIn([1, 2, 3, 4, 5])->forceDelete();
+        DB::table('package_definitions')->whereIn('type', [
+            PackageTypeEnum::STAKING->value,
+            PackageTypeEnum::PRESENT->value,
+            PackageTypeEnum::VIP->value,
+            PackageTypeEnum::PRIVILEGE->value,
+            PackageTypeEnum::STANDARD->value,
+        ])->forceDelete();
     }
 };

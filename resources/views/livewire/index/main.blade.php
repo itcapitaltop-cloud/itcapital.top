@@ -313,6 +313,17 @@
             </div>
         </div>
     </section>
+    @if ($packageDefinitions->isNotEmpty())
+        <section class="relative w-full py-[28px] overflow-hidden">
+            <div class="container">
+                <div class="grid grid-cols-1 justify-items-center gap-12 lg:grid-cols-3 lg:justify-items-start lg:gap-8 xl:gap-16">
+                    @foreach ($packageDefinitions as $packageDefinition)
+                        <x-index.package-definition-card :definition="$packageDefinition" />
+                    @endforeach
+                </div>
+            </div>
+        </section>
+    @endif
     <section id="club" class="relative w-full py-[28px] overflow-visible">
         <div class="container">
             <div class="relative mx-auto">

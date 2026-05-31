@@ -52,12 +52,12 @@ class PromoCodeResource extends ModelResource
                                 Number::make('Снизить порог до суммы', 'reduced_minimum_amount')
                                     ->customAttributes([
                                         'min' => 0,
-                                        'max' => 99.99999999,
                                         'step' => 'any',
                                     ])
                                     ->required(),
                             ])
                             ->method('POST')
+                            ->async()
                             ->submit('Сгенерировать'),
                     ])
                 )

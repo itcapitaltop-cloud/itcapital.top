@@ -13,6 +13,8 @@ return new class extends Migration
     {
         Schema::create('package_definitions', function (Blueprint $table) {
             $table->id();
+            $table->string('slug')->unique();
+            $table->string('type')->index();
             $table->string('name');
             $table->decimal('default_profit_percent', 5, 2);
             $table->decimal('min_start_amount', 16, 8);
@@ -20,7 +22,6 @@ return new class extends Migration
             $table->string('card_image_path')->nullable();
             $table->boolean('is_active')->default(true)->index();
             $table->unsignedInteger('sort_order')->default(0)->index();
-            $table->string('type')->unique();
             $table->softDeletes();
             $table->timestamps();
         });

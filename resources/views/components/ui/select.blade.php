@@ -5,10 +5,11 @@
     'placeholder' => '',
     'label'       => null,
     'value'       => null,
+    'nullable'    => false,
 ])
 
 @php($first = array_key_first($options))
-@php($current = $value ?? old($name) ?? $first)
+@php($current = $value ?? old($name) ?? ($nullable ? null : $first))
 
 <div
     x-data="{
@@ -69,9 +70,11 @@
     </ul>
 
     <select name="{{ $name }}" x-model="value" class="hidden">
+        @if($nullable)
+            <option value="" @selected($current === null || $current === '')>{{ $placeholder }}</option>
+        @endif
         @foreach($options as $val => $text)
             <option value="{{ $val }}" @selected($val == $current)>{{ $text }}</option>
         @endforeach
     </select>
 </div>
-

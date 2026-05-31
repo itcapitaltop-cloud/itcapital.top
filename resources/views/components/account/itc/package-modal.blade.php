@@ -1,8 +1,12 @@
+@php
+    $displayName = $package->packageDefinition?->name ?? $package->type->getName();
+@endphp
+
 <x-widget.modal>
     <x-bg.section-slim>
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-sm {{ $package->type->getTextColor() }}">{{ $package->type->getName() }}</p>
+                <p class="text-sm {{ $package->type->getTextColor() }}">{{ $displayName }}</p>
                 <h3 class="text-white text-base -mt-0.5">{{ __('components_account_itc_package_modal_itc') }}</h3>
             </div>
             <figure class="cursor-pointer" x-on:click="isModalActive = false">

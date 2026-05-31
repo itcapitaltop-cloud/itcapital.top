@@ -91,7 +91,7 @@ final class Index extends Component
         $packages = ItcPackage::query()
             ->active(PackageTypeEnum::STAKING)
             ->whereHas('transaction', fn ($query) => $query->where('user_id', auth()->id()))
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases', 'packageDefinition'])
             ->get();
 
         $performanceService = app(StakingPerformanceService::class);

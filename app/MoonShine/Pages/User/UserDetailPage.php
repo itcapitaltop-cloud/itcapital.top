@@ -9,6 +9,7 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
+use App\Models\Package\PackageDefinition;
 use App\Models\Partner;
 use App\Models\PartnerLevelPercent;
 use App\Models\Transaction;
@@ -185,22 +186,62 @@ class UserDetailPage extends DetailPage
             components: $formComponents
         )->name('edit-password-modal');
 
+        $packageDefinitionDefaults = PackageDefinition::query()
+            ->orderByDesc('is_active')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (PackageDefinition $definition): array => [
+                $definition->id => [
+                    'type' => $definition->type->value,
+                    'percent' => $definition->default_profit_percent,
+                    'duration' => $definition->duration_months,
+                ],
+            ])
+            ->all();
+        $packageDefinitionOptions = PackageDefinition::query()
+            ->orderByDesc('is_active')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (PackageDefinition $definition): array => [
+                $definition->id => $definition->is_active
+                    ? "{$definition->name} ({$definition->slug})"
+                    : "{$definition->name} ({$definition->slug}) — только в админке",
+            ])
+            ->all();
+        $defaultPackageDefinition = PackageDefinition::query()
+            ->where('type', PackageTypeEnum::STANDARD)
+            ->orderByDesc('is_active')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+        $defaultPackageDefinitionId = $defaultPackageDefinition?->id ?? array_key_first($packageDefinitionOptions);
+        $standardPackageDefaults = $defaultPackageDefinitionId !== null && isset($packageDefinitionDefaults[$defaultPackageDefinitionId])
+            ? $packageDefinitionDefaults[$defaultPackageDefinitionId]
+            : [
+                'percent' => '8.2',
+                'duration' => 1,
+            ];
+        $packageDefinitionDefaultsJson = json_encode($packageDefinitionDefaults, JSON_THROW_ON_ERROR | JSON_HEX_APOS | JSON_HEX_QUOT);
+
         $createPackageForm = FormBuilder::make()
             ->asyncMethod('createPackage')
             ->customAttributes([
                 'x-data' => "( () => {
                     const data = formBuilder(``, { whenFields: [], reactiveUrl: `` }, []);
+                    const definitionDefaults = {$packageDefinitionDefaultsJson};
+                    const defaultPackageDefinitionId = '" . $defaultPackageDefinitionId . "';
+                    const defaultPercent = definitionDefaults[defaultPackageDefinitionId]?.percent ?? '8.2';
                     Object.assign(data, {
-                        packageType: '" . PackageTypeEnum::STANDARD->value . "',
-                        percent: 8.2,
+                        packageDefinitionId: defaultPackageDefinitionId,
+                        packageType: definitionDefaults[defaultPackageDefinitionId]?.type ?? '" . PackageTypeEnum::STANDARD->value . "',
+                        percent: defaultPercent,
                         onChangeFieldPackageForm(event) {
-                            if (event.target.name === 'packageType') {
-                                this.packageType = event.target.value;
-                                if (this.packageType === '" . PackageTypeEnum::STAKING->value . "') {
-                                    this.percent = 2;
-                                } else {
-                                    this.percent = 8.2;
-                                }
+                            if (event.target.name === 'package_definition_id') {
+                                this.packageDefinitionId = event.target.value;
+                                this.packageType = definitionDefaults[this.packageDefinitionId]?.type ?? '" . PackageTypeEnum::STANDARD->value . "';
+                                this.percent = definitionDefaults[this.packageDefinitionId]?.percent ?? defaultPercent;
                                 // Находим инпут percent и обновляем его значение напрямую
                                 const percentInput = document.querySelector('[name=\"percent\"]');
                                 if (percentInput) {
@@ -216,16 +257,12 @@ class UserDetailPage extends DetailPage
             ->fields([
                 Hidden::make('user_id')->fill($item->id),
 
-                /* Тип пакета */
-                Select::make('Тип пакета', 'packageType')
-                    ->options(
-                        collect(PackageTypeEnum::cases())
-                            ->reject(fn ($e) => $e === PackageTypeEnum::ARCHIVE)
-                            ->mapWithKeys(fn ($e) => [$e->value => $e->getName()])
-                            ->all()
-                    )
+                /* Настройка пакета */
+                Select::make('Пакет', 'package_definition_id')
+                    ->options($packageDefinitionOptions)
+                    ->fill($defaultPackageDefinitionId)
                     ->customAttributes([
-                        'x-model' => 'packageType',
+                        'x-model' => 'packageDefinitionId',
                         'x-on:change' => 'onChangeFieldPackageForm($event)',
                     ])
                     ->required(),
@@ -240,7 +277,7 @@ class UserDetailPage extends DetailPage
                     ]),
 
                 Number::make('Доходность,%', 'percent')
-                    ->fill(8.2)
+                    ->fill($standardPackageDefaults['percent'])
                     ->customAttributes(
                         [
                             'x-model' => 'percent',

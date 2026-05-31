@@ -12,8 +12,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('itc_package', function (Blueprint $table) {
-            $table->foreignIdFor(PackageDefinition::class)->nullable()->constrained()->cascadeOnDelete();
+        Schema::table('itc_packages', function (Blueprint $table) {
+            $table->foreignIdFor(PackageDefinition::class)->nullable()->constrained()->nullOnDelete();
         });
     }
 
@@ -22,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('itc_package', function (Blueprint $table) {
-            $table->dropForeignIdFor(PackageDefinition::class);
+        Schema::table('itc_packages', function (Blueprint $table) {
+            $table->dropConstrainedForeignIdFor(PackageDefinition::class);
         });
     }
 };

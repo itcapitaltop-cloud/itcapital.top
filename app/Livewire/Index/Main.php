@@ -2,12 +2,21 @@
 
 namespace App\Livewire\Index;
 
+use App\Enums\Itc\PackageTypeEnum;
+use App\Models\Package\PackageDefinition;
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Main extends Component
 {
-    public function render()
+    public function render(): View
     {
-        return view('livewire.index.main');
+        return view('livewire.index.main', [
+            'packageDefinitions' => PackageDefinition::query()
+                ->active()
+                ->orderByDesc('sort_order')
+                ->orderBy('id')
+                ->get(),
+        ]);
     }
 }

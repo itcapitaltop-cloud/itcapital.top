@@ -73,6 +73,10 @@ tests/               Pest/PHPUnit test suite
 | Document | Path | Description |
 |----------|------|-------------|
 | README | `README.md` | Project notes, refactoring warning, Pest and PHPStan rules |
+| User Documentation Index | `resources/docs/1.0/index.md` | Versioned business documentation navigation |
+| Package Definitions | `resources/docs/1.0/package-definitions.md` | Admin tariffs, statuses, audit log |
+| Manual Rank | `resources/docs/1.0/manual-rank.md` | Manual partner rank behavior |
+| Documentation Overview | `resources/docs/1.0/overview.md` | Business docs purpose and format |
 | Project Description | `.ai-factory/DESCRIPTION.md` | AI Factory project specification and tech stack |
 | Architecture | `.ai-factory/ARCHITECTURE.md` | Architecture decisions and dependency guidelines |
 | Project Map | `AGENTS.md` | This file: structural map for AI agents |

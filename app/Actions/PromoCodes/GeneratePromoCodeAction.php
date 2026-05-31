@@ -6,6 +6,7 @@ namespace App\Actions\PromoCodes;
 
 use App\Enums\Itc\PackageTypeEnum;
 use App\Models\PromoCode;
+use App\Services\Package\PackageDefinitionResolver;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -16,8 +17,6 @@ use Throwable;
 
 final class GeneratePromoCodeAction extends Action
 {
-    private const DEFAULT_PACKAGE_MINIMUM = '100.00000000';
-
     private const MAX_GENERATION_ATTEMPTS = 5;
 
     protected function handle(PackageTypeEnum $packageType, string $reducedMinimumAmount, ?MoonshineUser $admin = null): PromoCode
@@ -29,7 +28,9 @@ final class GeneratePromoCodeAction extends Action
         ]);
 
         $this->assertPackageTypeCanUsePromoCodes($packageType);
-        $this->assertReducedMinimumAmount($reducedMinimumAmount);
+        $packageDefinition = app(PackageDefinitionResolver::class)->resolve($packageType);
+
+        $this->assertReducedMinimumAmount($reducedMinimumAmount, $packageDefinition->min_start_amount);
 
         try {
             $promoCode = PromoCode::query()->create([
@@ -50,12 +51,6 @@ final class GeneratePromoCodeAction extends Action
             throw $throwable;
         }
 
-        Log::info('[GeneratePromoCodeAction.handle] promo code generated', [
-            'promo_code_id' => $promoCode->id,
-            'package_type' => $promoCode->package_type->value,
-            'admin_id' => $admin?->id,
-        ]);
-
         return $promoCode;
     }
 
@@ -70,15 +65,15 @@ final class GeneratePromoCodeAction extends Action
         }
     }
 
-    private function assertReducedMinimumAmount(string $reducedMinimumAmount): void
+    private function assertReducedMinimumAmount(string $reducedMinimumAmount, string $defaultMinimumAmount): void
     {
         $amount = BigDecimal::of($reducedMinimumAmount);
-        $defaultMinimum = BigDecimal::of(self::DEFAULT_PACKAGE_MINIMUM);
+        $defaultMinimum = BigDecimal::of($defaultMinimumAmount);
 
         if ($amount->isLessThan(0) || $amount->isGreaterThanOrEqualTo($defaultMinimum)) {
             Log::warning('[GeneratePromoCodeAction.assertReducedMinimumAmount] invalid reduced threshold', [
                 'reduced_minimum_amount' => $reducedMinimumAmount,
-                'default_minimum' => self::DEFAULT_PACKAGE_MINIMUM,
+                'default_minimum' => $defaultMinimumAmount,
             ]);
 
             throw new InvalidArgumentException('Reduced minimum amount must be lower than the default package minimum.');

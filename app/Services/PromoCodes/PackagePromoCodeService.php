@@ -34,6 +34,7 @@ final class PackagePromoCodeService
         PackageTypeEnum $packageType,
         string $amount,
         ?string $code,
+        string $defaultMinimumAmount = self::DEFAULT_PACKAGE_MINIMUM,
     ): PackagePromoCodeValidationResult {
         $normalizedCode = $this->normalizeCode($code);
 
@@ -52,7 +53,7 @@ final class PackagePromoCodeService
 
             return new PackagePromoCodeValidationResult(
                 promoCode: null,
-                effectiveMinimumAmount: self::DEFAULT_PACKAGE_MINIMUM,
+                effectiveMinimumAmount: $defaultMinimumAmount,
                 errorCode: self::ERROR_UNSUPPORTED_PACKAGE_TYPE,
             );
         }
@@ -62,7 +63,7 @@ final class PackagePromoCodeService
                 user: $user,
                 packageType: $packageType,
                 amount: $amount,
-                effectiveMinimumAmount: self::DEFAULT_PACKAGE_MINIMUM,
+                effectiveMinimumAmount: $defaultMinimumAmount,
                 promoCode: null,
             );
         }
@@ -79,7 +80,7 @@ final class PackagePromoCodeService
 
             return new PackagePromoCodeValidationResult(
                 promoCode: null,
-                effectiveMinimumAmount: self::DEFAULT_PACKAGE_MINIMUM,
+                effectiveMinimumAmount: $defaultMinimumAmount,
                 errorCode: self::ERROR_INVALID,
             );
         }
@@ -93,7 +94,7 @@ final class PackagePromoCodeService
 
             return new PackagePromoCodeValidationResult(
                 promoCode: $promoCode,
-                effectiveMinimumAmount: self::DEFAULT_PACKAGE_MINIMUM,
+                effectiveMinimumAmount: $defaultMinimumAmount,
                 errorCode: self::ERROR_USED,
             );
         }
@@ -108,7 +109,7 @@ final class PackagePromoCodeService
 
             return new PackagePromoCodeValidationResult(
                 promoCode: $promoCode,
-                effectiveMinimumAmount: self::DEFAULT_PACKAGE_MINIMUM,
+                effectiveMinimumAmount: $defaultMinimumAmount,
                 errorCode: self::ERROR_PACKAGE_TYPE_MISMATCH,
             );
         }
@@ -122,15 +123,19 @@ final class PackagePromoCodeService
         );
     }
 
-    public function redeem(PromoCode $promoCode, User $user, PackageTypeEnum $packageType): PromoCodeUsage
-    {
+    public function redeem(
+        PromoCode $promoCode,
+        User $user,
+        PackageTypeEnum $packageType,
+        string $defaultMinimumAmount = self::DEFAULT_PACKAGE_MINIMUM,
+    ): PromoCodeUsage {
         Log::debug('[PackagePromoCodeService.redeem] start', [
             'promo_code_id' => $promoCode->id,
             'user_id' => $user->id,
             'package_type' => $packageType->value,
         ]);
 
-        $usage = DB::transaction(function () use ($promoCode, $user, $packageType) {
+        $usage = DB::transaction(function () use ($promoCode, $user, $packageType, $defaultMinimumAmount) {
             $lockedPromoCode = PromoCode::query()
                 ->whereKey($promoCode->id)
                 ->lockForUpdate()
@@ -167,7 +172,7 @@ final class PackagePromoCodeService
                 'user_id' => $user->id,
                 'package_type' => $packageType->value,
                 'usage_id' => $usage->id,
-                'original_threshold' => self::DEFAULT_PACKAGE_MINIMUM,
+                'original_threshold' => $defaultMinimumAmount,
                 'effective_threshold' => $lockedPromoCode->reduced_minimum_amount,
             ]);
 

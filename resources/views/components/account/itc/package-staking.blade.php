@@ -3,12 +3,23 @@
 @php
     use App\Enums\Itc\PackageTypeEnum;
     use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Facades\Storage;
+
+    $cardImagePath = $package->packageDefinition?->card_image_path;
+    if ($cardImagePath === null) {
+        Log::debug('[package-staking] fallback to type image', [
+            'package_id' => $package->id,
+            'package_uuid' => $package->uuid,
+            'package_type' => $package->type->value,
+            'package_definition_id' => $package->package_definition_id,
+        ]);
+    }
 @endphp
 
 <div class="flex flex-col gap-6 items-center lg:flex-row lg:gap-10">
     {{-- ► Карта пакета --}}
     <div class="relative w-full max-w-[356px] aspect-[356/208] rounded-[20px] sm:rounded-[28px] flex-shrink-0">
-        <img src="{{ vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
+        <img src="{{ $cardImagePath ? Storage::disk('public')->url($cardImagePath) : vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
             class="w-full h-full absolute z-[10] object-cover rounded-[20px] sm:rounded-[28px]" alt="">
         <div class="relative z-[11] w-full h-full bg-none">
             <div class="relative h-full flex flex-col justify-between p-4 sm:p-6 text-white">

@@ -123,7 +123,7 @@ class PromoCodeIndexPage extends IndexPage
                             Select::make('Тип пакета', 'package_type')
                                 ->options(
                                     collect(PackageTypeEnum::cases())
-                                        ->reject(fn (PackageTypeEnum $packageType) => in_array($packageType, [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING], true))
+                                        ->reject(fn (PackageTypeEnum $packageType) => in_array($packageType, [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING, PackageTypeEnum::PRESENT], true))
                                         ->mapWithKeys(fn (PackageTypeEnum $packageType) => [$packageType->value => $packageType->getName()])
                                         ->all()
                                 )
@@ -131,12 +131,12 @@ class PromoCodeIndexPage extends IndexPage
                             Number::make('Снизить порог до суммы', 'reduced_minimum_amount')
                                 ->customAttributes([
                                     'min' => 0,
-                                    'max' => 99.99999999,
                                     'step' => 'any',
                                 ])
                                 ->required(),
                         ])
                         ->method('POST')
+                        ->async()
                         ->submit('Сгенерировать'),
                 ])
             )

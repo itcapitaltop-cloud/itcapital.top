@@ -12,6 +12,7 @@ use App\MoonShine\Resources\DepositResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\NewsResource;
+use App\MoonShine\Resources\PackageDefinitionResource;
 use App\MoonShine\Resources\PromoCodeResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
@@ -87,6 +88,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             new MoonShineUserRoleResource(),
             new ActivityLogResource(),
             new PromoCodeResource(),
+            new PackageDefinitionResource(),
         ];
     }
 
@@ -117,6 +119,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
                 ->canSee($this->canSeeResource(WithdrawResource::class)),
             MenuItem::make('Пакеты', new ItcPackageResource())
                 ->canSee($this->canSeeResource(ItcPackageResource::class)),
+            MenuItem::make('Настройки пакетов', new PackageDefinitionResource())
+                ->canSee($this->canSeeResource(PackageDefinitionResource::class)),
             MenuItem::make('Верификация', new VerifyingUserResource())
                 ->canSee($this->canSeeResource(VerifyingUserResource::class)),
             MenuItem::make('Cтейкинг', new ItcStakingResource())

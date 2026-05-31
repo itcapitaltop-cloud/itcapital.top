@@ -56,4 +56,16 @@ php artisan test
 npm run build
 ```
 
+### Тестовая база данных
+
+`php artisan test` принудительно использует PostgreSQL-базу `itc_testing`, заданную в `phpunit.xml`. Для тестов не используйте значения `DB_*` из локального `.env`.
+
+По умолчанию тестовый хост в `phpunit.xml` — `pgsql`, поэтому `php artisan test` нужно запускать внутри Docker-контейнера приложения или через `docker compose exec app php artisan test`.
+
+Если Docker-volume PostgreSQL уже был создан до появления `itc_testing`, создайте базу один раз вручную:
+
+```bash
+docker compose exec pgdb createdb -U postgres itc_testing
+```
+
 Bootstrap-скрипт выводит сообщения с префиксом `[devcontainer]`. Предупреждения с `WARN` не всегда являются фатальными: например, база данных может быть еще не готова, и миграции можно запустить вручную после старта сервисов.

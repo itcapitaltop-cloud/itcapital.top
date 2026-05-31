@@ -26,17 +26,24 @@
 
                     <x-bg.section-slim class="!px-1 !py-2">
                         <form wire:submit="buyPackage" x-on:bought.window="isModalBuyPackageActive = false">
+                            <x-ui.select name="selectedPackageDefinitionId" :options="$packageDefinitionOptions"
+                                :placeholder="__('livewire_itc_package_placeholder')" :label="__('livewire_itc_package_label')"
+                                :nullable="true" />
+                            @error('selectedPackageDefinitionId')
+                                <p class="mt-2 text-sm text-red-400">{{ $message }}</p>
+                            @enderror
+
                             <x-ui.input name="amount" placeholder="{{ $this->minimumAmountPlaceholder() }}"
-                                validate="number" input-class="py-[5px] px-[12px]">
+                                validate="number" input-class="py-[5px] px-[12px]" class="mt-8">
                                 {{ __('livewire_account_common_buy_amount_label') }}
                             </x-ui.input>
 
                             <x-ui.input name="promoCode" placeholder="{{ __('livewire_itc_promo_code_placeholder') }}"
-                                class="mt-8 mb-5" input-class="py-[5px] px-[12px]">
+                                class="mt-8 mb-5" input-class="py-[5px] px-[12px]" :disabled="$selectedPackageDefinitionId === null">
                                 {{ __('livewire_itc_promo_code_label') }}
                             </x-ui.input>
 
-                            <x-ui.button wire:click="applyPromoCode" class="w-full mt-2" type="button">
+                            <x-ui.button wire:click="applyPromoCode" class="w-full mt-2" type="button" :disabled="$selectedPackageDefinitionId === null">
                                 {{ __('livewire_itc_promo_code_apply') }}
                             </x-ui.button>
 
@@ -48,7 +55,7 @@
                                 </div>
                             @endif
 
-                            <x-ui.submit-button action="buyPackage" class="w-full mt-4">
+                            <x-ui.submit-button action="buyPackage" class="w-full mt-4" :is-disable="$selectedPackageDefinitionId === null">
                                 {{ __('buy') }}
                             </x-ui.submit-button>
                         </form>

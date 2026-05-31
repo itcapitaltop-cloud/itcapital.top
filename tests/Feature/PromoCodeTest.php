@@ -1,17 +1,56 @@
 <?php
 
 use App\Actions\PromoCodes\GeneratePromoCodeAction;
+use App\Actions\Staking\CreateStakingPackageAction;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Livewire\Account\Itc\Packages as ItcPackages;
 use App\Models\ItcPackage;
+use App\Models\Package\PackageDefinition;
 use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use Livewire\Livewire;
 
-function fundMainBalance(User $user, string $amount = '100.00000000'): void
+function activePackageDefinition(PackageTypeEnum $packageType, string $minimumAmount = '250.00000000'): PackageDefinition
+{
+    $definition = PackageDefinition::query()
+        ->where('slug', $packageType->value)
+        ->first();
+
+    if ($definition instanceof PackageDefinition) {
+        $definition->forceFill([
+            'type' => $packageType,
+            'name' => $packageType->getName(),
+            'min_start_amount' => $minimumAmount,
+            'default_profit_percent' => '5.00',
+            'duration_months' => 1,
+            'is_active' => true,
+            'sort_order' => 1,
+        ])->save();
+
+        return $definition->refresh();
+    }
+
+    return PackageDefinition::factory()->create([
+        'slug' => $packageType->value,
+        'type' => $packageType,
+        'name' => $packageType->getName(),
+        'min_start_amount' => $minimumAmount,
+        'default_profit_percent' => '5.00',
+        'duration_months' => 1,
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
+}
+
+function activeStandardPackageDefinition(string $minimumAmount = '250.00000000'): PackageDefinition
+{
+    return activePackageDefinition(PackageTypeEnum::STANDARD, $minimumAmount);
+}
+
+function fundMainBalance(User $user, string $amount = '500.00000000'): void
 {
     Transaction::factory()->create([
         'user_id' => $user->id,
@@ -36,9 +75,60 @@ it('generates an unused promo code', function () {
         ->and($promoCode->reduced_minimum_amount)->toBe('25.00000000');
 });
 
+it('generates promo codes for active privilege and vip package definitions', function (PackageTypeEnum $packageType) {
+    $promoCode = GeneratePromoCodeAction::make()->run(
+        $packageType,
+        '100.00000000',
+    );
+
+    expect($promoCode->code)
+        ->toStartWith('ITC-')
+        ->and($promoCode->package_type)->toBe($packageType)
+        ->and($promoCode->reduced_minimum_amount)->toBe('100.00000000');
+})->with([
+    'privilege' => [PackageTypeEnum::PRIVILEGE],
+    'vip' => [PackageTypeEnum::VIP],
+]);
+
+it('creates staking package with inactive staking package definition', function () {
+    $user = User::factory()->create();
+
+    PackageDefinition::query()
+        ->where('slug', PackageTypeEnum::STAKING->value)
+        ->update(['is_active' => false]);
+
+    $package = CreateStakingPackageAction::make()->run($user->id, 100.00);
+
+    expect($package->type)->toBe(PackageTypeEnum::STAKING)
+        ->and($package->packageDefinition)->not->toBeNull()
+        ->and($package->packageDefinition->type)->toBe(PackageTypeEnum::STAKING)
+        ->and($package->packageDefinition->is_active)->toBeFalse();
+});
+
+it('rejects admin promo code generation when reduced threshold is not below package minimum', function () {
+    $this->withoutMiddleware();
+
+    activeStandardPackageDefinition('2510.00000000');
+
+    $response = $this->from('/itcapitalmoonshineadminpanel/resource/promo-code-resource/index-page')
+        ->post(route('admin.promo-codes.generate'), [
+            'package_type' => PackageTypeEnum::STANDARD->value,
+            'reduced_minimum_amount' => '3000',
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('messageType', 'error')
+        ->assertJsonPath('message', 'Сумма сниженного порога должна быть меньше минимальной суммы тарифа (2510.00).')
+        ->assertJsonMissingPath('redirect');
+
+    expect(PromoCode::query()->exists())->toBeFalse();
+});
+
 it('redeems a valid promo code once during package purchase', function () {
     $user = User::factory()->create();
     fundMainBalance($user);
+    $definition = activeStandardPackageDefinition('50.00000000');
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'PROMO50',
@@ -49,6 +139,7 @@ it('redeems a valid promo code once during package purchase', function () {
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'PROMO50')
         ->call('applyPromoCode')
@@ -70,11 +161,13 @@ it('redeems a valid promo code once during package purchase', function () {
 it('allows package purchase without a promo code', function () {
     $user = User::factory()->create();
     fundMainBalance($user);
+    $definition = activeStandardPackageDefinition();
 
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
-        ->set('amount', '100')
+        ->set('selectedPackageDefinitionId', $definition->id)
+        ->set('amount', '250')
         ->set('promoCode', '')
         ->call('buyPackage')
         ->assertHasNoErrors();
@@ -85,7 +178,7 @@ it('allows package purchase without a promo code', function () {
         ->first();
 
     expect($transaction)->not->toBeNull()
-        ->and((string) $transaction->amount)->toBe('100.00')
+        ->and((string) $transaction->amount)->toBe('250.00')
         ->and(ItcPackage::query()->where('uuid', $transaction->uuid)->exists())->toBeTrue();
 });
 
@@ -94,6 +187,7 @@ it('allows different users to use the same promo code', function () {
     $secondUser = User::factory()->create();
     fundMainBalance($firstUser);
     fundMainBalance($secondUser);
+    $definition = activeStandardPackageDefinition('50.00000000');
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'MULTI50',
@@ -104,6 +198,7 @@ it('allows different users to use the same promo code', function () {
     $this->actingAs($firstUser);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'MULTI50')
         ->call('applyPromoCode')
@@ -113,6 +208,7 @@ it('allows different users to use the same promo code', function () {
     $this->actingAs($secondUser);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'MULTI50')
         ->call('applyPromoCode')
@@ -127,6 +223,7 @@ it('allows different users to use the same promo code', function () {
 it('rejects same user reusing a promo code for the same package type', function () {
     $user = User::factory()->create();
     fundMainBalance($user, '200.00000000');
+    $definition = activeStandardPackageDefinition('50.00000000');
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'ONCE50',
@@ -137,6 +234,7 @@ it('rejects same user reusing a promo code for the same package type', function 
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'ONCE50')
         ->call('applyPromoCode')
@@ -144,6 +242,7 @@ it('rejects same user reusing a promo code for the same package type', function 
         ->assertHasNoErrors();
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '60')
         ->set('promoCode', 'ONCE50')
         ->call('applyPromoCode')
@@ -159,6 +258,7 @@ it('rejects same user reusing a promo code for the same package type', function 
 it('rejects promo code for a different package type', function () {
     $user = User::factory()->create();
     fundMainBalance($user, '300.00000000');
+    $definition = activeStandardPackageDefinition('50.00000000');
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'SAME50',
@@ -169,6 +269,7 @@ it('rejects promo code for a different package type', function () {
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'SAME50')
         ->call('applyPromoCode')
@@ -177,9 +278,62 @@ it('rejects promo code for a different package type', function () {
     expect($promoCode->usages()->where('user_id', $user->id)->count())->toBe(0);
 });
 
+it('rejects a standard promo code for privilege package purchase', function () {
+    $user = User::factory()->create();
+    fundMainBalance($user, '3000.00000000');
+    $definition = activePackageDefinition(PackageTypeEnum::PRIVILEGE, '2500.00000000');
+
+    PromoCode::factory()->create([
+        'code' => 'STD100',
+        'package_type' => PackageTypeEnum::STANDARD,
+        'reduced_minimum_amount' => '100.00000000',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
+        ->set('amount', '2500')
+        ->set('promoCode', 'STD100')
+        ->call('applyPromoCode')
+        ->assertHasErrors(['promoCode']);
+});
+
+it('accepts a vip promo code for vip package purchase', function () {
+    $user = User::factory()->create();
+    fundMainBalance($user, '6000.00000000');
+    $definition = activePackageDefinition(PackageTypeEnum::VIP, '5000.00000000');
+
+    $promoCode = PromoCode::factory()->create([
+        'code' => 'VIP100',
+        'package_type' => PackageTypeEnum::VIP,
+        'reduced_minimum_amount' => '100.00000000',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
+        ->set('amount', '5000')
+        ->set('promoCode', 'VIP100')
+        ->call('applyPromoCode')
+        ->call('buyPackage')
+        ->assertHasNoErrors();
+
+    expect($promoCode->usages()->where('user_id', $user->id)->exists())->toBeTrue();
+
+    $package = ItcPackage::query()
+        ->where('package_definition_id', $definition->id)
+        ->first();
+
+    expect($package)->not->toBeNull()
+        ->and($package->type)->toBe(PackageTypeEnum::VIP);
+});
+
 it('rejects invalid and mismatched promo codes without creating a package', function (string $code, array $attributes) {
     $user = User::factory()->create();
     fundMainBalance($user);
+    $definition = activeStandardPackageDefinition('50.00000000');
 
     if ($attributes !== []) {
         PromoCode::factory()->create($attributes);
@@ -188,6 +342,7 @@ it('rejects invalid and mismatched promo codes without creating a package', func
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', $code)
         ->call('applyPromoCode')
@@ -209,6 +364,7 @@ it('rejects invalid and mismatched promo codes without creating a package', func
 it('rejects package purchase below the promo reduced threshold', function () {
     $user = User::factory()->create();
     fundMainBalance($user);
+    $definition = activeStandardPackageDefinition('250.00000000');
 
     PromoCode::factory()->create([
         'code' => 'MIN75',
@@ -219,6 +375,7 @@ it('rejects package purchase below the promo reduced threshold', function () {
     $this->actingAs($user);
 
     Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
         ->set('amount', '50')
         ->set('promoCode', 'MIN75')
         ->call('applyPromoCode')
