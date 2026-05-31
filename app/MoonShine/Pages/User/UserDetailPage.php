@@ -429,6 +429,8 @@ class UserDetailPage extends DetailPage
 
         $fields = [];
 
+        $fields[] = Text::make('ФИО', formatted: fn () => trim("{$item->first_name} {$item->last_name}"));
+
         $fields[] = Date::make('Дата регистрации', formatted: fn () => $item->created_at);
 
         $fields[] = $lastAuth
