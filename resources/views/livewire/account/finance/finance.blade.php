@@ -235,7 +235,7 @@
                     </x-ui.input>
                     <p x-show="parseFloat($wire.withdrawForm.withdrawAmount) >= 10" class="text-white px-4 pt-1.5">
                         {{ __('livewire_finance_withdraw_to_receive') }} <span
-                            x-text="(parseFloat($wire.withdrawForm.withdrawAmount) * 0.98 - 2).toFixed(2)"></span>
+                            x-text="Math.floor(parseFloat($wire.withdrawForm.withdrawAmount) * 0.98 - 2)"></span>
                     </p>
                 </div>
                 <template x-if="withdrawSource === 'fiat'">
