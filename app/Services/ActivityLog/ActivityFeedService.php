@@ -15,6 +15,7 @@ use App\Models\Deposit;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\Withdraw;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -74,9 +75,16 @@ final class ActivityFeedService
     /**
      * @return array<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
      */
-    public function userDetailUserFeed(int $userId, int $limit = 200): array
+    public function userDetailUserFeed(
+        int $userId,
+        ?int $limit = 200,
+        ?CarbonInterface $dateFrom = null,
+        ?CarbonInterface $dateTo = null,
+    ): array
     {
         return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $limit)
+            ->when($dateFrom !== null, fn (Builder $query) => $query->where('created_at', '>=', $dateFrom))
+            ->when($dateTo !== null, fn (Builder $query) => $query->where('created_at', '<=', $dateTo))
             ->get()
             ->map(function (BusinessActivity $activity): array {
                 $amount = $activity->getExtraProperty('amount');
@@ -199,17 +207,18 @@ final class ActivityFeedService
         ];
     }
 
-    private function baseFeedQuery(int $userId, ActivityFeedTypeEnum $feed, int $limit): Builder
+    private function baseFeedQuery(int $userId, ActivityFeedTypeEnum $feed, ?int $limit): Builder
     {
-        return BusinessActivity::query()
+        $query = BusinessActivity::query()
             ->forUser($userId)
             ->forFeed($feed)
             ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->limit($limit);
+            ->orderByDesc('id');
+
+        return $limit === null ? $query : $query->limit($limit);
     }
 
-    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed, int $limit): Builder
+    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed, ?int $limit): Builder
     {
         return $this->baseFeedQuery($userId, $feed, $limit)
             ->where(function (Builder $query): void {

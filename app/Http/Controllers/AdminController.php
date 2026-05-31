@@ -23,6 +23,7 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Package\PackageDefinitionResolver;
@@ -44,7 +45,10 @@ use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
 use MoonShine\Permissions\Models\MoonshineUser;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class AdminController extends Controller
@@ -146,6 +150,65 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()
             ->toast('Отредактировано', ToastType::SUCCESS)
             ->redirect(request()->headers->get('referer'));
+    }
+
+    public function exportUserOperations(Request $request, int $userId): StreamedResponse
+    {
+        $user = User::withoutGlobalScope('notBanned')->findOrFail($userId);
+
+        $rules = [
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+        ];
+
+        if ($request->filled('date_from')) {
+            $rules['date_to'][] = 'after_or_equal:date_from';
+        }
+
+        $validated = $request->validate($rules);
+
+        $dateFrom = filled($validated['date_from'] ?? null)
+            ? Carbon::parse($validated['date_from'])->startOfDay()
+            : null;
+        $dateTo = filled($validated['date_to'] ?? null)
+            ? Carbon::parse($validated['date_to'])->endOfDay()
+            : null;
+
+        $filename = sprintf('user-%d-journal-%s.xlsx', $user->id, now()->format('Ymd-His'));
+
+        return response()->streamDownload(
+            function () use ($user, $dateFrom, $dateTo): void {
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+                $sheet->setTitle('Журнал пользователя');
+
+                $sheet->fromArray([
+                    'Событие',
+                    'Сумма операции',
+                    'Пользователь',
+                    'Дата',
+                ], null, 'A1');
+
+                $row = 2;
+                foreach (app(ActivityFeedService::class)->userDetailUserFeed($user->id, null, $dateFrom, $dateTo) as $log) {
+                    $sheet->fromArray([
+                        $log['type'],
+                        $log['operation_amount'],
+                        $log['from_user'],
+                        $log['date'],
+                    ], null, "A{$row}");
+                    $row++;
+                }
+
+                foreach (range('A', 'D') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                (new Xlsx($spreadsheet))->save('php://output');
+            },
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
     }
 
     public function generatePromoCode(MoonShineRequest $request): MoonShineJsonResponse

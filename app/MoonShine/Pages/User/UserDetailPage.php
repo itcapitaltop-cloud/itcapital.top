@@ -160,6 +160,28 @@ class UserDetailPage extends DetailPage
             components: $formComponents
         )->name('edit-balance-modal');
 
+        $exportOperationsTrigger = ActionButton::make('Выгрузить журнал пользователя')
+            ->icon('heroicons.arrow-down-tray')
+            ->toggleModal('export-user-operations-modal')
+            ->secondary();
+
+        $exportOperationsModal = Modal::make(
+            title: 'Выгрузить журнал пользователя',
+            content: fn () => null,
+            outer: $exportOperationsTrigger,
+            asyncUrl: null,
+            components: PageComponents::make([
+                FormBuilder::make()
+                    ->action(route('admin.users.operations.export', ['userId' => $item->id]))
+                    ->method('GET')
+                    ->fields([
+                        Date::make('Дата с', 'date_from'),
+                        Date::make('Дата по', 'date_to'),
+                    ])
+                    ->submit('Скачать файл', ['formtarget' => '_blank']),
+            ])
+        )->name('export-user-operations-modal');
+
         $formChangePassword = FormBuilder::make()
             ->asyncMethod('changePassword')
             ->fields([
@@ -689,11 +711,12 @@ class UserDetailPage extends DetailPage
                         {$stakingChangedStartBonusPercent}
                         {$stakingChangedSRegularPercent}
                         {$actionButton}
-                        {$createPackageModal}
-                        {$passwordModal}
-                        {$testModeButton}
-                    </div>
-                "
+                         {$createPackageModal}
+                         {$passwordModal}
+                         {$exportOperationsModal}
+                         {$testModeButton}
+                     </div>
+                 "
             ),
             Tabs::make([
                 Tab::make(
