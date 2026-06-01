@@ -22,13 +22,13 @@ chmod 644 /var/www/html/.env.cron
 touch /var/log/cron.log
 chmod 666 /var/log/cron.log
 
-# Apply cron job
-crontab /etc/cron.d/app
+# Apply cron job for the sail user (cron daemon runs the jobs as sail)
+crontab -u sail /etc/cron.d/app
 
 # Cache configuration if not in local/testing
 if [ "$APP_ENV" != "local" ] && [ "$APP_ENV" != "testing" ]; then
     echo "Caching Laravel configuration..."
-    php artisan config:cache || true
+    runuser -u sail -- php artisan config:cache || true
 fi
 
 # Start cron in foreground and tail log

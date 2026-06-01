@@ -72,6 +72,7 @@ services:
       context: ./docker/cron
       args:
         BASE_IMAGE: ubuntu:22.04
+        WWWGROUP: 1000
     container_name: "${COMPOSE_PROJECT_NAME}-cron"
     env_file:
       - .env
@@ -97,6 +98,7 @@ services:
       context: ./docker/supervisor
       args:
         BASE_IMAGE: ubuntu:22.04
+        WWWGROUP: 1000
     container_name: "${COMPOSE_PROJECT_NAME}-supervisor"
     env_file:
       - .env
