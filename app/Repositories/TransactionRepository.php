@@ -90,7 +90,8 @@ class TransactionRepository implements TransactionRepositoryContract
         return DB::transaction(function () use ($dto, $callback) {
             DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 
-            $amount = $this->getBalanceAmountByUserIdAndType($dto->userId, $dto->balanceType);
+            $amount = app(UserBalanceCalculator::class)
+                ->balanceFor($dto->userId, $dto->balanceType, forceFresh: true);
             //            Log::channel('source')->debug($amount);
 
             if ($amount - $dto->amount < 0) {

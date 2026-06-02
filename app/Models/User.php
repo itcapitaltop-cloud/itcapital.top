@@ -99,6 +99,8 @@ final class User extends Authenticatable implements MustVerifyEmail
         'remember_token',
     ];
 
+    private ?int $cachedUnreadNotificationsCount = null;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -358,5 +360,17 @@ final class User extends Authenticatable implements MustVerifyEmail
         $this->save();
 
         return $this;
+    }
+
+    /**
+     * Number of unread notifications, memoized for the current request.
+     *
+     * The dashboard layout reads this in two places on a single page load (the
+     * Alpine store bootstrap and the notifications dropdown component); sharing
+     * one count avoids running the same aggregate query twice.
+     */
+    public function unreadNotificationsCount(): int
+    {
+        return $this->cachedUnreadNotificationsCount ??= $this->unreadNotifications()->count();
     }
 }

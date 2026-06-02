@@ -10,6 +10,7 @@ use App\Repositories\TransactionRepository;
 use App\Services\User\UserBalanceCalculator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Carbon::setTestNow('2026-06-02 12:00:00');
@@ -112,4 +113,25 @@ it('keeps partnerPeriodStats consistent with the unified balance', function () {
     expect($stats['start'])->toBe(100.0)
         ->and($stats['end'])->toBe(130.0)
         ->and($stats['delta'])->toBe(30.0);
+});
+
+it('reuses a point-in-time snapshot instead of re-querying it', function () {
+    $user = User::factory()->create();
+    Transaction::factory()->create([
+        'user_id' => $user->id,
+        'balance_type' => BalanceTypeEnum::PARTNER,
+        'trx_type' => TrxTypeEnum::PARTNER_TRANSFER_IN,
+        'amount' => 100,
+        'accepted_at' => now()->subDays(3),
+    ]);
+
+    $calc = app(UserBalanceCalculator::class);
+    $asOf = now();
+
+    DB::connection()->enableQueryLog();
+    $first = $calc->balanceFor($user->id, BalanceTypeEnum::PARTNER, $asOf);
+    $second = $calc->balanceFor($user->id, BalanceTypeEnum::PARTNER, $asOf);
+
+    expect($first)->toBe($second)
+        ->and(DB::connection()->getQueryLog())->toHaveCount(1);
 });

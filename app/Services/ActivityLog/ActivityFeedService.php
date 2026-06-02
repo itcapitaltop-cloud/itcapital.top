@@ -165,7 +165,7 @@ final class ActivityFeedService
     {
         $query = BusinessActivity::query()
             ->forFeed(ActivityFeedTypeEnum::GlobalAdmin)
-            ->with('causer')
+            ->with(['causer', 'subject'])
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -246,6 +246,7 @@ final class ActivityFeedService
         $query = BusinessActivity::query()
             ->forUser($userId)
             ->forFeed($feed)
+            ->with('subject')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 

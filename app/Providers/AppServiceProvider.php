@@ -57,6 +57,11 @@ class AppServiceProvider extends ServiceProvider
         // Token rates are immutable within a single request; sharing one
         // resolver instance lets it memoize lookups across every staking package.
         $this->app->singleton(\App\Services\Token\TokenRateResolver::class);
+
+        // Point-in-time balance snapshots are immutable within a request; sharing
+        // one instance lets it dedupe the "as of now" partner balance the dashboard
+        // recomputes for each period stat.
+        $this->app->singleton(\App\Services\User\UserBalanceCalculator::class);
     }
 
     /**
