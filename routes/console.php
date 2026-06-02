@@ -40,3 +40,8 @@ Schedule::command('summary:reconcile')
     ->withoutOverlapping()
     ->onOneServer()
     ->sendOutputTo(storage_path('logs/summary-reconcile.log'));
+
+Schedule::command('summary:warm-dashboard')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

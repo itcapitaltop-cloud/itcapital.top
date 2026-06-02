@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\Summary;
 
-use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\PartnerLevelPercent;
 use App\Models\PartnerRankRequirement;
-use App\Models\Transaction;
-use App\Models\User;
-use App\Repositories\TransactionRepository;
 use App\Services\Admin\SummaryMetricsService;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\Components\FormBuilder;
@@ -62,18 +58,20 @@ class SummaryIndexPage extends IndexPage
      */
     protected function mainLayer(): array
     {
+        $users = app(SummaryMetricsService::class)->snapshot()['users'];
+
         return [
             Heading::make('Пользователи')->h(5),
 
             Grid::make([
                 ValueMetric::make('Всего')
-                    ->value(User::count())
+                    ->value($users['total'])
                     ->columnSpan(3),
                 ValueMetric::make('Новые за неделю')
-                    ->value(fn () => User::where('created_at', '>=', now()->startOfWeek())->count())
+                    ->value($users['week'])
                     ->columnSpan(3),
                 ValueMetric::make('Новые за сегодня')
-                    ->value(fn () => User::whereDate('created_at', today())->count())
+                    ->value($users['today'])
                     ->columnSpan(3),
             ]),
             Divider::make(),
@@ -88,113 +86,51 @@ class SummaryIndexPage extends IndexPage
      */
     protected function bottomLayer(): array
     {
-        $totalPackagesAmount = new SummaryMetricsService()->totalPackagesAmount();
+        $summary = app(SummaryMetricsService::class)->snapshot();
+        $deposits = $summary['deposits'];
+        $withdraws = $summary['withdraws'];
+        $packages = $summary['packages'];
+        $balances = $summary['balances'];
+        $accruals = $summary['accruals'];
 
         return [
             Heading::make('Инвестиции')->h(5),
 
             Grid::make([
                 // Всего депозитов
-                ValueMetric::make(''
-                )
-                    // primary value (количество депозитов)
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                        ->whereNotNull('accepted_at')
-                        ->count()
-                    )
-                    // valueFormat — HTML с двумя числами в одну строку
-                    ->valueFormat(fn (int $count): string =>
-                        // пересчитываем сумму отдельно
-                        '<div class="mb-6 text-base">Всего</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . $count . '</div>
-                              <div class="text-label-report-card whitespace-normal mn-break-words">Количество депозитов</div>
-                            </div>
-                            <div class="block">
-                                <div>
-                                '
-                                    . round(
-                                        (float) Transaction::query()
-                                            ->withoutTestUsers()
-                                            ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                                            ->whereNotNull('accepted_at')
-                                            ->sum('amount'),
-                                        2
-                                    )
-                            . '</div>
-                                <div class="text-label-report-card whitespace-normal mn-break-words">Сумма депозитов</div>
-                            </div>
-                        </div>'
-                    )
+                ValueMetric::make('')
+                    ->value($deposits['total_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'Всего',
+                        $count,
+                        'Количество депозитов',
+                        $deposits['total_sum'],
+                        'Сумма депозитов',
+                    ))
                     ->columnSpan(3),
 
                 // Новых за неделю
                 ValueMetric::make('')
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                        ->whereNotNull('accepted_at')
-                        ->where('accepted_at', '>=', now()->startOfWeek())
-                        ->count()
-                    )
-                    ->valueFormat(fn (int $count): string => '<div class="mb-6 md:text-lg">Новые за неделю</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . $count . '</div>
-                              <div class="text-label-report-card whitespace-normal mn-break-words">Количество депозитов</div>
-                            </div>
-                            <div class="block">
-                            <div>
-                        '
-                        . round(
-                            (float) Transaction::query()
-                                ->withoutTestUsers()
-                                ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                                ->whereNotNull('accepted_at')
-                                ->where('accepted_at', '>=', now()->startOfWeek())
-                                ->sum('amount'),
-                            2
-                        ) . '</div>
-                                <div class="text-label-report-card whitespace-normal mn-break-words">Сумма депозитов</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($deposits['week_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'Новые за неделю',
+                        $count,
+                        'Количество депозитов',
+                        $deposits['week_sum'],
+                        'Сумма депозитов',
+                    ))
                     ->columnSpan(3),
 
                 // Новых за месяц
                 ValueMetric::make('')
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                        ->whereNotNull('accepted_at')
-                        ->where('accepted_at', '>=', now()->startOfMonth())
-                        ->count()
-                    )
-                    ->valueFormat(fn (int $count): string => '<div class="mb-6 md:text-lg">Новые за месяц</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . $count . '</div>
-                              <div class="text-label-report-card whitespace-normal mn-break-words">Количество депозитов</div>
-                            </div>
-                            <div class="block">
-                            <div>
-                        '
-                        . round(
-                            (float) Transaction::query()
-                                ->withoutTestUsers()
-                                ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
-                                ->whereNotNull('accepted_at')
-                                ->where('accepted_at', '>=', now()->startOfMonth())
-                                ->sum('amount'),
-                            2
-                        ) . '</div>
-                                <div class="text-label-report-card whitespace-normal mn-break-words">Сумма депозитов</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($deposits['month_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'Новые за месяц',
+                        $count,
+                        'Количество депозитов',
+                        $deposits['month_sum'],
+                        'Сумма депозитов',
+                    ))
                     ->columnSpan(3),
             ]),
 
@@ -204,89 +140,36 @@ class SummaryIndexPage extends IndexPage
 
             Grid::make([
                 ValueMetric::make('')
-                    // количество всех выводов
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                        ->count()
-                    )
-                    // две цифры в одной метрике: count и сумма
-                    ->valueFormat(fn (int $count): string => '<div class="mb-6 md:text-lg">Всего</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . $count . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Количество выводов</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) Transaction::query()
-                            ->withoutTestUsers()
-                            ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                            ->sum('amount'),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Сумма выводов</div>
-               </div>
-             </div>'
-                    )
+                    ->value($withdraws['total_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'Всего',
+                        $count,
+                        'Количество выводов',
+                        $withdraws['total_sum'],
+                        'Сумма выводов',
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    // count за неделю
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                        ->where('created_at', '>=', now()->startOfWeek())
-                        ->count()
-                    )
-                    ->valueFormat(fn (int $count): string => '<div class="mb-6 md:text-lg">За неделю</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . $count . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Количество выводов</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) Transaction::query()
-                            ->withoutTestUsers()
-                            ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                            ->where('created_at', '>=', now()->startOfWeek())
-                            ->sum('amount'),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Сумма выводов</div>
-               </div>
-             </div>'
-                    )
+                    ->value($withdraws['week_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'За неделю',
+                        $count,
+                        'Количество выводов',
+                        $withdraws['week_sum'],
+                        'Сумма выводов',
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    // count за месяц
-                    ->value(fn () => Transaction::query()
-                        ->withoutTestUsers()
-                        ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                        ->where('created_at', '>=', now()->startOfMonth())
-                        ->count()
-                    )
-                    ->valueFormat(fn (int $count): string => '<div class="mb-6 md:text-lg">За месяц</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . $count . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Количество выводов</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) Transaction::query()
-                            ->withoutTestUsers()
-                            ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
-                            ->where('created_at', '>=', now()->startOfMonth())
-                            ->sum('amount'),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Сумма выводов</div>
-               </div>
-             </div>'
-                    )
+                    ->value($withdraws['month_count'])
+                    ->valueFormat(fn (int $count): string => $this->twoNumberCard(
+                        'За месяц',
+                        $count,
+                        'Количество выводов',
+                        $withdraws['month_sum'],
+                        'Сумма выводов',
+                    ))
                     ->columnSpan(3),
             ]),
 
@@ -295,13 +178,13 @@ class SummaryIndexPage extends IndexPage
             Heading::make('Общая сумма в пакетах текущая')->h(5),
 
             DonutChartMetric::make('Пакеты')
-                ->values(new SummaryMetricsService()->totalPackagesAmount()),
+                ->values($packages),
 
             Divider::make(),
 
             Grid::make([
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['privilege'])
+                    ->value($packages['privilege'])
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты privilege</div>
              <div class="flex justify-between text-lg">
                <div class="block">
@@ -312,7 +195,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['standard'])
+                    ->value($packages['standard'])
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты standard</div>
              <div class="flex justify-between text-lg">
                <div class="block">
@@ -323,7 +206,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['vip'])
+                    ->value($packages['vip'])
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты vip</div>
              <div class="flex justify-between text-lg">
                <div class="block">
@@ -334,7 +217,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['present'])
+                    ->value($packages['present'])
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты present</div>
              <div class="flex justify-between text-lg">
                <div class="block">
@@ -345,7 +228,7 @@ class SummaryIndexPage extends IndexPage
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value($totalPackagesAmount['staking'] ?? 0)
+                    ->value($packages['staking'] ?? 0)
                     ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Пакеты staking</div>
              <div class="flex justify-between text-lg">
                <div class="block">
@@ -362,58 +245,28 @@ class SummaryIndexPage extends IndexPage
 
             Grid::make([
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->mainBalance())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Основной баланс</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . round($count, 2) . '</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($balances['main'])
+                    ->valueFormat(fn (float $count): string => $this->singleNumberCard('Основной баланс', $count))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->packageDividends())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Дивиденды на пакетах</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . round($count, 2) . '</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($balances['package_dividends'])
+                    ->valueFormat(fn (float $count): string => $this->singleNumberCard('Дивиденды на пакетах', $count))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->partnerBalance())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Партнерский баланс</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . round($count, 2) . '</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($balances['partner'])
+                    ->valueFormat(fn (float $count): string => $this->singleNumberCard('Партнерский баланс', $count))
                     ->columnSpan(2),
 
                 ValueMetric::make('')
-                    ->value(fn () => new TransactionRepository()->getRegularBonus())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Регулярная премия</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . round($count, 2) . '</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($balances['regular_premium'])
+                    ->valueFormat(fn (float $count): string => $this->singleNumberCard('Регулярная премия', $count))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->tokenBalance())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Баланс токенов</div>
-                         <div class="flex justify-between text-lg">
-                            <div class="block">
-                              <div class="text-lg">' . round($count, 2) . '</div>
-                            </div>
-                        </div>'
-                    )
+                    ->value($balances['token'])
+                    ->valueFormat(fn (float $count): string => $this->singleNumberCard('Баланс токенов', $count))
                     ->columnSpan(3),
 
             ]),
@@ -424,97 +277,102 @@ class SummaryIndexPage extends IndexPage
 
             Grid::make([
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->dividendsMonth())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Дивиденды</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . round($count, 2) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Месяц</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) new SummaryMetricsService()->dividendsWeek(),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Неделя</div>
-               </div>
-             </div>')
+                    ->value($accruals['dividends_month'])
+                    ->valueFormat(fn (float $count): string => $this->monthWeekCard(
+                        'Дивиденды',
+                        $count,
+                        $accruals['dividends_week'],
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->startBonusMonth())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Стартовая премия</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . round($count, 2) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Месяц</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) new SummaryMetricsService()->startBonusWeek(),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Неделя</div>
-               </div>
-             </div>')
+                    ->value($accruals['start_bonus_month'])
+                    ->valueFormat(fn (float $count): string => $this->monthWeekCard(
+                        'Стартовая премия',
+                        $count,
+                        $accruals['start_bonus_week'],
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->regularPremiumMonth())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Регулярная премия</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . round($count, 2) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Месяц</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) new SummaryMetricsService()->regularPremiumWeek(),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Неделя</div>
-               </div>
-             </div>')
+                    ->value($accruals['regular_premium_month'])
+                    ->valueFormat(fn (float $count): string => $this->monthWeekCard(
+                        'Регулярная премия',
+                        $count,
+                        $accruals['regular_premium_week'],
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->rankBonusMonth())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Бонусы за достижения ранга</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . round($count, 2) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Месяц</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) new SummaryMetricsService()->rankBonusWeek(),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Неделя</div>
-               </div>
-             </div>')
+                    ->value($accruals['rank_bonus_month'])
+                    ->valueFormat(fn (float $count): string => $this->monthWeekCard(
+                        'Бонусы за достижения ранга',
+                        $count,
+                        $accruals['rank_bonus_week'],
+                    ))
                     ->columnSpan(3),
 
                 ValueMetric::make('')
-                    ->value(fn () => new SummaryMetricsService()->stakingProfitsMonth())
-                    ->valueFormat(fn (float $count): string => '<div class="mb-6 md:text-lg">Прибыли на пакетах токенов</div>
-             <div class="flex justify-between text-lg">
-               <div class="block">
-                 <div class="text-lg">' . round($count, 2) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Месяц</div>
-               </div>
-               <div class="block">
-                 <div>' . round(
-                        (float) new SummaryMetricsService()->stakingProfitsWeek(),
-                        2
-                    ) . '</div>
-                 <div class="text-label-report-card whitespace-normal mn-break-words">Неделя</div>
-               </div>
-             </div>')
+                    ->value($accruals['staking_profits_month'])
+                    ->valueFormat(fn (float $count): string => $this->monthWeekCard(
+                        'Прибыли на пакетах токенов',
+                        $count,
+                        $accruals['staking_profits_week'],
+                    ))
                     ->columnSpan(3),
             ]),
 
         ];
+    }
+
+    /**
+     * Renders a metric card with two side-by-side numbers (count + sum).
+     */
+    private function twoNumberCard(
+        string $title,
+        int|float $primaryValue,
+        string $primaryLabel,
+        int|float $secondaryValue,
+        string $secondaryLabel,
+    ): string {
+        return '<div class="mb-6 md:text-lg">' . $title . '</div>
+             <div class="flex justify-between text-lg">
+               <div class="block">
+                 <div class="text-lg">' . $primaryValue . '</div>
+                 <div class="text-label-report-card whitespace-normal mn-break-words">' . $primaryLabel . '</div>
+               </div>
+               <div class="block">
+                 <div>' . round((float) $secondaryValue, 2) . '</div>
+                 <div class="text-label-report-card whitespace-normal mn-break-words">' . $secondaryLabel . '</div>
+               </div>
+             </div>';
+    }
+
+    /**
+     * Renders a metric card with a single number.
+     */
+    private function singleNumberCard(string $title, int|float $value): string
+    {
+        return '<div class="mb-6 md:text-lg">' . $title . '</div>
+                         <div class="flex justify-between text-lg">
+                            <div class="block">
+                              <div class="text-lg">' . round((float) $value, 2) . '</div>
+                            </div>
+                        </div>';
+    }
+
+    /**
+     * Renders a metric card comparing a monthly and a weekly figure.
+     */
+    private function monthWeekCard(string $title, int|float $monthValue, int|float $weekValue): string
+    {
+        return $this->twoNumberCard(
+            $title,
+            round((float) $monthValue, 2),
+            'Месяц',
+            $weekValue,
+            'Неделя',
+        );
     }
 
     protected function itemsComponent(iterable $items, Fields $fields): MoonShineRenderable

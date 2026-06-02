@@ -53,6 +53,10 @@ class AppServiceProvider extends ServiceProvider
             GoogleDriveBackupUploaderContract::class,
             GoogleDriveBackupUploaderRepository::class
         );
+
+        // Token rates are immutable within a single request; sharing one
+        // resolver instance lets it memoize lookups across every staking package.
+        $this->app->singleton(\App\Services\Token\TokenRateResolver::class);
     }
 
     /**
