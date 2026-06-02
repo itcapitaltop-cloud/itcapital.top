@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\Transaction;
@@ -75,7 +76,15 @@ it('computes transaction metrics for a real user', function () {
         ->and($snapshot['withdraws']['total_sum'])->toBe(40.0)
         ->and($snapshot['balances']['main'])->toBe(60.0)
         ->and($snapshot['balances']['partner'])->toBe(50.0)
-        ->and($snapshot['balances']['regular_premium'])->toBe(50.0);
+        ->and($snapshot['balances']['regular_premium'])->toBe(50.0)
+        ->and($snapshot['packages'])->toHaveKeys([
+            PackageTypeEnum::PRIVILEGE->value,
+            PackageTypeEnum::STANDARD->value,
+            PackageTypeEnum::VIP->value,
+            PackageTypeEnum::PRESENT->value,
+            PackageTypeEnum::STAKING->value,
+        ])
+        ->and($snapshot['packages'][PackageTypeEnum::PRIVILEGE->value])->toBe(0.0);
 });
 
 it('excludes test users and banned users from every metric', function () {

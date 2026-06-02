@@ -67,32 +67,17 @@ class TransactionRepository implements TransactionRepositoryContract
         ];
     }
 
-    /** баланс партнёрского счёта на конец $moment */
+    /**
+     * Партнёрский баланс на конец $moment.
+     *
+     * Делегирует в UserBalanceCalculator, чтобы правила знаков и фильтрации
+     * (accepted_at / rejected_at, исключение стейкинговых начислений) были
+     * идентичны живому балансу и не расходились с ним.
+     */
     private function balanceUpTo(Carbon $moment): float
     {
-        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
-        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
-
-        $debitsList = "'" . implode("','", $debits) . "'";
-        $creditsList = "'" . implode("','", $credits) . "'";
-
-        $sum = Transaction::query()
-            ->where('user_id', Auth::id())
-            ->where('balance_type', BalanceTypeEnum::PARTNER)
-            ->whereNull('rejected_at')
-            ->where('accepted_at', '<=', $moment)
-            ->selectRaw("
-            SUM(
-                CASE
-                    WHEN trx_type IN ($debitsList) THEN amount
-                    WHEN trx_type IN ($creditsList) THEN -amount
-                    ELSE 0
-                END
-            ) as balance
-        ")
-            ->value('balance');
-
-        return (float) ($sum ?? 0);
+        return (float) app(UserBalanceCalculator::class)
+            ->balanceFor(Auth::id(), BalanceTypeEnum::PARTNER, $moment);
     }
 
     /**

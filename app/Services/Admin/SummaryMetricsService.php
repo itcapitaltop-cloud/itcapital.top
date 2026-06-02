@@ -48,7 +48,11 @@ final class SummaryMetricsService
      */
     public function snapshot(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, fn (): array => $this->compute());
+        $snapshot = Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, fn (): array => $this->compute());
+
+        $snapshot['packages'] = $this->packageTotalsWithDefaults($snapshot['packages'] ?? []);
+
+        return $snapshot;
     }
 
     /**
@@ -241,7 +245,27 @@ final class SummaryMetricsService
             $totals[PackageTypeEnum::STAKING->value] = app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
         }
 
-        return $totals;
+        return $this->packageTotalsWithDefaults($totals);
+    }
+
+    /**
+     * @param array<string, float|int|string> $totals
+     * @return array<string, float>
+     */
+    private function packageTotalsWithDefaults(array $totals): array
+    {
+        $defaults = [
+            PackageTypeEnum::PRIVILEGE->value => 0.0,
+            PackageTypeEnum::STANDARD->value => 0.0,
+            PackageTypeEnum::VIP->value => 0.0,
+            PackageTypeEnum::PRESENT->value => 0.0,
+            PackageTypeEnum::STAKING->value => 0.0,
+        ];
+
+        return array_map(
+            static fn (float|int|string $total): float => (float) $total,
+            array_replace($defaults, array_intersect_key($totals, $defaults))
+        );
     }
 
     public function mainBalance(): float

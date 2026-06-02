@@ -4,7 +4,6 @@ namespace App\Livewire\Account\Dashboard;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\PackageProfit;
@@ -19,6 +18,10 @@ class Index extends Component
     public function render(): \Illuminate\Contracts\View\View
     {
         $transactionRepo = app(TransactionRepositoryContract::class);
+
+        // Обход партнёрского дерева (до 5 уровней) считаем один раз:
+        // отсюда получаем и распределение по линиям, и общее число партнёров.
+        $partnersInLines = $this->partnersByLine();
 
         return view('livewire.account.dashboard.index', [
 
@@ -69,49 +72,15 @@ class Index extends Component
                 ->join('itc_packages', 'package_profits.package_uuid', '=', 'itc_packages.uuid')
                 ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
                 ->where('transactions.user_id', Auth::id())
-                ->where('itc_packages.type', '!=', PackageTypeEnum::ARCHIVE)
+                ->whereNotIn('itc_packages.type', [PackageTypeEnum::PRESENT, PackageTypeEnum::STAKING])
                 ->where('package_profits.created_at', '>=', now()->subWeek())
                 ->sum('package_profits.amount'),
 
-            // распределение партнёров по линиям (до 5 уровней)
-            'partnersInLines' => (function () {
-                $lines = [];
-                $front = [Auth::id()];
+            // распределение партнёров по линиям (до 5 уровней) и их общее число —
+            // считаются из одного обхода дерева (см. $partnersInLines выше)
+            'partnersInLines' => $partnersInLines,
 
-                for ($lvl = 1; $lvl <= 5; $lvl++) {
-                    $ids = Partner::whereIn('partner_id', $front)
-                        ->whereHas('user', fn ($q) => $q->whereNull('banned_at'))
-                        ->pluck('user_id');
-
-                    if ($ids->isEmpty()) {
-                        break;
-                    }
-
-                    $lines[$lvl] = $ids->count();
-                    $front = $ids;           // переходим на следующий уровень
-                }
-
-                return $lines;
-            })(),
-
-            'partnersTotal' => (function () {
-                $cnt = 0;
-                $front = [Auth::id()];
-
-                for ($lvl = 1; $lvl <= 5; $lvl++) {
-                    $ids = Partner::whereIn('partner_id', $front)
-                        ->whereHas('user', fn ($q) => $q->whereNull('banned_at'))
-                        ->pluck('user_id');
-
-                    if ($ids->isEmpty()) {
-                        break;
-                    }
-                    $cnt += $ids->count();
-                    $front = $ids;
-                }
-
-                return $cnt;
-            })(),
+            'partnersTotal' => array_sum($partnersInLines),
 
             // прирост первой линии
             'growthWeek' => Partner::where('partner_id', Auth::id())
@@ -122,10 +91,6 @@ class Index extends Component
                 ->whereBetween('created_at', [now()->subMonth(), now()])
                 ->count(),
 
-            // Balance amounts
-            'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
-            'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
-
             // Partner link
             'partnerLink' => url()->query('/', ['partner' => Auth::user()->username]),
 
@@ -133,5 +98,34 @@ class Index extends Component
             'weekStats' => $transactionRepo->partnerPeriodStats(now()->subWeek()),
             'monthStats' => $transactionRepo->partnerPeriodStats(now()->subMonth()),
         ]);
+    }
+
+    /**
+     * Число партнёров по линиям первой пятёрки уровней.
+     *
+     * Спускаемся вглубь только через незабаненных партнёров; уровни без
+     * партнёров обрывают обход. Результат: [уровень => количество].
+     *
+     * @return array<int, int>
+     */
+    private function partnersByLine(): array
+    {
+        $lines = [];
+        $front = [Auth::id()];
+
+        for ($lvl = 1; $lvl <= 5; $lvl++) {
+            $ids = Partner::whereIn('partner_id', $front)
+                ->whereHas('user', fn ($q) => $q->whereNull('banned_at'))
+                ->pluck('user_id');
+
+            if ($ids->isEmpty()) {
+                break;
+            }
+
+            $lines[$lvl] = $ids->count();
+            $front = $ids->all();
+        }
+
+        return $lines;
     }
 }
