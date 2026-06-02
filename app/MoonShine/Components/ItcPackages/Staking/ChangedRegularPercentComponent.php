@@ -43,7 +43,7 @@ final class ChangedRegularPercentComponent
                 Hidden::make('user_id')->fill($package->transaction->user_id),
 
                 Number::make('Процент регулярной премии', 'percent')
-                    ->fill(User::findOrFail($package->transaction->user_id)->setting('regular_staking_percent', app(GeneralSetting::class)->regular_staking_percent))
+                    ->fill(($package->transaction->user ?? User::findOrFail($package->transaction->user_id))->setting('regular_staking_percent', app(GeneralSetting::class)->regular_staking_percent))
                     ->customAttributes(
                         [
                             'wire:model.defer' => 'percent',

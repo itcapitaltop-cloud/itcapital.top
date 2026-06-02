@@ -32,6 +32,7 @@ use Carbon\Carbon;
 use Closure;
 use Exception;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
@@ -50,7 +51,6 @@ use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
 use MoonShine\Pages\Page;
 use MoonShine\Resources\ModelResource;
-use Illuminate\Contracts\Pagination\Paginator;
 use Throwable;
 
 /**
@@ -65,6 +65,20 @@ class UserResource extends ModelResource
     protected bool $saveFilterState = false;
 
     protected array $with = ['summary'];
+
+    private ?Paginator $cachedPaginator = null;
+
+    /**
+     * Мемоизируем paginate(), чтобы повторный вызов внутри страницы индекса
+     * (явный в UserIndexPage::mainLayer() + внутренний в parent::mainLayer())
+     * не выполнял запросы count(*) и eager-load summary дважды.
+     *
+     * @throws Throwable
+     */
+    public function paginate(): Paginator
+    {
+        return $this->cachedPaginator ??= parent::paginate();
+    }
 
     /**
      * @return list<Page>

@@ -208,11 +208,12 @@ class UserDetailPage extends DetailPage
             components: $formComponents
         )->name('edit-password-modal');
 
-        $packageDefinitionDefaults = PackageDefinition::query()
+        $packageDefinitions = PackageDefinition::query()
             ->orderByDesc('is_active')
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get()
+            ->get();
+        $packageDefinitionDefaults = $packageDefinitions
             ->mapWithKeys(fn (PackageDefinition $definition): array => [
                 $definition->id => [
                     'type' => $definition->type->value,
@@ -221,11 +222,7 @@ class UserDetailPage extends DetailPage
                 ],
             ])
             ->all();
-        $packageDefinitionOptions = PackageDefinition::query()
-            ->orderByDesc('is_active')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
+        $packageDefinitionOptions = $packageDefinitions
             ->mapWithKeys(fn (PackageDefinition $definition): array => [
                 $definition->id => $definition->is_active
                     ? "{$definition->name} ({$definition->slug})"
