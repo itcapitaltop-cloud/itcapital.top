@@ -6,7 +6,7 @@
 
         <section class="w-full px-4 mt-10 sm:px-5 md:px-6 md:mt-6">
             @forelse($news as $new)
-                <article class="overflow-hidden">
+                <article wire:key="news-{{ $new->id }}" class="overflow-hidden">
                     <p class="font-medium text-base text-white opacity-50">
                         {{ $new->published_at->format('j.m, H:i') }} • {{ $new->category->label() }}
                     </p>
@@ -42,6 +42,25 @@
                     </div>
                 </div>
             @endforelse
+
+            @if($hasMorePages)
+                <div
+                    x-data
+                    x-init="
+                        const observer = new IntersectionObserver((entries) => {
+                            if (entries[0].isIntersecting) {
+                                $wire.loadMore();
+                            }
+                        }, { rootMargin: '300px' });
+                        observer.observe($el);
+                    "
+                    class="flex justify-center py-6"
+                >
+                    <span wire:loading wire:target="loadMore" class="text-sm text-white opacity-50">
+                        {{ __('Загрузка...') }}
+                    </span>
+                </div>
+            @endif
         </section>
     </x-bg.main>
 </div>
