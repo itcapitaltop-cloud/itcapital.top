@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class UserSummary extends Model
+final class UserSummary extends Model
 {
     use HasFactory;
 
@@ -22,6 +24,7 @@ class UserSummary extends Model
     protected $fillable = [
         'user_id',
         'investments_sum',
+        'buy_packages_sum',
         'reinvests_sum',
         'partner_balance',
         'partners_count',

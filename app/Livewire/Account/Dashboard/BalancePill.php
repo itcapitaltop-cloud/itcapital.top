@@ -2,11 +2,6 @@
 
 namespace App\Livewire\Account\Dashboard;
 
-use App\Contracts\Transactions\TransactionRepositoryContract;
-use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
-use App\Models\ItcPackage;
-use App\Services\Package\Staking\StakingPerformanceService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -30,19 +25,13 @@ class BalancePill extends Component
             ]);
         }
 
-        $transactionRepo = app(TransactionRepositoryContract::class);
+        $userSummary = auth()->user()->summary;
 
-        $packages = ItcPackage::query()
-            ->whereHas('transaction', fn ($query) => $query->where('user_id', auth()->id()))
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
-            ->get()
-            ->filter(fn (ItcPackage $package) => $package->type === PackageTypeEnum::STAKING);
-
-        $balanceStaking = app(StakingPerformanceService::class)->forPackages($packages)['total_tokens'];
+        $balanceStaking = 100.0;
 
         return view('livewire.account.dashboard.balance-pill', [
-            'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
-            'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
+            'mainBalanceAmount' => $userSummary->investments_sum,
+            'partnerBalanceAmount' => $userSummary->partner_balance,
             'balanceStaking' => $balanceStaking,
         ]);
     }

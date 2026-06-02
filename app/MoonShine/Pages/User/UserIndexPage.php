@@ -4,14 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\User;
 
-use App\Contracts\Transactions\TransactionRepositoryContract;
-use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
-use App\Models\ItcPackage;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
 use MoonShine\Components\Alert;
 use MoonShine\Components\Link;
 use MoonShine\Components\MoonShineComponent;
@@ -61,23 +56,18 @@ class UserIndexPage extends IndexPage
                 ->showOnExport()
                 ->sortable($multi),
             Text::make('Имя пользователя', 'username')->showOnExport()->sortable($multi),
-            Number::make('Пакеты', 'buy_packages_sum', formatted: function (User $user) {
-                $sum = ItcPackage::query()
-                    ->whereHas('transaction', fn ($q) => $q->where('user_id', $user->id))
-                    ->whereNotIn('type', [PackageTypeEnum::ARCHIVE])
-                    ->withSum('transaction', 'amount')
-                    ->get()
-                    ->sum('transaction_sum_amount');
-
-                return round((float) $sum, 2);
-            })->showOnExport()->sortable($multi),
-            Number::make('Реинвесты', 'reinvests_sum')->showOnExport()->sortable($multi),
-            Number::make('Основной', formatted: function (User $user) {
-                $balance = (float) app(TransactionRepositoryContract::class)->getBalanceAmountByUserIdAndType($user->id, BalanceTypeEnum::MAIN);
-
-                return number_format($balance, 2, '.', '');
-            })->showOnExport()->sortable($multi),
-            Number::make('Партнерский', 'partner_balance')->showOnExport()->sortable($multi),
+            Number::make('Пакеты', 'buy_packages_sum', formatted: fn (User $user) => $user->summary->buy_packages_sum)
+                ->showOnExport()
+                ->sortable($multi),
+            Number::make('Реинвесты', 'reinvests_sum', formatted: fn (User $user) => $user->summary->reinvests_sum)
+                ->showOnExport()
+                ->sortable($multi),
+            Number::make('Основной', formatted: fn (User $user) => $user->summary->investments_sum)
+                ->showOnExport()
+                ->sortable($multi),
+            Number::make('Партнерский', 'partner_balance', formatted: fn (User $user) => $user->summary->partner_balance)
+                ->showOnExport()
+                ->sortable($multi),
             Date::make('Дата регистрации', 'created_at')->showOnExport()->sortable($multi),
         ];
     }

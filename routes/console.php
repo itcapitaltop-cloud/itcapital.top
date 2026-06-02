@@ -34,3 +34,9 @@ Schedule::command('profit-accrual:itc-staking')
     ->monthlyOn(1, '00:00')
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('summary:reconcile')
+    ->dailyAt('04:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sendOutputTo(storage_path('logs/summary-reconcile.log'));

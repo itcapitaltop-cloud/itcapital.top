@@ -218,7 +218,7 @@ final class User extends Authenticatable implements MustVerifyEmail
 
     public function summary(): HasOne
     {
-        return $this->hasOne(UserSummary::class, 'user_id');
+        return $this->hasOne(UserSummary::class);
     }
 
     protected function reinvestsSum(): Attribute

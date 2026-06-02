@@ -10,6 +10,7 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Models\Transaction;
 use App\Services\ActivityLog\ActivityFeedService;
+use App\Services\User\UserBalanceCalculator;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
@@ -35,35 +36,7 @@ class TransactionRepository implements TransactionRepositoryContract
 
     public function getBalanceAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
     {
-
-        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
-        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
-
-        $debitsList = "'" . implode("','", $debits) . "'";
-        $creditsList = "'" . implode("','", $credits) . "'";
-
-        $sum = Transaction::query()
-            ->where('user_id', $userId)
-            ->where('balance_type', $balanceType)
-            ->selectRaw("
-            SUM(
-                CASE
-                    WHEN trx_type IN ($debitsList)
-                         AND accepted_at IS NOT NULL
-                         AND rejected_at IS NULL
-                        THEN amount
-
-                    WHEN trx_type IN ($creditsList)
-                         AND rejected_at IS NULL
-                        THEN -amount
-
-                    ELSE 0
-                END
-            ) as balance
-        ")
-            ->value('balance');
-
-        return (string) ($sum ?? 0);
+        return app(UserBalanceCalculator::class)->balanceFor($userId, $balanceType);
     }
 
     public function store(CreateTransactionDto $dto, Closure $callback): mixed
