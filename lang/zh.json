@@ -825,5 +825,19 @@
     "academy_news_published_at": "发布时间",
     "academy_news_read_more": "阅读全文",
     "liveware_news": "财经新闻",
-    "liveware_news_not_found": "新闻即将推出"
+    "liveware_news_not_found": "新闻即将推出",
+    "reviews_page_title": "评价",
+    "reviews_page_based_on": "基于 :count 条评价|基于 :count 条评价",
+    "reviews_form_title": "发表评价",
+    "reviews_form_rating_label": "您的评分",
+    "reviews_form_body_label": "您的评价",
+    "reviews_form_body_placeholder": "请分享您的体验...",
+    "reviews_form_submit": "提交评价",
+    "reviews_form_submitting": "提交中...",
+    "reviews_form_success_title": "评价已提交！",
+    "reviews_form_success_description": "您的评价已发送审核，审核通过后将会发布。",
+    "reviews_form_guest_prompt": "请登录后发表评价。",
+    "reviews_form_guest_login": "登录",
+    "reviews_empty": "暂无评价，快来第一个吧！",
+    "reviews_page_be_first": "留下评价"
 }

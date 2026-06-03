@@ -79,16 +79,22 @@
                         {{-- Рейтинг --}}
                         <div class="flex flex-col gap-2">
                             <div class="flex items-center gap-2">
-                                <div class="flex items-center gap-[4px] text-[#FFD600] text-[22px]">
-                                    @for ($i = 0; $i < 5; $i++)
-                                        <img src="{{ vite()->icon('/main/star.svg') }}" alt="" />
+                                <div class="flex items-center gap-[4px]">
+                                    @for ($i = 1; $i <= 5; $i++)
+                                        <img src="{{ vite()->icon('/main/star.svg') }}" alt="" class="{{ $reviewTotalCount > 0 && $i <= round($reviewAverageRating) ? '' : 'opacity-30' }}" />
                                     @endfor
                                 </div>
-                                <span class="text-[#BDBDBD] text-[12px] font-medium ml-1">4.9</span>
+                                @if($reviewTotalCount > 0)
+                                    <span class="text-[#BDBDBD] text-[12px] font-medium ml-1">{{ number_format($reviewAverageRating, 1) }}</span>
+                                @endif
                             </div>
-                            <div class="text-[#BDBDBD] text-[12px]">
-                                {{ __('livewire_index_main_rating_reviews_count') }}
-                            </div>
+                            <a href="{{ route('reviews') }}" class="text-[#BDBDBD] text-[12px] hover:text-white transition-colors underline underline-offset-2">
+                                @if($reviewTotalCount > 0)
+                                    {{ trans_choice('reviews_page_based_on', $reviewTotalCount, ['count' => $reviewTotalCount]) }}
+                                @else
+                                    {{ __('reviews_page_be_first') }}
+                                @endif
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -129,14 +135,22 @@
                 {{-- Рейтинг --}}
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center gap-[4px] text-[#FFD600] text-[22px]">
-                            @for ($i = 0; $i < 5; $i++)
-                                <img src="{{ vite()->icon('/main/star.svg') }}" alt="" />
+                        <div class="flex items-center gap-[4px]">
+                            @for ($i = 1; $i <= 5; $i++)
+                                <img src="{{ vite()->icon('/main/star.svg') }}" alt="" class="{{ $reviewTotalCount > 0 && $i <= round($reviewAverageRating) ? '' : 'opacity-30' }}" />
                             @endfor
                         </div>
-                        <span class="text-[#BDBDBD] text-[12px] font-medium ml-1">4.9</span>
+                        @if($reviewTotalCount > 0)
+                            <span class="text-[#BDBDBD] text-[12px] font-medium ml-1">{{ number_format($reviewAverageRating, 1) }}</span>
+                        @endif
                     </div>
-                    <div class="text-[#BDBDBD] text-[12px]">{{ __('livewire_index_main_rating_reviews_count') }}</div>
+                    <a href="{{ route('reviews') }}" class="text-[#BDBDBD] text-[12px] hover:text-white transition-colors underline underline-offset-2">
+                        @if($reviewTotalCount > 0)
+                            {{ trans_choice('reviews_page_based_on', $reviewTotalCount, ['count' => $reviewTotalCount]) }}
+                        @else
+                            {{ __('reviews_page_be_first') }}
+                        @endif
+                    </a>
                 </div>
             </div>
         </div>

@@ -15,6 +15,7 @@ use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\NewsResource;
 use App\MoonShine\Resources\PackageDefinitionResource;
 use App\MoonShine\Resources\PromoCodeResource;
+use App\MoonShine\Resources\ReviewResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
@@ -129,6 +130,8 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
                 ->canSee($this->canSeeResource(ItcStakingResource::class)),
             MenuItem::make('Новости', new NewsResource())
                 ->canSee($this->canSeeResource(NewsResource::class)),
+            MenuItem::make('Отзывы', new ReviewResource())
+                ->canSee($this->canSeeResource(ReviewResource::class)),
             MenuItem::make('Админы', new AdminUserResource())
                 ->canSee($this->canSeeResource(AdminUserResource::class)),
             MenuItem::make('Журнал действий', new GlobalAdminActivityResource())
