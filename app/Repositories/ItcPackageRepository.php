@@ -335,19 +335,24 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
 
     /**
      * @param \Illuminate\Support\Collection $userIds
-     * @param \DateTime|null $fromDate
+     * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по created_at реинвеста)
+     * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по created_at реинвеста)
      * @return float
      */
-    public function reinvestAmountForUsers(Collection $userIds, ?\DateTime $fromDate = null): float
+    public function reinvestAmountForUsers(Collection $userIds, ?\DateTimeInterface $fromDate = null, ?\DateTimeInterface $toDate = null): float
     {
         $query = ItcPackage::join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
             ->whereIn('transactions.user_id', $userIds);
 
         return (float) $query
             ->withSum([
-                'reinvestProfitsAll' => function ($q) use ($fromDate) {
+                'reinvestProfitsAll' => function ($q) use ($fromDate, $toDate) {
                     if ($fromDate) {
                         $q->where('created_at', '>=', $fromDate);
+                    }
+
+                    if ($toDate) {
+                        $q->where('created_at', '<', $toDate);
                     }
                 },
             ], 'amount')

@@ -17,6 +17,10 @@
 
 На данный момент он внедрен:
 1. В раздел **ITC стейкинг**
+2. В раздел **партнёрских рангов** — события `partner_rank_increased` / `partner_rank_decreased`
+
+Подробно о поддержании ранга и постепенном понижении — в бизнес-документации:
+`resources/docs/1.0/rank-maintenance.md`.
 
 ## Dev Container
 

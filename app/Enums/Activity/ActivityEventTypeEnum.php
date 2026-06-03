@@ -29,6 +29,7 @@ enum ActivityEventTypeEnum: string
     case PartnerRegularBonusReceived = 'partner_regular_bonus_received';
     case PartnerStartBonusReceived = 'partner_start_bonus_received';
     case PartnerRankIncreased = 'partner_rank_increased';
+    case PartnerRankDecreased = 'partner_rank_decreased';
     case StakingRegularBonusReceived = 'staking_regular_bonus_received';
     case StakingStartBonusReceived = 'staking_start_bonus_received';
     case PartnerToMainTransferred = 'partner_to_main_transferred';

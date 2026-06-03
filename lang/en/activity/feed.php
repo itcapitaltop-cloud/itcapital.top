@@ -58,6 +58,7 @@ return [
         'partner_regular_bonus_received' => 'Regular bonus of :amount ITC received from referral @:username in line :line',
         'partner_start_bonus_received' => 'Start bonus of :amount ITC received from referral @:username in line :line',
         'partner_rank_increased' => 'Partner rank increased from :old_rank to :new_rank',
+        'partner_rank_decreased' => 'Partner rank decreased from :old_rank to :new_rank',
         'staking_regular_bonus_received' => 'Regular staking bonus of :amount ITC received from referral @:username',
         'staking_start_bonus_received' => 'Start staking bonus of :amount ITC received from referral @:username',
         'partner_to_main_transferred' => ':amount ITC transferred from partner balance to main balance',

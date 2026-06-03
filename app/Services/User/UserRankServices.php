@@ -15,6 +15,7 @@ use App\Models\PartnerClosure;
 use App\Models\User;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Tasks\User\AwardUserRankBonusTask;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -52,7 +53,12 @@ final class UserRankServices
     }
 
     /**
-     * Пересчитать и обновить ранг пользователя
+     * Пересчитать и обновить ранг пользователя.
+     *
+     * Реалтайм-пересчёт работает только на повышение: понижение ранга
+     * выполняется исключительно ежемесячным заданием обслуживания
+     * (по одному шагу). Бонус начисляется один раз за ранг —
+     * только когда новый ранг превышает `max_rank_awarded`.
      */
     public function recalculateAndUpdateRank(User $user, bool $withBonus = true): bool
     {
@@ -60,22 +66,37 @@ final class UserRankServices
 
         $newRank = $this->calculateRank($user);
         $oldRank = $user->rank;
+        $maxRankAwarded = (int) $user->max_rank_awarded;
 
         Log::debug('[UserRankServices.recalculateAndUpdateRank] calculated rank', [
             'user_id' => $user->id,
             'old_rank' => $oldRank,
             'new_rank' => $newRank,
+            'max_rank_awarded' => $maxRankAwarded,
             'with_bonus' => $withBonus,
             'overridden_rank' => (bool) $user->overridden_rank,
         ]);
 
-        if ($newRank === $oldRank) {
+        if ($newRank <= $oldRank) {
+            if ($newRank < $oldRank) {
+                Log::debug('[UserRankServices.recalculateAndUpdateRank] downgrade suppressed (promote-only)', [
+                    'user_id' => $user->id,
+                    'old_rank' => $oldRank,
+                    'new_rank' => $newRank,
+                    'skipped_downgrade' => true,
+                ]);
+            }
+
             return false;
         }
 
-        if ($withBonus && $newRank > $oldRank) {
-            $this->awardUserRankBonusTask->run($user, $newRank);
-            Notify::rank($user, $newRank);
+        $bonusAwarded = $withBonus && $newRank > $maxRankAwarded;
+
+        DB::transaction(function () use ($user, $oldRank, $newRank, $maxRankAwarded, $bonusAwarded): void {
+            if ($bonusAwarded) {
+                $this->awardUserRankBonusTask->run($user, $newRank);
+                Notify::rank($user, $newRank);
+            }
 
             $this->activityLogger->write(new WriteBusinessActivityData(
                 type: ActivityEventTypeEnum::PartnerRankIncreased,
@@ -85,24 +106,214 @@ final class UserRankServices
                 properties: [
                     'old_rank' => $oldRank,
                     'new_rank' => $newRank,
-                    'bonus_awarded' => true,
+                    'bonus_awarded' => $bonusAwarded,
                 ],
                 causer: $user,
                 logName: 'partners',
                 context: 'rank',
             ));
-        }
 
-        $user->update(['rank' => $newRank]);
+            $attributes = ['rank' => $newRank];
+
+            if ($newRank > $maxRankAwarded) {
+                $attributes['max_rank_awarded'] = $newRank;
+            }
+
+            $user->update($attributes);
+        });
 
         Log::info('[UserRankServices.recalculateAndUpdateRank] persisted rank change', [
             'user_id' => $user->id,
             'old_rank' => $oldRank,
             'new_rank' => $newRank,
+            'max_rank_awarded' => max($maxRankAwarded, $newRank),
+            'bonus_awarded' => $bonusAwarded,
             'with_bonus' => $withBonus,
         ]);
 
         return true;
+    }
+
+    /**
+     * Применить ежемесячное обслуживание ранга (постепенное понижение).
+     *
+     * Для сохранения ранга `N` пользователь должен за расчётный месяц выполнить
+     * требования по линиям ранга `N-2`. Если хотя бы одна линия не выполнена —
+     * ранг понижается ровно на один шаг (`N → N-1`). Кумулятивный оборот и
+     * `max_rank_awarded` при этом не изменяются.
+     *
+     * @param \App\Models\User $user
+     * @param \Carbon\CarbonInterface $periodStart Начало расчётного окна включительно
+     * @param \Carbon\CarbonInterface $periodEnd Конец расчётного окна исключительно
+     * @param bool $dryRun Только рассчитать и залогировать понижение, не сохраняя его
+     * @return bool Был ли (или был бы при dry-run) понижен ранг
+     */
+    public function applyMonthlyMaintenance(
+        User $user,
+        CarbonInterface $periodStart,
+        CarbonInterface $periodEnd,
+        bool $dryRun = false
+    ): bool {
+        $this->resetCaches();
+
+        $currentRank = (int) $user->rank;
+
+        if ((bool) $user->overridden_rank === true) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] skipped: manual override', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+            ]);
+
+            return false;
+        }
+
+        // Maintenance floor: для ранга N <= 2 порог N-2 <= 0, требований по линиям нет.
+        if ($currentRank < 3) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] skipped: below maintenance floor', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+            ]);
+
+            return false;
+        }
+
+        $thresholdRankLevel = $currentRank - 2;
+        $thresholdRank = $this->partnerRepository->findRankByLevel($thresholdRankLevel);
+
+        if (! $thresholdRank) {
+            Log::warning('[UserRankServices.applyMonthlyMaintenance] threshold rank requirements missing', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+                'threshold_rank' => $thresholdRankLevel,
+            ]);
+
+            return false;
+        }
+
+        $lineRequirements = $thresholdRank->requirements->whereNotNull('line');
+
+        if ($lineRequirements->isEmpty()) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] no line requirements for threshold rank', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+                'threshold_rank' => $thresholdRankLevel,
+            ]);
+
+            return false;
+        }
+
+        Log::debug('[UserRankServices.applyMonthlyMaintenance] evaluating maintenance window', [
+            'user_id' => $user->id,
+            'rank' => $currentRank,
+            'threshold_rank' => $thresholdRankLevel,
+            'period_start' => $periodStart->toDateTimeString(),
+            'period_end' => $periodEnd->toDateTimeString(),
+        ]);
+
+        $maintenanceFailed = false;
+
+        foreach ($lineRequirements as $requirement) {
+            $line = (int) $requirement->line;
+            $requiredTurnover = (float) $requirement->requiredTurnover;
+            $monthlyTurnover = $this->monthlyLineTurnover($user, $line, $periodStart, $periodEnd);
+
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] line turnover check', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+                'threshold_rank' => $thresholdRankLevel,
+                'line' => $line,
+                'monthly_turnover' => $monthlyTurnover,
+                'required_turnover' => $requiredTurnover,
+            ]);
+
+            if ($monthlyTurnover < $requiredTurnover) {
+                $maintenanceFailed = true;
+
+                break;
+            }
+        }
+
+        if (! $maintenanceFailed) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] maintenance met, rank preserved', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+                'threshold_rank' => $thresholdRankLevel,
+            ]);
+
+            return false;
+        }
+
+        $newRank = max(1, $currentRank - 1);
+
+        if ($dryRun) {
+            Log::info('[UserRankServices.applyMonthlyMaintenance] rank demotion (dry-run, not persisted)', [
+                'user_id' => $user->id,
+                'old_rank' => $currentRank,
+                'new_rank' => $newRank,
+                'threshold_rank' => $thresholdRankLevel,
+                'period_start' => $periodStart->toDateTimeString(),
+                'period_end' => $periodEnd->toDateTimeString(),
+                'dry_run' => true,
+            ]);
+
+            return true;
+        }
+
+        DB::transaction(function () use ($user, $currentRank, $newRank, $periodStart, $periodEnd): void {
+            $user->update(['rank' => $newRank]);
+
+            Notify::rankDecreased($user, $newRank);
+
+            $this->activityLogger->write(new WriteBusinessActivityData(
+                type: ActivityEventTypeEnum::PartnerRankDecreased,
+                userId: $user->id,
+                subject: $user,
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'old_rank' => $currentRank,
+                    'new_rank' => $newRank,
+                    'period' => $periodStart->toDateString() . '..' . $periodEnd->toDateString(),
+                ],
+                causer: $user,
+                logName: 'partners',
+                context: 'rank',
+            ));
+        });
+
+        Log::info('[UserRankServices.applyMonthlyMaintenance] rank demoted', [
+            'user_id' => $user->id,
+            'old_rank' => $currentRank,
+            'new_rank' => $newRank,
+            'threshold_rank' => $thresholdRankLevel,
+            'period_start' => $periodStart->toDateTimeString(),
+            'period_end' => $periodEnd->toDateTimeString(),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Оборот по линии за расчётное окно [start, end).
+     *
+     * В отличие от кумулятивного оборота (используется для повышения), здесь
+     * суммируется только оборот, сгенерированный внутри окна.
+     */
+    private function monthlyLineTurnover(
+        User $user,
+        int $line,
+        CarbonInterface $start,
+        CarbonInterface $end
+    ): float {
+        $lineIds = $this->getDescendantIds($user->id, $line);
+
+        if ($lineIds->isEmpty()) {
+            return 0.0;
+        }
+
+        $buyAmount = $this->calculateBuyAmount($lineIds, $start, $end);
+        $reinvestAmount = $this->calculateReinvestAmount($lineIds, $start, $end);
+
+        return $buyAmount + $reinvestAmount;
     }
 
     /**
@@ -337,13 +548,14 @@ final class UserRankServices
     }
 
     /**
-     * Рассчитать сумму покупок
+     * Рассчитать сумму покупок в окне [fromDate, toDate).
      *
      * @param \Illuminate\Support\Collection $userIds
-     * @param \DateTime|null $fromDate
+     * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по accepted_at)
+     * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по accepted_at)
      * @return float
      */
-    private function calculateBuyAmount(Collection $userIds, ?\DateTime $fromDate): float
+    private function calculateBuyAmount(Collection $userIds, ?\DateTimeInterface $fromDate, ?\DateTimeInterface $toDate = null): float
     {
         $query = DB::table('transactions')
             ->whereIn('user_id', $userIds)
@@ -354,19 +566,24 @@ final class UserRankServices
             $query->where('accepted_at', '>=', $fromDate);
         }
 
+        if ($toDate) {
+            $query->where('accepted_at', '<', $toDate);
+        }
+
         return (float) $query->sum('amount');
     }
 
     /**
-     * Рассчитать сумму реинвестов
+     * Рассчитать сумму реинвестов в окне [fromDate, toDate).
      *
      * @param \Illuminate\Support\Collection $userIds
-     * @param \DateTime|null $fromDate
+     * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по created_at реинвеста)
+     * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по created_at реинвеста)
      * @return float
      */
-    private function calculateReinvestAmount(Collection $userIds, ?\DateTime $fromDate): float
+    private function calculateReinvestAmount(Collection $userIds, ?\DateTimeInterface $fromDate, ?\DateTimeInterface $toDate = null): float
     {
-        return $this->itcPackageRepository->reinvestAmountForUsers($userIds, $fromDate);
+        return $this->itcPackageRepository->reinvestAmountForUsers($userIds, $fromDate, $toDate);
     }
 
     /**

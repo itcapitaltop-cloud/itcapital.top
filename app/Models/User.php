@@ -55,8 +55,10 @@ use Illuminate\Notifications\Notifiable;
  * @method static \Illuminate\Database\Eloquent\Builder|User whereBannedAt($value)
  *
  * @property int $rank
+ * @property int $max_rank_awarded
  *
  * @method static \Illuminate\Database\Eloquent\Builder|User whereRank($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|User whereMaxRankAwarded($value)
  *
  * @mixin \Eloquent
  */
@@ -75,6 +77,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'username',
         'email',
         'rank',
+        'max_rank_awarded',
         'password',
         'banned_at',
         'session_version',

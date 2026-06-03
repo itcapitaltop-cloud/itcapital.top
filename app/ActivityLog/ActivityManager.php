@@ -98,6 +98,7 @@ final class ActivityManager
             ActivityEventTypeEnum::PartnerRegularBonusReceived => __('activity/feed.business.partner_regular_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
             ActivityEventTypeEnum::PartnerStartBonusReceived => __('activity/feed.business.partner_start_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
             ActivityEventTypeEnum::PartnerRankIncreased => __('activity/feed.business.partner_rank_increased', ['old_rank' => $oldRank, 'new_rank' => $newRank]),
+            ActivityEventTypeEnum::PartnerRankDecreased => __('activity/feed.business.partner_rank_decreased', ['old_rank' => $oldRank, 'new_rank' => $newRank]),
             ActivityEventTypeEnum::StakingRegularBonusReceived => __('activity/feed.business.staking_regular_bonus_received', ['amount' => $amount, 'username' => $username]),
             ActivityEventTypeEnum::StakingStartBonusReceived => __('activity/feed.business.staking_start_bonus_received', ['amount' => $amount, 'username' => $username]),
             ActivityEventTypeEnum::PartnerToMainTransferred => __('activity/feed.business.partner_to_main_transferred', ['amount' => $amount]),

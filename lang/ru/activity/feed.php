@@ -58,6 +58,7 @@ return [
         'partner_regular_bonus_received' => 'Получена регулярная премия :amount ITC от реферала @:username линии :line',
         'partner_start_bonus_received' => 'Получена стартовая премия :amount ITC от реферала @:username линии :line',
         'partner_rank_increased' => 'Партнерский ранг повышен с :old_rank до :new_rank',
+        'partner_rank_decreased' => 'Партнерский ранг понижен с :old_rank до :new_rank',
         'staking_regular_bonus_received' => 'Получена регулярная премия на стейкинг :amount ITC от реферала @:username',
         'staking_start_bonus_received' => 'Получена стартовая премия на стейкинг :amount ITC от реферала @:username',
         'partner_to_main_transferred' => 'Сумма :amount ITC выведена с партнерского на основной баланс',
