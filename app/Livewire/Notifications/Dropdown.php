@@ -3,17 +3,17 @@
 namespace App\Livewire\Notifications;
 
 use App\Livewire\Account\Itc\Packages;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Models\PackageProfitWithReinvestLink;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-use Livewire\WithPagination;
 use Throwable;
 
 class Dropdown extends Component
 {
-    use WithPagination;
+    use WithInfiniteFeed;
 
     public string $tab = 'unread'; // unread|read
 
@@ -61,7 +61,7 @@ class Dropdown extends Component
     public function switchTab(string $tab): void
     {
         $this->tab = $tab === 'read' ? 'read' : 'unread';
-        $this->resetPage();
+        $this->resetFeedPaging();
         $this->refreshCount();
     }
 
@@ -174,16 +174,24 @@ class Dropdown extends Component
     {
         $user = auth()->user();
 
-        if ($this->tab === 'read') {
-            return $user->readNotifications()->latest()->get();
+        if (! $user || ! $this->itemsLoaded) {
+            return collect();
         }
 
-        return $user->unreadNotifications()->latest()->get();
+        $relation = $this->tab === 'read'
+            ? $user->readNotifications()
+            : $user->unreadNotifications();
+
+        return $relation->latest()->limit($this->feedFetchLimit())->get();
     }
 
     public function render()
     {
+        [$items, $hasMore] = $this->paginateFeed($this->items);
+
         return view('livewire.notifications.dropdown', [
+            'items' => $items,
+            'hasMore' => $hasMore,
             'reinvestedMap' => $this->reinvestedMap,
         ]);
     }

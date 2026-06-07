@@ -55,6 +55,12 @@ class Packages extends Component
 {
     use WithInfiniteFeed;
 
+    private const PURCHASABLE_PACKAGE_TYPES = [
+        PackageTypeEnum::STANDARD->value,
+        PackageTypeEnum::PRIVILEGE->value,
+        PackageTypeEnum::VIP->value,
+    ];
+
     #[Validate(['required', 'numeric'])]
     public string $amount = '';
 
@@ -1076,6 +1082,7 @@ class Packages extends Component
                 ->get(),
             'logRows' => $logRows,
             'logHasMore' => $logHasMore,
+            'packageDefinitionOptions' => $this->activePackageDefinitionOptions(),
         ]);
     }
 }
