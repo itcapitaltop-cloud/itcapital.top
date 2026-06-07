@@ -5,6 +5,7 @@ namespace App\Livewire\Account\Finance;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Livewire\Forms\Account\Dashboard\CreateDepositForm;
 use App\Livewire\Forms\Account\Dashboard\CreateWithdrawForm;
 use App\Models\User;
@@ -16,6 +17,8 @@ use Livewire\Component;
 
 class Finance extends Component
 {
+    use WithInfiniteFeed;
+
     public CreateDepositForm $depositForm;
 
     public CreateWithdrawForm $withdrawForm;
@@ -87,13 +90,16 @@ class Finance extends Component
 
     public function render()
     {
-        $operations = app(ActivityFeedService::class)
-            ->financeFeed(Auth::id())
-            ->sortByDesc('created_at')
-            ->values();
+        [$operations, $operationsHasMore] = $this->paginateFeed(
+            app(ActivityFeedService::class)
+                ->financeFeed(Auth::id(), $this->feedFetchLimit())
+                ->sortByDesc('created_at')
+                ->values()
+        );
 
         return view('livewire.account.finance.finance', [
             'operations' => $operations,
+            'operationsHasMore' => $operationsHasMore,
             'countApplicationsReplenishment' => User::query()->withCount([
                 'transactions as countApplicationsReplenishment' => fn ($query) => $query->where('trx_type', TrxTypeEnum::DEPOSIT)->whereNull('accepted_at')->whereNull('rejected_at'),
             ])

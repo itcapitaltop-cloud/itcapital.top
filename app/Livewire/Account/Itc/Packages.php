@@ -14,6 +14,7 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Helpers\Notify;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Models\ItcPackage;
 use App\Models\NotificationProfitReaded;
 use App\Models\Package\PackageDefinition;
@@ -33,6 +34,9 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Routing\Redirector;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -49,14 +53,7 @@ use RuntimeException;
 
 class Packages extends Component
 {
-    /**
-     * @return list<string>
-     */
-    private const PURCHASABLE_PACKAGE_TYPES = [
-        PackageTypeEnum::STANDARD->value,
-        PackageTypeEnum::PRIVILEGE->value,
-        PackageTypeEnum::VIP->value,
-    ];
+    use WithInfiniteFeed;
 
     #[Validate(['required', 'numeric'])]
     public string $amount = '';
@@ -207,7 +204,7 @@ class Packages extends Component
      */
     public function topUpNeeded(
         string $uuid,
-    ): \Illuminate\Routing\Redirector|RedirectResponse {
+    ): Redirector|RedirectResponse {
         $this->validateOnly('withdrawPackageAmount', [
             'withdrawPackageAmount' => [
                 'required',
@@ -958,7 +955,7 @@ class Packages extends Component
 
         // Берём ВСЕ уведомления пользователя, где action.type=call и action.name=reinvest
         // Столбец notifications.data — JSON; в Eloquent доступ к полям через синтаксис ->.
-        /** @var \Illuminate\Support\Collection<int, \Illuminate\Notifications\DatabaseNotification> $notifications */
+        /** @var Collection<int, DatabaseNotification> $notifications */
         $notifications = DB::table('notifications as n')
             ->leftJoin('notification_profit_readeds as npr', 'npr.notification_id', '=', 'n.id')
             ->whereNull('npr.notification_id') // ещё не отмечены
@@ -1068,13 +1065,17 @@ class Packages extends Component
     {
         $trxRepo = app(TransactionRepositoryContract::class);
 
+        [$logRows, $logHasMore] = $this->paginateFeed(
+            $trxRepo->packageLog($this->feedFetchLimit())
+        );
+
         return view('livewire.account.itc.packages', [
             'packages' => ItcPackage::query()
                 ->notActive()
                 ->userPackagesWithFinancials(auth()->user()->id)
                 ->get(),
-            'logRows' => $trxRepo->packageLog(),
-            'packageDefinitionOptions' => $this->activePackageDefinitionOptions(),
+            'logRows' => $logRows,
+            'logHasMore' => $logHasMore,
         ]);
     }
 }

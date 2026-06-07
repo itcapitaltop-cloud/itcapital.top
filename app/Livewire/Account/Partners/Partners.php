@@ -14,6 +14,7 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Partners\PartnerRewardTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Models\ItcPackage;
 use App\Models\PartnerClosure;
 use App\Models\PartnerRank;
@@ -35,6 +36,8 @@ use Throwable;
 
 class Partners extends Component
 {
+    use WithInfiniteFeed;
+
     #[Validate(['required', 'numeric', 'min:1', 'balance'])]
     public string $toPartnerAmount = '';
 
@@ -696,7 +699,9 @@ class Partners extends Component
     {
         $this->transactionRepo = app(TransactionRepositoryContract::class);
 
-        $logRows = $this->transactionRepo->partnerLog();
+        [$logRows, $logHasMore] = $this->paginateFeed(
+            $this->transactionRepo->partnerLog($this->feedFetchLimit())
+        );
 
         return view('livewire.account.partners.partners', [
             'partnerBalance' => $this->partnerBalance,
@@ -711,6 +716,7 @@ class Partners extends Component
             'partners' => $this->partners,
             'availableLines' => $this->availableLines,
             'logRows' => $logRows,
+            'logHasMore' => $logHasMore,
             'nicknames' => User::query()
                 ->withoutGlobalScope('notBanned')
                 ->whereNull('banned_at')

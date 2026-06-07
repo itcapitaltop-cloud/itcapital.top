@@ -414,8 +414,8 @@ class UserDetailPage extends DetailPage
 
             $userLogs = $activityFeedService->userDetailUserFeed($item->id);
             $adminLogs = $activityFeedService->userDetailAdminFeed($item->id);
-            $loadedSections['user_logs'] = count($userLogs);
-            $loadedSections['admin_logs'] = count($adminLogs);
+            $loadedSections['user_logs'] = $userLogs->count();
+            $loadedSections['admin_logs'] = $adminLogs->count();
         } else {
             $loadedSections['user_logs'] = 'deferred';
             $loadedSections['admin_logs'] = 'deferred';
@@ -1038,7 +1038,7 @@ class UserDetailPage extends DetailPage
                                         ])
                                         ->items($adminLogs),
                                 ]
-                            ),
+                            )->active(fn () => ! request()->has('user_logs_page')),
                             Tab::make('Пользователь', [
                                 TableBuilder::make()
                                     ->withNotFound()
@@ -1062,7 +1062,7 @@ class UserDetailPage extends DetailPage
 
                                         return $attributes->merge(['style' => "color: {$color};"]);
                                     }),
-                            ]),
+                            ])->active(fn () => request()->has('user_logs_page')),
                         ]),
                     ]
                 )

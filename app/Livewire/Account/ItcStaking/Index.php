@@ -9,6 +9,7 @@ use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Helpers\Notify;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
 use App\Services\Package\Staking\StakingPerformanceService;
@@ -22,6 +23,8 @@ use Spatie\Activitylog\Models\Activity;
 
 final class Index extends Component
 {
+    use WithInfiniteFeed;
+
     #[Locked]
     public string $mainBalance;
 
@@ -99,20 +102,26 @@ final class Index extends Component
             ->mapWithKeys(fn (ItcPackage $package): array => [$package->id => $performanceService->forPackage($package)]);
         $summaryPerformance = $performanceService->forPackages($packages);
 
+        $stakingLogs = BusinessActivity::query()
+            ->packagesStaking(auth()->id())
+            ->latest()
+            ->limit($this->feedFetchLimit())
+            ->get()
+            ->each(function (Activity $activity) {
+                $activity->text = new ActivityManager()->resolve($activity);
+
+                return $activity;
+            });
+
+        [$logs, $logsHasMore] = $this->paginateFeed($stakingLogs);
+
         return view('livewire.account.itc-staking.index', [
             'packages' => $packages,
             'packagePerformances' => $packagePerformances,
             'summaryPerformance' => $summaryPerformance,
             'lastMonthProfitability' => ItcPackage::query()->calculateStakingLastMonthProfitability(auth()->id())->first(),
-            'logs' => BusinessActivity::query()
-                ->packagesStaking(auth()->id())
-                ->latest()
-                ->get()
-                ->each(function (Activity $activity) {
-                    $activity->text = new ActivityManager()->resolve($activity);
-
-                    return $activity;
-                }),
+            'logs' => $logs,
+            'logsHasMore' => $logsHasMore,
             'exchangeRateItc' => $summaryPerformance['current_rate'],
         ]);
     }

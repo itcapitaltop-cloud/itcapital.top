@@ -65,24 +65,24 @@ class ItcStakingDetailPage extends DetailPage
         $adminLogs = BusinessActivity::query()
             ->packagesStakingWithAdmin($package->transaction->user->id)
             ->latest()
-            ->get()
-            ->each(function (Activity $activity) {
+            ->simplePaginate(50, pageName: 'staking_admin_logs_page')
+            ->withQueryString()
+            ->through(function (Activity $activity): array {
                 $activity->text = new ActivityManager()->resolve($activity);
 
-                return $activity;
-            })
-            ->toArray();
+                return $activity->toArray();
+            });
 
         $userLogs = BusinessActivity::query()
             ->packagesStaking($package->transaction->user->id)
             ->latest()
-            ->get()
-            ->each(function (Activity $activity) {
+            ->simplePaginate(50, pageName: 'staking_user_logs_page')
+            ->withQueryString()
+            ->through(function (Activity $activity): array {
                 $activity->text = new ActivityManager()->resolve($activity);
 
-                return $activity;
-            })
-            ->toArray();
+                return $activity->toArray();
+            });
 
         $stakingChangedStartBonusPercent = new ChangedStartBonusPercentComponent()->handle($package);
         $stakingChangedSRegularPercent = new ChangedRegularPercentComponent()->handle($package);
@@ -176,7 +176,7 @@ class ItcStakingDetailPage extends DetailPage
                                     Date::make('Дата', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                     Text::make('Действие', 'text')->showOnExport(),
                                 ]),
-                        ]),
+                        ])->active(fn () => ! request()->has('staking_user_logs_page')),
                         Tab::make('Пользователь', [
                             TableBuilder::make()
                                 ->withNotFound()
@@ -185,7 +185,7 @@ class ItcStakingDetailPage extends DetailPage
                                     Date::make('Дата', 'created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                     Text::make('Действие', 'text')->showOnExport(),
                                 ]),
-                        ]),
+                        ])->active(fn () => request()->has('staking_user_logs_page')),
                     ]),
                 ]),
             ]),

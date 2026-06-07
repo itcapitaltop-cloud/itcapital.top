@@ -54,12 +54,7 @@ class ActivityLogResource extends ModelResource
             ->leftJoin('itc_packages as pkg', 'package_profits.package_uuid', '=', 'pkg.uuid')
             ->leftJoin('transactions as tr', 'pkg.uuid', '=', 'tr.uuid')
             ->leftJoin('users as u', 'tr.user_id', '=', 'u.id')
-            ->with(['package.transaction.user'])
-            ->where('package_profits.created_at', '>=', now()->subMonth());
-
-        if (! request()->filled('filters.created_at')) {
-            $query->where('package_profits.created_at', '>=', now()->subWeek(2));
-        }
+            ->with(['package.transaction.user']);
 
         return $query->latest('package_profits.created_at');
     }

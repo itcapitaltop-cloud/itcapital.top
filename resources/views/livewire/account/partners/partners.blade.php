@@ -293,6 +293,8 @@
                                     </td>
                                 </tr>
                             @endforelse
+
+                            <x-ui.feed-loader :has-more="$logHasMore" :colspan="4" :page="$feedPerPage" />
                         </tbody>
                     </table>
                 </div>
