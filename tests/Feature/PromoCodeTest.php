@@ -63,27 +63,31 @@ function fundMainBalance(User $user, string $amount = '500.00000000'): void
 }
 
 it('generates an unused promo code', function () {
+    $definition = activeStandardPackageDefinition();
+
     $promoCode = GeneratePromoCodeAction::make()->run(
-        PackageTypeEnum::STANDARD,
+        $definition,
         '25.00000000',
     );
 
     expect($promoCode->code)
         ->toStartWith('ITC-')
         ->and($promoCode->usages()->exists())->toBeFalse()
-        ->and($promoCode->package_type)->toBe(PackageTypeEnum::STANDARD)
+        ->and($promoCode->package_definition_id)->toBe($definition->id)
         ->and($promoCode->reduced_minimum_amount)->toBe('25.00000000');
 });
 
 it('generates promo codes for active privilege and vip package definitions', function (PackageTypeEnum $packageType) {
+    $definition = activePackageDefinition($packageType, '5000.00000000');
+
     $promoCode = GeneratePromoCodeAction::make()->run(
-        $packageType,
+        $definition,
         '100.00000000',
     );
 
     expect($promoCode->code)
         ->toStartWith('ITC-')
-        ->and($promoCode->package_type)->toBe($packageType)
+        ->and($promoCode->package_definition_id)->toBe($definition->id)
         ->and($promoCode->reduced_minimum_amount)->toBe('100.00000000');
 })->with([
     'privilege' => [PackageTypeEnum::PRIVILEGE],
@@ -108,11 +112,11 @@ it('creates staking package with inactive staking package definition', function 
 it('rejects admin promo code generation when reduced threshold is not below package minimum', function () {
     $this->withoutMiddleware();
 
-    activeStandardPackageDefinition('2510.00000000');
+    $definition = activeStandardPackageDefinition('2510.00000000');
 
     $response = $this->from('/itcapitalmoonshineadminpanel/resource/promo-code-resource/index-page')
         ->post(route('admin.promo-codes.generate'), [
-            'package_type' => PackageTypeEnum::STANDARD->value,
+            'package_definition_id' => $definition->id,
             'reduced_minimum_amount' => '3000',
         ]);
 
@@ -132,7 +136,7 @@ it('redeems a valid promo code once during package purchase', function () {
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'PROMO50',
-        'package_type' => PackageTypeEnum::STANDARD,
+        'package_definition_id' => $definition->id,
         'reduced_minimum_amount' => '50.00000000',
     ]);
 
@@ -191,7 +195,7 @@ it('allows different users to use the same promo code', function () {
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'MULTI50',
-        'package_type' => PackageTypeEnum::STANDARD,
+        'package_definition_id' => $definition->id,
         'reduced_minimum_amount' => '50.00000000',
     ]);
 
@@ -227,7 +231,7 @@ it('rejects same user reusing a promo code for the same package type', function 
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'ONCE50',
-        'package_type' => PackageTypeEnum::STANDARD,
+        'package_definition_id' => $definition->id,
         'reduced_minimum_amount' => '50.00000000',
     ]);
 
@@ -259,10 +263,11 @@ it('rejects promo code for a different package type', function () {
     $user = User::factory()->create();
     fundMainBalance($user, '300.00000000');
     $definition = activeStandardPackageDefinition('50.00000000');
+    $vipDefinition = activePackageDefinition(PackageTypeEnum::VIP, '5000.00000000');
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'SAME50',
-        'package_type' => PackageTypeEnum::VIP,
+        'package_definition_id' => $vipDefinition->id,
         'reduced_minimum_amount' => '50.00000000',
     ]);
 
@@ -282,10 +287,11 @@ it('rejects a standard promo code for privilege package purchase', function () {
     $user = User::factory()->create();
     fundMainBalance($user, '3000.00000000');
     $definition = activePackageDefinition(PackageTypeEnum::PRIVILEGE, '2500.00000000');
+    $standardDefinition = activeStandardPackageDefinition('250.00000000');
 
     PromoCode::factory()->create([
         'code' => 'STD100',
-        'package_type' => PackageTypeEnum::STANDARD,
+        'package_definition_id' => $standardDefinition->id,
         'reduced_minimum_amount' => '100.00000000',
     ]);
 
@@ -306,7 +312,7 @@ it('accepts a vip promo code for vip package purchase', function () {
 
     $promoCode = PromoCode::factory()->create([
         'code' => 'VIP100',
-        'package_type' => PackageTypeEnum::VIP,
+        'package_definition_id' => $definition->id,
         'reduced_minimum_amount' => '100.00000000',
     ]);
 
@@ -330,13 +336,19 @@ it('accepts a vip promo code for vip package purchase', function () {
         ->and($package->type)->toBe(PackageTypeEnum::VIP);
 });
 
-it('rejects invalid and mismatched promo codes without creating a package', function (string $code, array $attributes) {
+it('rejects invalid and mismatched promo codes without creating a package', function (string $code, ?PackageTypeEnum $mismatchedPackageType) {
     $user = User::factory()->create();
     fundMainBalance($user);
     $definition = activeStandardPackageDefinition('50.00000000');
 
-    if ($attributes !== []) {
-        PromoCode::factory()->create($attributes);
+    if ($mismatchedPackageType !== null) {
+        $mismatchedDefinition = activePackageDefinition($mismatchedPackageType, '5000.00000000');
+
+        PromoCode::factory()->create([
+            'code' => $code,
+            'package_definition_id' => $mismatchedDefinition->id,
+            'reduced_minimum_amount' => '50.00000000',
+        ]);
     }
 
     $this->actingAs($user);
@@ -353,12 +365,8 @@ it('rejects invalid and mismatched promo codes without creating a package', func
         ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
         ->exists())->toBeFalse();
 })->with([
-    'invalid code' => ['UNKNOWN50', []],
-    'mismatched package type' => ['VIP50', [
-        'code' => 'VIP50',
-        'package_type' => PackageTypeEnum::VIP,
-        'reduced_minimum_amount' => '50.00000000',
-    ]],
+    'invalid code' => ['UNKNOWN50', null],
+    'mismatched package type' => ['VIP50', PackageTypeEnum::VIP],
 ]);
 
 it('rejects package purchase below the promo reduced threshold', function () {
@@ -368,7 +376,7 @@ it('rejects package purchase below the promo reduced threshold', function () {
 
     PromoCode::factory()->create([
         'code' => 'MIN75',
-        'package_type' => PackageTypeEnum::STANDARD,
+        'package_definition_id' => $definition->id,
         'reduced_minimum_amount' => '75.00000000',
     ]);
 

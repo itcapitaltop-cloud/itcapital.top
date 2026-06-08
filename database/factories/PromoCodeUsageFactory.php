@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\Itc\PackageTypeEnum;
 use App\Models\PromoCode;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -17,7 +16,7 @@ class PromoCodeUsageFactory extends Factory
         return [
             'promo_code_id' => PromoCode::factory(),
             'user_id' => User::factory(),
-            'package_type' => PackageTypeEnum::STANDARD,
+            'package_definition_id' => fn (array $attributes) => PromoCode::query()->find($attributes['promo_code_id'])?->package_definition_id,
             'used_at' => fake()->dateTimeBetween('-30 days', 'now'),
         ];
     }
@@ -26,7 +25,7 @@ class PromoCodeUsageFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'promo_code_id' => $promoCode->id,
-            'package_type' => $promoCode->package_type,
+            'package_definition_id' => $promoCode->package_definition_id,
         ]);
     }
 

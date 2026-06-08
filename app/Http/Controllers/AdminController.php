@@ -15,6 +15,7 @@ use App\Enums\Transactions\TransactionStatusEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Helpers\Notify;
 use App\Models\ItcPackage;
+use App\Models\Package\PackageDefinition;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitWithdraw;
@@ -26,7 +27,6 @@ use App\Models\UserSummary;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
-use App\Services\Package\PackageDefinitionResolver;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -190,6 +190,7 @@ class AdminController extends Controller
                 ], null, 'A1');
 
                 $row = 2;
+
                 foreach (app(ActivityFeedService::class)->userDetailUserFeed($user->id, null, $dateFrom, $dateTo) as $log) {
                     $sheet->fromArray([
                         $log['type'],
@@ -218,28 +219,34 @@ class AdminController extends Controller
 
         Log::debug('[AdminController.generatePromoCode] start', [
             'admin_id' => $admin?->id,
-            'package_type' => $request->input('package_type'),
+            'package_definition_id' => $request->input('package_definition_id'),
             'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
         ]);
 
         $validator = validator($request->all(), [
-            'package_type' => [
+            'package_definition_id' => [
                 'required',
-                Rule::enum(PackageTypeEnum::class)->except([
-                    PackageTypeEnum::ARCHIVE,
-                    PackageTypeEnum::STAKING,
+                Rule::exists('package_definitions', 'id')->whereNotIn('type', [
+                    PackageTypeEnum::ARCHIVE->value,
+                    PackageTypeEnum::STAKING->value,
                 ]),
             ],
             'reduced_minimum_amount' => ['required', 'numeric', 'min:0'],
         ]);
 
         $validator->after(function (Validator $validator) use ($request): void {
-            if ($validator->errors()->has('package_type') || $validator->errors()->has('reduced_minimum_amount')) {
+            if ($validator->errors()->has('package_definition_id') || $validator->errors()->has('reduced_minimum_amount')) {
                 return;
             }
 
-            $packageType = PackageTypeEnum::from((string) $request->input('package_type'));
-            $packageDefinition = app(PackageDefinitionResolver::class)->resolve($packageType);
+            $packageDefinition = PackageDefinition::query()->find((int) $request->input('package_definition_id'));
+
+            if (! $packageDefinition instanceof PackageDefinition) {
+                $validator->errors()->add('package_definition_id', 'Выбранный пакет не найден.');
+
+                return;
+            }
+
             $reducedMinimumAmount = BigDecimal::of((string) $request->input('reduced_minimum_amount'));
             $defaultMinimumAmount = BigDecimal::of($packageDefinition->min_start_amount);
 
@@ -263,16 +270,18 @@ class AdminController extends Controller
                 ->toast($validator->errors()->first(), ToastType::ERROR);
         }
 
+        $packageDefinition = PackageDefinition::query()->findOrFail((int) $request->input('package_definition_id'));
+
         try {
             $promoCode = GeneratePromoCodeAction::make()->run(
-                PackageTypeEnum::from((string) $request->input('package_type')),
+                $packageDefinition,
                 (string) $request->input('reduced_minimum_amount'),
                 $admin,
             );
         } catch (Throwable $throwable) {
             Log::error('[AdminController.generatePromoCode] generation failed', [
                 'admin_id' => $admin?->id,
-                'package_type' => $request->input('package_type'),
+                'package_definition_id' => $packageDefinition->id,
                 'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
                 'exception' => $throwable::class,
                 'message' => $throwable->getMessage(),
@@ -285,7 +294,7 @@ class AdminController extends Controller
         Log::info('[AdminController.generatePromoCode] generated', [
             'admin_id' => $admin?->id,
             'promo_code_id' => $promoCode->id,
-            'package_type' => $promoCode->package_type->value,
+            'package_definition_id' => $promoCode->package_definition_id,
         ]);
 
         return MoonShineJsonResponse::make()

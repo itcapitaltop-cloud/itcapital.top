@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\Itc\PackageTypeEnum;
+use App\Models\Package\PackageDefinition;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -20,16 +20,16 @@ class PromoCodeFactory extends Factory
     {
         return [
             'code' => Str::upper(fake()->bothify('ITC-????-####')),
-            'package_type' => PackageTypeEnum::STANDARD,
+            'package_definition_id' => PackageDefinition::factory(),
             'reduced_minimum_amount' => fake()->randomElement(['10.00000000', '25.00000000', '50.00000000']),
             'created_by_admin_id' => null,
         ];
     }
 
-    public function forPackageType(PackageTypeEnum $packageType): static
+    public function forPackageDefinition(PackageDefinition $packageDefinition): static
     {
         return $this->state(fn (array $attributes) => [
-            'package_type' => $packageType,
+            'package_definition_id' => $packageDefinition->id,
         ]);
     }
 }

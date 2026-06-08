@@ -551,7 +551,7 @@ class Packages extends Component
 
         $result = $promoCodeService->validateForPurchase(
             user: $user,
-            packageType: $packageDefinition->type,
+            packageDefinition: $packageDefinition,
             amount: (string) ($this->amount ?: $packageDefinition->min_start_amount),
             code: $this->promoCode,
             defaultMinimumAmount: $packageDefinition->min_start_amount,
@@ -613,7 +613,7 @@ class Packages extends Component
 
         $promoCodeValidation = $promoCodeService->validateForPurchase(
             user: $user,
-            packageType: $packageDefinition->type,
+            packageDefinition: $packageDefinition,
             amount: $this->amount,
             code: $appliedPromoCode?->code,
             defaultMinimumAmount: $packageDefinition->min_start_amount,
@@ -670,7 +670,7 @@ class Packages extends Component
                     $redeemedPromoCode = $promoCodeService->redeem(
                         $promoCodeValidation->promoCode,
                         $user,
-                        $packageDefinition->type,
+                        $packageDefinition,
                         $packageDefinition->min_start_amount,
                     );
                     $redeemedPromoCodeId = $redeemedPromoCode->promo_code_id;

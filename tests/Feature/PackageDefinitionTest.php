@@ -207,15 +207,22 @@ it('uses configured minimum when generating promo codes', function () {
         ->where('type', PackageTypeEnum::STANDARD)
         ->update(['min_start_amount' => '300.00000000']);
 
+    $definition = PackageDefinition::query()
+        ->where('type', PackageTypeEnum::STANDARD)
+        ->active()
+        ->orderBy('sort_order')
+        ->orderBy('id')
+        ->firstOrFail();
+
     $promoCode = GeneratePromoCodeAction::make()->run(
-        PackageTypeEnum::STANDARD,
+        $definition,
         '299.00000000',
     );
 
     expect($promoCode->reduced_minimum_amount)->toBe('299.00000000');
 
     GeneratePromoCodeAction::make()->run(
-        PackageTypeEnum::STANDARD,
+        $definition,
         '300.00000000',
     );
 })->throws(InvalidArgumentException::class, 'Reduced minimum amount must be lower than the default package minimum.');

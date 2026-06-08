@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoonShine\Resources;
 
 use App\Enums\Itc\PackageTypeEnum;
+use App\Models\Package\PackageDefinition;
 use App\Models\PromoCode;
 use App\MoonShine\Pages\PromoCode\PromoCodeIndexPage;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,11 +42,14 @@ class PromoCodeResource extends ModelResource
                         FormBuilder::make()
                             ->action(route('admin.promo-codes.generate'))
                             ->fields([
-                                Select::make('Тип пакета', 'package_type')
+                                Select::make('Пакет', 'package_definition_id')
                                     ->options(
-                                        collect(PackageTypeEnum::cases())
-                                            ->reject(fn (PackageTypeEnum $packageType) => in_array($packageType, [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING], true))
-                                            ->mapWithKeys(fn (PackageTypeEnum $packageType) => [$packageType->value => $packageType->getName()])
+                                        PackageDefinition::query()
+                                            ->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING])
+                                            ->orderBy('sort_order')
+                                            ->orderBy('id')
+                                            ->get()
+                                            ->mapWithKeys(fn (PackageDefinition $definition) => [$definition->id => $definition->name . ' (' . $definition->slug . ')'])
                                             ->all()
                                     )
                                     ->required(),

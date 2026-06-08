@@ -6,6 +6,7 @@ namespace App\Services\PromoCodes;
 
 use App\Dto\PromoCodes\PackagePromoCodeValidationResult;
 use App\Enums\Itc\PackageTypeEnum;
+use App\Models\Package\PackageDefinition;
 use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
 use App\Models\User;
@@ -31,7 +32,7 @@ final class PackagePromoCodeService
 
     public function validateForPurchase(
         User $user,
-        PackageTypeEnum $packageType,
+        PackageDefinition $packageDefinition,
         string $amount,
         ?string $code,
         string $defaultMinimumAmount = self::DEFAULT_PACKAGE_MINIMUM,
@@ -40,15 +41,17 @@ final class PackagePromoCodeService
 
         Log::debug('[PackagePromoCodeService.validateForPurchase] start', [
             'user_id' => $user->id,
-            'package_type' => $packageType->value,
+            'package_definition_id' => $packageDefinition->id,
+            'package_slug' => $packageDefinition->slug,
             'amount' => $amount,
             'has_promo_code' => $normalizedCode !== null,
         ]);
 
-        if (! $this->supportsPackageType($packageType)) {
-            Log::warning('[PackagePromoCodeService.validateForPurchase] unsupported package type', [
+        if (! $this->supportsPackageDefinition($packageDefinition)) {
+            Log::warning('[PackagePromoCodeService.validateForPurchase] unsupported package definition', [
                 'user_id' => $user->id,
-                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+                'package_slug' => $packageDefinition->slug,
             ]);
 
             return new PackagePromoCodeValidationResult(
@@ -61,7 +64,7 @@ final class PackagePromoCodeService
         if ($normalizedCode === null) {
             return $this->validateAmountThreshold(
                 user: $user,
-                packageType: $packageType,
+                packageDefinition: $packageDefinition,
                 amount: $amount,
                 effectiveMinimumAmount: $defaultMinimumAmount,
                 promoCode: null,
@@ -75,7 +78,8 @@ final class PackagePromoCodeService
         if ($promoCode === null) {
             Log::warning('[PackagePromoCodeService.validateForPurchase] invalid promo code', [
                 'user_id' => $user->id,
-                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+                'package_slug' => $packageDefinition->slug,
             ]);
 
             return new PackagePromoCodeValidationResult(
@@ -85,11 +89,12 @@ final class PackagePromoCodeService
             );
         }
 
-        if ($promoCode->isUsedByUser($user, $packageType)) {
+        if ($promoCode->isUsedByUser($user, $packageDefinition)) {
             Log::warning('[PackagePromoCodeService.validateForPurchase] promo code already used by user for this package', [
                 'user_id' => $user->id,
                 'promo_code_id' => $promoCode->id,
-                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+                'package_slug' => $packageDefinition->slug,
             ]);
 
             return new PackagePromoCodeValidationResult(
@@ -99,12 +104,13 @@ final class PackagePromoCodeService
             );
         }
 
-        if ($promoCode->package_type !== $packageType) {
-            Log::warning('[PackagePromoCodeService.validateForPurchase] package type mismatch', [
+        if ($promoCode->package_definition_id !== $packageDefinition->id) {
+            Log::warning('[PackagePromoCodeService.validateForPurchase] package definition mismatch', [
                 'user_id' => $user->id,
                 'promo_code_id' => $promoCode->id,
-                'expected_package_type' => $promoCode->package_type->value,
-                'actual_package_type' => $packageType->value,
+                'expected_package_definition_id' => $promoCode->package_definition_id,
+                'actual_package_definition_id' => $packageDefinition->id,
+                'actual_package_slug' => $packageDefinition->slug,
             ]);
 
             return new PackagePromoCodeValidationResult(
@@ -116,7 +122,7 @@ final class PackagePromoCodeService
 
         return $this->validateAmountThreshold(
             user: $user,
-            packageType: $packageType,
+            packageDefinition: $packageDefinition,
             amount: $amount,
             effectiveMinimumAmount: $promoCode->reduced_minimum_amount,
             promoCode: $promoCode,
@@ -126,16 +132,17 @@ final class PackagePromoCodeService
     public function redeem(
         PromoCode $promoCode,
         User $user,
-        PackageTypeEnum $packageType,
+        PackageDefinition $packageDefinition,
         string $defaultMinimumAmount = self::DEFAULT_PACKAGE_MINIMUM,
     ): PromoCodeUsage {
         Log::debug('[PackagePromoCodeService.redeem] start', [
             'promo_code_id' => $promoCode->id,
             'user_id' => $user->id,
-            'package_type' => $packageType->value,
+            'package_definition_id' => $packageDefinition->id,
+            'package_slug' => $packageDefinition->slug,
         ]);
 
-        $usage = DB::transaction(function () use ($promoCode, $user, $packageType, $defaultMinimumAmount) {
+        $usage = DB::transaction(function () use ($promoCode, $user, $packageDefinition, $defaultMinimumAmount) {
             $lockedPromoCode = PromoCode::query()
                 ->whereKey($promoCode->id)
                 ->lockForUpdate()
@@ -150,27 +157,27 @@ final class PackagePromoCodeService
                 throw new RuntimeException('Promo code was not found during redemption.');
             }
 
-            if ($lockedPromoCode->isUsedByUser($user, $packageType)) {
+            if ($lockedPromoCode->isUsedByUser($user, $packageDefinition)) {
                 Log::error('[PackagePromoCodeService.redeem] promo code already redeemed by user for this package', [
                     'promo_code_id' => $lockedPromoCode->id,
                     'user_id' => $user->id,
-                    'package_type' => $packageType->value,
+                    'package_definition_id' => $packageDefinition->id,
                 ]);
 
-                throw new RuntimeException('Promo code has already been used by this user for this package type.');
+                throw new RuntimeException('Promo code has already been used by this user for this package.');
             }
 
             $usage = PromoCodeUsage::create([
                 'promo_code_id' => $lockedPromoCode->id,
                 'user_id' => $user->id,
-                'package_type' => $packageType,
+                'package_definition_id' => $packageDefinition->id,
                 'used_at' => now(),
             ]);
 
             Log::info('[PackagePromoCodeService.redeem] promo code redeemed', [
                 'promo_code_id' => $lockedPromoCode->id,
                 'user_id' => $user->id,
-                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
                 'usage_id' => $usage->id,
                 'original_threshold' => $defaultMinimumAmount,
                 'effective_threshold' => $lockedPromoCode->reduced_minimum_amount,
@@ -184,7 +191,7 @@ final class PackagePromoCodeService
 
     private function validateAmountThreshold(
         User $user,
-        PackageTypeEnum $packageType,
+        PackageDefinition $packageDefinition,
         string $amount,
         string $effectiveMinimumAmount,
         ?PromoCode $promoCode,
@@ -193,7 +200,7 @@ final class PackagePromoCodeService
             Log::warning('[PackagePromoCodeService.validateAmountThreshold] amount below threshold', [
                 'user_id' => $user->id,
                 'promo_code_id' => $promoCode?->id,
-                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
                 'amount' => $amount,
                 'effective_minimum_amount' => $effectiveMinimumAmount,
             ]);
@@ -209,7 +216,7 @@ final class PackagePromoCodeService
         Log::debug('[PackagePromoCodeService.validateAmountThreshold] validation passed', [
             'user_id' => $user->id,
             'promo_code_id' => $promoCode?->id,
-            'package_type' => $packageType->value,
+            'package_definition_id' => $packageDefinition->id,
             'amount' => $amount,
             'effective_minimum_amount' => $effectiveMinimumAmount,
         ]);
@@ -227,8 +234,8 @@ final class PackagePromoCodeService
         return $normalizedCode === '' ? null : $normalizedCode;
     }
 
-    private function supportsPackageType(PackageTypeEnum $packageType): bool
+    private function supportsPackageDefinition(PackageDefinition $packageDefinition): bool
     {
-        return ! in_array($packageType, [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING], true);
+        return ! in_array($packageDefinition->type, [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING], true);
     }
 }
