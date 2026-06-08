@@ -3,24 +3,24 @@
 namespace App\Livewire\Notifications;
 
 use App\Livewire\Account\Itc\Packages;
+use App\Livewire\Concerns\WithInfiniteFeed;
 use App\Models\PackageProfitWithReinvestLink;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
-use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithPagination;
 use Throwable;
 
 class Dropdown extends Component
 {
-    use WithPagination;
+    use WithInfiniteFeed;
+
     public string $tab = 'unread'; // unread|read
+
     public int $unreadCount = 0;
+
     public int $readCount = 0;
+
     public bool $openNotifications = false;
 
     public bool $isLanding = false;
@@ -46,13 +46,14 @@ class Dropdown extends Component
 
         if (! $user) {
             $this->unreadCount = 0;
-            $this->readCount   = 0;
+            $this->readCount = 0;
             $this->dispatch('notifications:count', unread: 0);
+
             return;
         }
 
-        $this->unreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
-        $this->readCount   = $user->readNotifications()->count();
+        $this->unreadCount = $user->unreadNotificationsCount();
+        $this->readCount = $user->readNotifications()->count();
 
         $this->dispatch('notifications:count', unread: $this->unreadCount);
     }
@@ -60,14 +61,17 @@ class Dropdown extends Component
     public function switchTab(string $tab): void
     {
         $this->tab = $tab === 'read' ? 'read' : 'unread';
-        $this->resetPage();
+        $this->resetFeedPaging();
         $this->refreshCount();
     }
 
     public function markAllRead(): void
     {
         $user = auth()->user();
-        if (!$user) return;
+
+        if (! $user) {
+            return;
+        }
 
         $user->unreadNotifications->markAsRead();
         $this->refreshCount();
@@ -88,11 +92,14 @@ class Dropdown extends Component
 
         if (($action['type'] ?? null) !== 'call') {
             $this->markAsRead($id);
+
             return;
         }
+
         switch ($action['name'] ?? '') {
             case 'reinvest':
                 $profitUuid = Arr::get($action, 'params.uuid');
+
                 if ($profitUuid) {
                     try {
                         app(Packages::class)->reinvestOneProfit($profitUuid);
@@ -106,10 +113,12 @@ class Dropdown extends Component
                     }
                 }
                 $this->markAsRead($id);
+
                 break;
 
             default:
                 $this->markAsRead($id);
+
                 break;
         }
     }
@@ -121,9 +130,11 @@ class Dropdown extends Component
         $uuids = $items
             ->map(function ($n) {
                 $action = $n->data['action'] ?? null;
+
                 if (($action['type'] ?? null) !== 'call' || ($action['name'] ?? null) !== 'reinvest') {
                     return null;
                 }
+
                 return Arr::get($action, 'params.uuid');
             })
             ->filter()
@@ -163,16 +174,24 @@ class Dropdown extends Component
     {
         $user = auth()->user();
 
-        if ($this->tab === 'read') {
-            return $user->readNotifications()->latest()->get();
+        if (! $user || ! $this->itemsLoaded) {
+            return collect();
         }
 
-        return $user->unreadNotifications()->latest()->get();
+        $relation = $this->tab === 'read'
+            ? $user->readNotifications()
+            : $user->unreadNotifications();
+
+        return $relation->latest()->limit($this->feedFetchLimit())->get();
     }
 
     public function render()
     {
+        [$items, $hasMore] = $this->paginateFeed($this->items);
+
         return view('livewire.notifications.dropdown', [
+            'items' => $items,
+            'hasMore' => $hasMore,
             'reinvestedMap' => $this->reinvestedMap,
         ]);
     }

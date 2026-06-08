@@ -10,19 +10,28 @@ use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitReinvestWithdraw;
 use App\Models\PackageProfitWithdraw;
+use App\Models\Partner;
+use App\Models\Transaction;
+use App\Models\User;
 use App\Notifications\ResetPasswordRu;
 use App\Notifications\VerifyEmailRu;
 use App\Observers\PackageBalanceWithdrawObserver;
 use App\Observers\PackagePartnerTransferObserver;
 use App\Observers\PackageProfitObserver;
 use App\Observers\PackageProfitReinvestObserver;
+use App\Observers\PackageProfitReinvestSummaryObserver;
 use App\Observers\PackageProfitReinvestWithdrawObserver;
+use App\Observers\PackageProfitReinvestWithdrawSummaryObserver;
 use App\Observers\PackageProfitWithdrawObserver;
+use App\Observers\PartnerSummaryObserver;
+use App\Observers\TransactionObserver;
+use App\Observers\UserSummaryRowObserver;
 use App\Repositories\GoogleDriveBackupUploaderRepository;
 use App\Repositories\GoogleSheetsUploaderRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -44,6 +53,15 @@ class AppServiceProvider extends ServiceProvider
             GoogleDriveBackupUploaderContract::class,
             GoogleDriveBackupUploaderRepository::class
         );
+
+        // Token rates are immutable within a single request; sharing one
+        // resolver instance lets it memoize lookups across every staking package.
+        $this->app->singleton(\App\Services\Token\TokenRateResolver::class);
+
+        // Point-in-time balance snapshots are immutable within a request; sharing
+        // one instance lets it dedupe the "as of now" partner balance the dashboard
+        // recomputes for each period stat.
+        $this->app->singleton(\App\Services\User\UserBalanceCalculator::class);
     }
 
     /**
@@ -58,6 +76,13 @@ class AppServiceProvider extends ServiceProvider
         PackageBalanceWithdraw::observe(PackageBalanceWithdrawObserver::class);
         PackagePartnerTransfer::observe(PackagePartnerTransferObserver::class);
 
+        // user_summary projection — single PHP writer, replaces PL/pgSQL triggers.
+        Transaction::observe(TransactionObserver::class);
+        Partner::observe(PartnerSummaryObserver::class);
+        User::observe(UserSummaryRowObserver::class);
+        PackageProfitReinvest::observe(PackageProfitReinvestSummaryObserver::class);
+        PackageProfitReinvestWithdraw::observe(PackageProfitReinvestWithdrawSummaryObserver::class);
+
         if (! app()->environment('production')) {
             Mail::alwaysTo(config('mail.staging.address'));
         }
@@ -66,6 +91,28 @@ class AppServiceProvider extends ServiceProvider
             $this->app['request']->server->set('HTTPS', 'on');
             URL::forceScheme('https');
         }
+
+        Gate::define('viewLogViewer', function ($user = null) {
+            if (class_exists(\MoonShine\Permissions\Models\MoonshineUser::class)) {
+                $guard = config('moonshine.auth.guard', 'moonshine');
+                $moonshineUser = auth($guard)->user();
+
+                return $moonshineUser && $moonshineUser->isSuperUser();
+            }
+
+            return $user && $user->isAdmin();
+        });
+
+        Gate::define('viewPulse', function ($user = null) {
+            if (class_exists(\MoonShine\Permissions\Models\MoonshineUser::class)) {
+                $guard = config('moonshine.auth.guard', 'moonshine');
+                $moonshineUser = auth($guard)->user();
+
+                return $moonshineUser && $moonshineUser->isSuperUser();
+            }
+
+            return $user && $user->isAdmin();
+        });
 
         View::composer('*', function (\Illuminate\View\View $view) {
             $view->with('isAuthPage', request()->routeIs(

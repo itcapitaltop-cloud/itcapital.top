@@ -6,6 +6,7 @@ use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TransactionStatusEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Services\User\UserBalanceCalculator;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -61,6 +62,18 @@ class Transaction extends Model
         'balance_type' => BalanceTypeEnum::class,
         'amount' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        $forgetBalance = static function (self $transaction): void {
+            if ($transaction->user_id !== null && $transaction->balance_type instanceof BalanceTypeEnum) {
+                app(UserBalanceCalculator::class)->forget($transaction->user_id, $transaction->balance_type);
+            }
+        };
+
+        static::saved($forgetBalance);
+        static::deleted($forgetBalance);
+    }
 
     public function getStatus(): TransactionStatusEnum
     {

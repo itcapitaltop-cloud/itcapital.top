@@ -21,7 +21,7 @@ IT Capital is an existing Laravel application for an investment, staking, partne
 - **Cache/Queue/Broadcast Infrastructure:** Redis, Laravel Reverb
 - **Testing:** Pest 4, PHPUnit configuration, Faker, Mockery
 - **Static Analysis and Refactoring:** Larastan/PHPStan, Laravel Pint, Rector Laravel
-- **Containers:** Docker Compose with PHP-FPM app, Nginx, PostgreSQL, and Redis services
+- **Containers:** Docker Compose with PHP-FPM app, Nginx, PostgreSQL, Redis services, and repository-local Dev Container configuration
 - **Important Packages:** `brick/money`, `spatie/laravel-activitylog`, `spatie/laravel-settings`, `spatie/sheets`, `league/csv`, `phpoffice/phpspreadsheet`, `google/apiclient`, `anhskohbo/no-captcha`
 
 ## Identified Patterns
@@ -30,6 +30,7 @@ IT Capital is an existing Laravel application for an investment, staking, partne
 - Activity logging uses `app/ActivityLog` strategies plus dedicated services under `app/Services/ActivityLog`.
 - Data schema changes are migration-driven with a substantial existing migration history.
 - Views and UI components live in `resources/views`, `app/View/Components`, `resources/js`, `resources/css`, and `resources/assets`.
+- Dev Container configuration lives in `.devcontainer/` and reuses the existing Docker Compose app stack.
 - README project rules emphasize writing Pest tests and following PHPStan.
 
 ## Architecture Notes

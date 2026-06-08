@@ -1,0 +1,5 @@
+- ## Партнерская программа
+    - [Ручной ранг пользователя](/{{route}}/{{version}}/manual-rank)
+    - [Поддержание и понижение ранга](/{{route}}/{{version}}/rank-maintenance)
+    - [Управление настройками пакетов](/{{route}}/{{version}}/package-definitions)
+    - [Обзор документации](/{{route}}/{{version}}/overview)

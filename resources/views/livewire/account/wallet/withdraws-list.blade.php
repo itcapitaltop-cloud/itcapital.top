@@ -6,7 +6,7 @@
                 <div class="flex gap-6 items-center">
                     <x-data.desc name="{{ __('livewire_deposit_crypto_amount_label') }}">
                         <p class="text-white">
-                            {{ \Brick\Money\Money::of($withdraw->amount, $withdraw->balance_type->getCurrency())->minus($withdraw->commission) }}</p>
+                            {{ \Brick\Math\BigDecimal::of($withdraw->amount)->minus($withdraw->commission)->toScale(0, \Brick\Math\RoundingMode::DOWN) }}</p>
                     </x-data.desc>
                     <x-data.desc name="{{ __('date_create') }}">
                         <p class="text-white">{{ $withdraw->created_at->format('d.m.y') }}</p>

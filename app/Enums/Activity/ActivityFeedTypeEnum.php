@@ -12,4 +12,5 @@ enum ActivityFeedTypeEnum: string
     case Staking = 'staking';
     case UserDetailUser = 'user_detail_user';
     case UserDetailAdmin = 'user_detail_admin';
+    case GlobalAdmin = 'global_admin';
 }

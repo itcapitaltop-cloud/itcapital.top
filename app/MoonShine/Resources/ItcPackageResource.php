@@ -12,6 +12,7 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDetailPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageIndexPage;
+use App\MoonShine\Pages\PromoCode\PromoCodeIndexPage;
 use App\MoonShine\Pages\User\UserDetailPage;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,6 +72,13 @@ class ItcPackageResource extends ModelResource
                 to_page(
                     page: ActivityLogIndexPage::class,
                     resource: ActivityLogResource::class
+                )
+            ),
+            ActionButton::make(
+                'Промокоды',
+                to_page(
+                    page: PromoCodeIndexPage::class,
+                    resource: PromoCodeResource::class
                 )
             ),
             ActionButton::make('Начислить прибыль', to_page(new ItcPackageDepositProfitPage())),

@@ -16,6 +16,39 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+function regularPremiumPeriodDate(): \Illuminate\Support\Carbon
+{
+    return now()->startOfWeek()->subDays(3);
+}
+
+function createRegularPremiumProfit(string $packageUuid, float $amount): void
+{
+    $profit = PackageProfit::query()->create([
+        'uuid' => 'PP-' . Str::random(10),
+        'package_uuid' => $packageUuid,
+        'amount' => $amount,
+    ]);
+
+    $profit->forceFill([
+        'created_at' => regularPremiumPeriodDate(),
+        'updated_at' => regularPremiumPeriodDate(),
+    ])->save();
+}
+
+function createRegularPremiumReinvest(string $packageUuid, float $amount): void
+{
+    $reinvest = PackageProfitReinvest::query()->create([
+        'uuid' => 'PR-' . Str::random(10),
+        'package_uuid' => $packageUuid,
+        'amount' => $amount,
+    ]);
+
+    $reinvest->forceFill([
+        'created_at' => regularPremiumPeriodDate(),
+        'updated_at' => regularPremiumPeriodDate(),
+    ])->save();
+}
+
 it('начисляет регулярную премию по активным пакетам и исключает архивные', function () {
     $upline = User::factory()->create(['rank' => 3]);
     $ref = User::factory()->create();
@@ -51,14 +84,9 @@ it('начисляет регулярную премию по активным �
         'trx_type' => TrxTypeEnum::BUY_PACKAGE,
         'balance_type' => BalanceTypeEnum::MAIN,
         'amount' => 100.00,
-        'accepted_at' => now()->subDays(1),
+        'accepted_at' => regularPremiumPeriodDate(),
     ]);
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $active->uuid,
-        'amount' => 20.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($active->uuid, 20.00);
 
     // Archived package with profits in period (must be ignored)
     $arch = ItcPackage::factory()->create([
@@ -73,12 +101,7 @@ it('начисляет регулярную премию по активным �
         'amount' => 100.00,
         'accepted_at' => now()->subDays(10),
     ]);
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $arch->uuid,
-        'amount' => 50.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($arch->uuid, 50.00);
 
     Artisan::call('regular-premium:accrual', ['--no-interaction' => true]);
 
@@ -123,14 +146,9 @@ it('процент регулярной премии зависит от ран�
         'trx_type' => TrxTypeEnum::BUY_PACKAGE,
         'balance_type' => BalanceTypeEnum::MAIN,
         'amount' => 200.00,
-        'accepted_at' => now()->subDays(1),
+        'accepted_at' => regularPremiumPeriodDate(),
     ]);
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $pkg->uuid,
-        'amount' => 10.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($pkg->uuid, 10.00);
 
     Artisan::call('regular-premium:accrual', ['--no-interaction' => true]);
 
@@ -175,22 +193,12 @@ it('учитывает реинвесты в базе расчёта регул�
         'trx_type' => TrxTypeEnum::BUY_PACKAGE,
         'balance_type' => BalanceTypeEnum::MAIN,
         'amount' => 100.00,
-        'accepted_at' => now()->subDays(1),
+        'accepted_at' => regularPremiumPeriodDate(),
     ]);
 
     // Dividends 10 + reinvest 15 => net base 25
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $pkg->uuid,
-        'amount' => 10.00,
-        'created_at' => now()->subDays(1),
-    ]);
-    PackageProfitReinvest::query()->create([
-        'uuid' => 'PR-' . Str::random(10),
-        'package_uuid' => $pkg->uuid,
-        'amount' => 15.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($pkg->uuid, 10.00);
+    createRegularPremiumReinvest($pkg->uuid, 15.00);
 
     Artisan::call('regular-premium:accrual', ['--no-interaction' => true]);
 
@@ -236,14 +244,9 @@ it('использует обновлённые глобальные проце�
         'trx_type' => TrxTypeEnum::BUY_PACKAGE,
         'balance_type' => BalanceTypeEnum::MAIN,
         'amount' => 100.00,
-        'accepted_at' => now()->subDays(1),
+        'accepted_at' => regularPremiumPeriodDate(),
     ]);
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $pkg->uuid,
-        'amount' => 100.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($pkg->uuid, 100.00);
 
     // Первое начисление с изначальным процентом 5% = 5.00
     Artisan::call('regular-premium:accrual', ['--no-interaction' => true]);
@@ -319,14 +322,9 @@ it('использует персональный оверрайд процен�
         'trx_type' => TrxTypeEnum::BUY_PACKAGE,
         'balance_type' => BalanceTypeEnum::MAIN,
         'amount' => 100.00,
-        'accepted_at' => now()->subDays(1),
+        'accepted_at' => regularPremiumPeriodDate(),
     ]);
-    PackageProfit::query()->create([
-        'uuid' => 'PP-' . Str::random(10),
-        'package_uuid' => $pkg->uuid,
-        'amount' => 100.00,
-        'created_at' => now()->subDays(1),
-    ]);
+    createRegularPremiumProfit($pkg->uuid, 100.00);
 
     Artisan::call('regular-premium:accrual', ['--no-interaction' => true]);
 

@@ -34,3 +34,20 @@ Schedule::command('profit-accrual:itc-staking')
     ->monthlyOn(1, '00:00')
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('partner:rank-maintenance')
+    ->monthlyOn(1, '00:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command('summary:reconcile')
+    ->dailyAt('04:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sendOutputTo(storage_path('logs/summary-reconcile.log'));
+
+Schedule::command('summary:warm-dashboard')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

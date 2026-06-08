@@ -6,6 +6,19 @@
 @php
     use App\Enums\Itc\PackageTypeEnum;
     use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Facades\Storage;
+
+    $displayName = $package->packageDefinition?->name ?? $package->type->getName();
+    $cardImagePath = $package->packageDefinition?->card_image_path;
+
+    if ($cardImagePath === null) {
+        Log::debug('[account.itc.package] fallback to type image', [
+            'package_id' => $package->id,
+            'package_uuid' => $package->uuid,
+            'package_type' => $package->type->value,
+            'package_definition_id' => $package->package_definition_id,
+        ]);
+    }
 @endphp
 
 <x-bg.main class="relative border-none bg-none rounded-none">
@@ -170,8 +183,8 @@
         </x-widget.modal>
 
         <div class="w-[356px] h-[208px] rounded-[28px]">
-            <img src="{{ vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
-                class="w-[356px] h-[208px] absolute z-[10]" alt="">
+            <img src="{{ $cardImagePath ? Storage::disk('public')->url($cardImagePath) : vite()->icon('/cards/bg-logo-' . $package->type->value . '.png') }}"
+                class="w-[356px] h-[208px] absolute z-[10] object-cover rounded-[28px]" alt="">
             <div class="relative z-[11] w-[356px] h-[208px]
                         bg-none">
                 <div class="relative h-full flex flex-col justify-between p-6 text-white">
@@ -239,7 +252,7 @@
                                 {{ $package->month_profit_percent }}%
                             </span>
                             <span class="uppercase text-white/90 tracking-wide text-[14px]">
-                                {{ $package->type->getName() }}
+                                {{ $displayName }}
                             </span>
                         </div>
                     </div>

@@ -87,6 +87,20 @@ class Notify
         ));
     }
 
+    public static function rankDecreased(User $user, int $rank): void
+    {
+        $badge = '<span class="flex text-[12px] items-center justify-center
+                             bg-[#B4FF59] text-[#17162D] font-semibold
+                             rounded-[4px] w-[16px] h-[17px] leading-none ml-1">' . $rank .
+                  '</span>';
+
+        $user->notify(new InAppNotification(
+            title: 'Ранг понижен',
+            message: $badge,
+            icon: 'notifications/rank.svg',
+        ));
+    }
+
     public static function referralJoined(User $user, string $refName): void
     {
         $nameHtml = '<span class="text-[#B4FF59] font-semibold">' . e($refName) . '</span>';

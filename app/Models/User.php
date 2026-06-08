@@ -55,8 +55,10 @@ use Illuminate\Notifications\Notifiable;
  * @method static \Illuminate\Database\Eloquent\Builder|User whereBannedAt($value)
  *
  * @property int $rank
+ * @property int $max_rank_awarded
  *
  * @method static \Illuminate\Database\Eloquent\Builder|User whereRank($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|User whereMaxRankAwarded($value)
  *
  * @mixin \Eloquent
  */
@@ -75,6 +77,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'username',
         'email',
         'rank',
+        'max_rank_awarded',
         'password',
         'banned_at',
         'session_version',
@@ -98,6 +101,8 @@ final class User extends Authenticatable implements MustVerifyEmail
         'password',
         'remember_token',
     ];
+
+    private ?int $cachedUnreadNotificationsCount = null;
 
     /**
      * Get the attributes that should be cast.
@@ -218,7 +223,7 @@ final class User extends Authenticatable implements MustVerifyEmail
 
     public function summary(): HasOne
     {
-        return $this->hasOne(UserSummary::class, 'user_id');
+        return $this->hasOne(UserSummary::class);
     }
 
     protected function reinvestsSum(): Attribute
@@ -358,5 +363,17 @@ final class User extends Authenticatable implements MustVerifyEmail
         $this->save();
 
         return $this;
+    }
+
+    /**
+     * Number of unread notifications, memoized for the current request.
+     *
+     * The dashboard layout reads this in two places on a single page load (the
+     * Alpine store bootstrap and the notifications dropdown component); sharing
+     * one count avoids running the same aggregate query twice.
+     */
+    public function unreadNotificationsCount(): int
+    {
+        return $this->cachedUnreadNotificationsCount ??= $this->unreadNotifications()->count();
     }
 }

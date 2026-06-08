@@ -6,7 +6,7 @@ ARG POSTGRES_VERSION=15
 
 WORKDIR /var/www/html
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 ENV SUPERVISOR_PHP_COMMAND="/usr/sbin/php-fpm8.4 -F"
 ENV SUPERVISOR_PHP_USER="root"
@@ -25,7 +25,6 @@ RUN apt-get update \
     php8.4-xml php8.4-zip php8.4-bcmath php8.4-soap \
     php8.4-intl php8.4-readline \
     php8.4-ldap php8.4-igbinary php8.4-redis php8.4-imagick \
-    && curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer \
     && curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && curl -sS https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/keyrings/pgdg.gpg >/dev/null \
@@ -35,6 +34,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && apt-get update \
     && apt-get install -y postgresql-client
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
 

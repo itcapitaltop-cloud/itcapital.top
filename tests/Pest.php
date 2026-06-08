@@ -45,3 +45,58 @@ function something()
 {
     // ..
 }
+
+/**
+ * Create a partner rank with an optional single line-turnover requirement.
+ *
+ * A rank with no line requirement is always "met" (used as a fallback rank
+ * by the natural-rank calculation).
+ */
+function createPartnerRank(int $rank, ?float $lineRequired = null, int $line = 1, float $bonus = 0.0): \App\Models\PartnerRank
+{
+    $partnerRank = \App\Models\PartnerRank::factory()->create([
+        'rank' => $rank,
+        'bonus_usd' => $bonus,
+    ]);
+
+    if ($lineRequired !== null) {
+        \App\Models\PartnerRankRequirement::factory()->create([
+            'partner_rank_id' => $partnerRank->id,
+            'line' => $line,
+            'required_turnover' => $lineRequired,
+            'personal_deposit' => null,
+        ]);
+    }
+
+    return $partnerRank;
+}
+
+/**
+ * Attach a downline on the given line to $ancestor and record a BUY_PACKAGE
+ * turnover transaction accepted at $acceptedAt. Returns the downline user.
+ */
+function addPartnerLineTurnover(
+    \App\Models\User $ancestor,
+    float $amount,
+    \DateTimeInterface $acceptedAt,
+    int $line = 1
+): \App\Models\User {
+    $downline = \App\Models\User::factory()->create();
+
+    \App\Models\PartnerClosure::factory()->create([
+        'ancestor_id' => $ancestor->id,
+        'descendant_id' => $downline->id,
+        'depth' => $line,
+    ]);
+
+    \App\Models\Transaction::factory()->create([
+        'user_id' => $downline->id,
+        'trx_type' => \App\Enums\Transactions\TrxTypeEnum::BUY_PACKAGE,
+        'balance_type' => \App\Enums\Transactions\BalanceTypeEnum::MAIN,
+        'amount' => $amount,
+        'accepted_at' => $acceptedAt,
+        'rejected_at' => null,
+    ]);
+
+    return $downline;
+}

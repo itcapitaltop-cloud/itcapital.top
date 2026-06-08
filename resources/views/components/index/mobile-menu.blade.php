@@ -38,9 +38,11 @@
                     </x-account.nav-button>
                 </ul>
 
-                <div class="w-full">
-                    <livewire:news.index position="mobile-menu" limit="2"/>
-                </div>
+                @unless(request()->routeIs('news.index'))
+                    <div class="w-full">
+                        <livewire:news.index position="mobile-menu" limit="2"/>
+                    </div>
+                @endunless
             </div>
 
             <div class="w-full shrink-0 mt-auto">

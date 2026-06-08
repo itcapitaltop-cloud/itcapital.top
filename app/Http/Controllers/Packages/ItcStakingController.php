@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Packages;
 
+use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Itc\StakingTransactionAccrualEnum;
+use App\Enums\LogActionTypeEnum;
 use App\Http\Controllers\Controller;
 use App\Models\ItcPackage;
+use App\Models\TokenRate;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Package\Staking\StakingAccrualService;
@@ -131,15 +134,59 @@ final class ItcStakingController extends Controller
 
     public function changeTokenRate(MoonShineRequest $request, TokenRateResolver $tokenRateResolver): MoonShineJsonResponse
     {
-        $tokenRateResolver->upsertRate(
+        $tokenRateId = $request->integer('token_rate_id') ?: null;
+        $existingTokenRate = $tokenRateId !== null
+            ? TokenRate::query()->find($tokenRateId)
+            : TokenRate::query()->whereDate('effective_from', $request->input('effective_from'))->first();
+        $oldValues = $existingTokenRate instanceof TokenRate
+            ? $this->tokenRateActivityValues($existingTokenRate)
+            : [];
+
+        $admin = auth()->user();
+        $tokenRate = $tokenRateResolver->upsertRate(
             $request->input('effective_from'),
             (float) $request->input('rate'),
-            $request->integer('token_rate_id') ?: null
+            $tokenRateId
         );
+
+        activity('admin')
+            ->performedOn($tokenRate)
+            ->causedBy($admin)
+            ->withProperties([
+                'feeds' => [ActivityFeedTypeEnum::GlobalAdmin->value],
+                'admin_login' => $this->adminActivityLogin($admin),
+                'old_values' => $oldValues,
+                'new_values' => $this->tokenRateActivityValues($tokenRate),
+            ])
+            ->log(LogActionTypeEnum::UPSERT_TOKEN_RATE->value);
 
         return MoonShineJsonResponse::make()
             ->toast('Курс токена сохранен', ToastType::SUCCESS)
             ->redirect(request()->headers->get('referer'));
+    }
+
+    /**
+     * @return array{effective_from:string,rate:string}
+     */
+    private function tokenRateActivityValues(TokenRate $tokenRate): array
+    {
+        return [
+            'effective_from' => $tokenRate->effective_from?->format('d.m.Y') ?? '',
+            'rate' => (string) $tokenRate->rate,
+        ];
+    }
+
+    private function adminActivityLogin(mixed $admin): string
+    {
+        foreach (['username', 'login', 'email', 'name'] as $attribute) {
+            $value = data_get($admin, $attribute);
+
+            if (is_scalar($value) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return '';
     }
 
     public function deleteTokenRate(int $tokenRateId, TokenRateResolver $tokenRateResolver): MoonShineJsonResponse

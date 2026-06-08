@@ -43,7 +43,7 @@ final class ChangedStartBonusPercentComponent
                 Hidden::make('user_id')->fill($package->transaction->user_id),
 
                 Number::make('Процент стартовой премии', 'percent')
-                    ->fill(User::findOrFail($package->transaction->user_id)->setting('start_bonus_staking_percent', app(GeneralSetting::class)->start_bonus_staking_percent))
+                    ->fill(($package->transaction->user ?? User::findOrFail($package->transaction->user_id))->setting('start_bonus_staking_percent', app(GeneralSetting::class)->start_bonus_staking_percent))
                     ->customAttributes(
                         [
                             'wire:model.defer' => 'percent',

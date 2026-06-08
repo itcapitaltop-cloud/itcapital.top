@@ -414,6 +414,8 @@ it('добавляет сумму в staking пакет через админк�
 
     $package = app(StakingPurchaseService::class)->createPackage($user->id, 300);
 
+    $this->withoutMiddleware();
+
     $this->actingAs($admin)
         ->post("/itcapitalmoonshineadminpanel/itc-staking/package/staking/{$package->uuid}", [
             'profit_percent' => $package->month_profit_percent,
@@ -481,4 +483,32 @@ it('показывает admin изменение staking баланса в по
         ->all();
 
     expect($logs)->toContain('Баланс пакета ITC-Rdmng7NE2e изменен администратором с 1918.27 на 1928.27');
+});
+
+it('показывает повышение партнерского ранга в пользовательском журнале', function () {
+    $user = User::factory()->create();
+
+    app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+        type: ActivityEventTypeEnum::PartnerRankIncreased,
+        userId: $user->id,
+        subject: $user,
+        feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+        properties: [
+            'old_rank' => 1,
+            'new_rank' => 2,
+            'bonus_awarded' => true,
+        ],
+        causer: $user,
+        logName: 'partners',
+        context: 'rank',
+    ));
+
+    $activity = BusinessActivity::query()
+        ->where('description', ActivityEventTypeEnum::PartnerRankIncreased->value)
+        ->latest('id')
+        ->firstOrFail();
+
+    $text = app(\App\ActivityLog\ActivityManager::class)->resolve($activity);
+
+    expect($text)->toBe('Партнерский ранг повышен с 1 до 2');
 });

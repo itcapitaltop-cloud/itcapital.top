@@ -57,8 +57,8 @@ class SignUp extends Component
             'passwordConfirm' => 'required',
         ];
 
-        // Добавляем капчу только если не локальная среда
-        if (! app()->environment('local')) {
+        // Добавляем капчу только если не dev/local среда
+        if (! app()->environment(['local', 'dev'])) {
             $rules['gRecaptchaResponse'] = 'required|captcha';
         }
 

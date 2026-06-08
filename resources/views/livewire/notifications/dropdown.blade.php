@@ -8,9 +8,9 @@
             if (window.Echo) {
                 window.Echo.private('App.Models.User.{{ auth()->id() }}')
                     .notification((n) => {
-                        // обновляем счётчик и, если открыт список, подгружаем первую страницу
+                        // обновляем счётчик и, если открыт список, сбрасываем окно подгрузки
                         $wire.refreshCount();
-                        if (this.open && $wire.tab === 'unread') $wire.resetPage();
+                        if (this.openNotifications && $wire.tab === 'unread') $wire.resetFeedPaging();
                     });
             }
         }
@@ -53,8 +53,8 @@
         </div>
 
         {{-- Список --}}
-        <div class="px-4 pb-4 max-h-[65vh] overflow-y-auto space-y-[8px] overflow-x-hidden">
-            @forelse($this->items as $n)
+        <div data-notif-scroll class="px-4 pb-4 max-h-[65vh] overflow-y-auto space-y-[8px] overflow-x-hidden">
+            @forelse($items as $n)
                 @php
                     $d = $n->data;
 //                    Log::channel('source')->debug($d);
@@ -127,9 +127,28 @@
                 <div class="px-2 py-6 text-center opacity-70">{{ __('no_notifications') }}</div>
             @endforelse
 
-            {{--            <div class="mt-2">--}}
-            {{--                {{ $this->items->links(data: ['scrollTo' => false]) }}--}}
-            {{--            </div>--}}
+            {{-- Сентинел бесконечной подгрузки уведомлений. wire:key завязан на
+                 текущее окно, чтобы после догрузки элемент пересоздавался и
+                 observer навешивался заново. root — внутренний скролл-контейнер. --}}
+            @if ($hasMore)
+                <div
+                    wire:key="notif-loader-{{ $feedPerPage }}"
+                    x-data
+                    x-init="
+                        const root = $el.closest('[data-notif-scroll]');
+                        const observer = new IntersectionObserver((entries) => {
+                            if (entries[0].isIntersecting) {
+                                observer.disconnect();
+                                $wire.loadMoreFeed();
+                            }
+                        }, { root, rootMargin: '120px' });
+                        observer.observe($el);
+                    "
+                    class="flex justify-center py-3"
+                >
+                    <span class="text-white/40 text-sm">{{ __('loading') }}</span>
+                </div>
+            @endif
         </div>
     </div>
 </div>

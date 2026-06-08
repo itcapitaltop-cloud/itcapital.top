@@ -33,7 +33,10 @@ if (! function_exists('hasPackage')) {
             return false;
         }
 
-        return Transaction::query()
+        /** @var array<int, bool> $cache */
+        static $cache = [];
+
+        return $cache[$userId] ??= Transaction::query()
             ->where('user_id', $userId)
             ->whereHas('itcPackage')
             ->exists();

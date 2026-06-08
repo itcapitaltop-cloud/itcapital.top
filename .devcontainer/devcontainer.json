@@ -1,0 +1,49 @@
+{
+    "name": "IT Capital Laravel",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "app",
+    "workspaceFolder": "/var/www/html",
+    "remoteUser": "sail",
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "forwardPorts": [80, 8080, 5173, 5432, 6379],
+    "portsAttributes": {
+        "80": {
+            "label": "Nginx HTTP"
+        },
+        "8080": {
+            "label": "Laravel Reverb"
+        },
+        "5173": {
+            "label": "Vite Dev Server"
+        },
+        "5432": {
+            "label": "PostgreSQL"
+        },
+        "6379": {
+            "label": "Redis"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "xdebug.php-debug",
+                "onecentlin.laravel-blade",
+                "bradlc.vscode-tailwindcss",
+                "esbenp.prettier-vscode",
+                "open-southeners.laravel-pint",
+                "sanderronde.phpstan-vscode",
+                "kilocode.kilo-code",
+                "laravel.vscode-laravel",
+                "bradlc.vscode-tailwindcss"
+            ],
+            "settings": {
+                "php.validate.executablePath": "/usr/bin/php8.4",
+                "intelephense.environment.phpVersion": "8.4.0",
+                "tailwindCSS.includeLanguages": {
+                    "blade": "html"
+                }
+            }
+        }
+    }
+}

@@ -27,7 +27,7 @@
                 });
 
                 Alpine.store('notifications', {
-                    unread: @json(auth()?->user()?->unreadNotifications()->count() ?? 0),
+                    unread: @json(auth()?->user()?->unreadNotificationsCount() ?? 0),
                 });
 
                 window.addEventListener('notifications:count', (e) => {

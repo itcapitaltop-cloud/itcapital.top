@@ -44,7 +44,7 @@ class WithdrawIndexPage extends IndexPage
                 // тут тоже можно логировать, если нужно
                 return BigDecimal::of($item->transaction->amount)
                     ->minus($item->commission)
-                    ->toScale(2, RoundingMode::HALF_UP)
+                    ->toScale(0, RoundingMode::DOWN)
                     ->stripTrailingZeros();
             })->showOnExport(),
             Url::make(

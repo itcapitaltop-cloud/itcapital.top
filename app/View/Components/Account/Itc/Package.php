@@ -1,22 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\View\Components\Account\Itc;
 
-use App\Enums\Itc\PackageTypeEnum;
 use App\Models\ItcPackage;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
 
-class Package extends Component
+final class Package extends Component
 {
     /**
      * Create a new component instance.
      */
     public function __construct(
         public ItcPackage $package
-    )
-    {
+    ) {
         //
     }
 
@@ -26,5 +26,15 @@ class Package extends Component
     public function render(): View|Closure|string
     {
         return view('components.account.itc.package');
+    }
+
+    public function displayName(): string
+    {
+        return $this->package->packageDefinition?->name ?? $this->package->type->getName();
+    }
+
+    public function cardImagePath(): ?string
+    {
+        return $this->package->packageDefinition?->card_image_path;
     }
 }

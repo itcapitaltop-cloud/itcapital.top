@@ -20,4 +20,7 @@ return [
     'extend_package_reinvest_profit' => 'Продление срока реинвеста профита',
     'close_itc_package' => 'Закрытие пакета',
     'update_regular_bonus' => 'Изменение регулярной премии',
+    'upsert_token_rate' => 'Создание/обновление курса токена',
+    'create_token_rate' => 'Создание курса токена',
+    'update_token_rate' => 'Обновление курса токена',
 ];

@@ -72,6 +72,8 @@ final class ActivityManager
         );
         $stakingPurchaseRate = $this->formatRate($activity->getExtraProperty('purchase_rate'));
         $stakingExchangeRate = $this->formatRate($activity->getExtraProperty('exchange_rate'));
+        $oldRank = (string) ($activity->getExtraProperty('old_rank') ?? '');
+        $newRank = (string) ($activity->getExtraProperty('new_rank') ?? '');
 
         return match ($type) {
             ActivityEventTypeEnum::DepositRequested => __('activity/feed.business.deposit_requested', ['details' => $financeDetails, 'amount' => $amount]),
@@ -95,6 +97,8 @@ final class ActivityManager
             ActivityEventTypeEnum::BecameReferralOfUser => __('activity/feed.business.became_referral_of_user', ['username' => $username]),
             ActivityEventTypeEnum::PartnerRegularBonusReceived => __('activity/feed.business.partner_regular_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
             ActivityEventTypeEnum::PartnerStartBonusReceived => __('activity/feed.business.partner_start_bonus_received', ['amount' => $amount, 'username' => $username, 'line' => $line]),
+            ActivityEventTypeEnum::PartnerRankIncreased => __('activity/feed.business.partner_rank_increased', ['old_rank' => $oldRank, 'new_rank' => $newRank]),
+            ActivityEventTypeEnum::PartnerRankDecreased => __('activity/feed.business.partner_rank_decreased', ['old_rank' => $oldRank, 'new_rank' => $newRank]),
             ActivityEventTypeEnum::StakingRegularBonusReceived => __('activity/feed.business.staking_regular_bonus_received', ['amount' => $amount, 'username' => $username]),
             ActivityEventTypeEnum::StakingStartBonusReceived => __('activity/feed.business.staking_start_bonus_received', ['amount' => $amount, 'username' => $username]),
             ActivityEventTypeEnum::PartnerToMainTransferred => __('activity/feed.business.partner_to_main_transferred', ['amount' => $amount]),
@@ -104,6 +108,11 @@ final class ActivityManager
             ActivityEventTypeEnum::StakingPackagePurchased => __('activity/feed.business.staking_package_purchased', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingPackageToppedUp => __('activity/feed.business.staking_package_topped_up', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingProfitAccrued => __('activity/feed.business.staking_profit_accrued', ['uuid' => $packageUuid, 'profit' => $profit, 'rate' => $stakingExchangeRate]),
+            ActivityEventTypeEnum::PromoCodeApplied => __('activity/feed.business.promo_code_applied', [
+                'promo_code' => (string) ($activity->getExtraProperty('promo_code') ?? ''),
+                'original_threshold' => $this->formatAmount($activity->getExtraProperty('original_threshold', '0')),
+                'effective_threshold' => $this->formatAmount($activity->getExtraProperty('effective_threshold', '0')),
+            ]),
         };
     }
 

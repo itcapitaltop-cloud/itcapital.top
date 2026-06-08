@@ -25,11 +25,14 @@ use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Pages\User\UserFormPage;
 use App\MoonShine\Pages\User\UserIndexPage;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Package\PackageDefinitionResolver;
 use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\User\UserRankServices;
 use Carbon\Carbon;
 use Closure;
 use Exception;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
@@ -61,13 +64,28 @@ class UserResource extends ModelResource
 
     protected bool $saveFilterState = false;
 
+    protected array $with = ['summary'];
+
+    private ?Paginator $cachedPaginator = null;
+
+    /**
+     * Мемоизируем paginate(), чтобы повторный вызов внутри страницы индекса
+     * (явный в UserIndexPage::mainLayer() + внутренний в parent::mainLayer())
+     * не выполнял запросы count(*) и eager-load summary дважды.
+     *
+     * @throws Throwable
+     */
+    public function paginate(): Paginator
+    {
+        return $this->cachedPaginator ??= parent::paginate();
+    }
+
     /**
      * @return list<Page>
      */
     public function filters(): array
     {
         return [
-
             Range::make('Баланс', 'buy_packages_sum')
                 ->onApply(function (Builder $q, array $value) {
                     // если ни from, ни to не заданы — ничего не делаем
@@ -188,45 +206,6 @@ class UserResource extends ModelResource
     public function indexButtons(): array
     {
         return [];
-    }
-
-    public function query(): Builder
-    {
-        $debits = collect(TrxTypeEnum::getDebits())->map(fn (TrxTypeEnum $type) => $type->value)->toArray();
-        $credits = collect(TrxTypeEnum::getCredits())->map(fn (TrxTypeEnum $type) => $type->value)->toArray();
-
-        $debitsList = "'" . implode("','", $debits) . "'";
-        $creditsList = "'" . implode("','", $credits) . "'";
-
-        $q = parent::query()
-            ->leftJoin('user_summary', 'user_summary.user_id', 'users.id')
-            ->select([
-                'users.*',
-                'user_summary.buy_packages_sum   as buy_packages_sum',
-                'user_summary.reinvests_sum     as reinvests_sum',
-                'user_summary.investments_sum     as investments_sum',
-                DB::raw("COALESCE((
-                    SELECT SUM(
-                        CASE
-                            WHEN transactions.trx_type IN ($debitsList)
-                                 AND transactions.accepted_at IS NOT NULL
-                                 AND transactions.rejected_at IS NULL
-                                THEN transactions.amount
-                            WHEN transactions.trx_type IN ($creditsList)
-                                 AND transactions.rejected_at IS NULL
-                                THEN -transactions.amount
-                            ELSE 0
-                        END
-                    )
-                    FROM transactions
-                    WHERE transactions.user_id = users.id
-                      AND transactions.balance_type = 'partner'
-                ), 0) as partner_balance"),
-                'user_summary.partners_count    as partners_count',
-                'user_summary.first_package_at  as first_package_at',
-            ]);
-
-        return $q;
     }
 
     public function resolveItemQuery(): Builder
@@ -560,17 +539,50 @@ class UserResource extends ModelResource
     ): MoonShineJsonResponse {
         $itcRepo = app(ItcPackageRepositoryContract::class);
         $transactionRepo = app(TransactionRepositoryContract::class);
+        $packageDefinitionResolver = app(PackageDefinitionResolver::class);
 
         $userId = (int) $request->input('user_id');
+        $packageDefinition = $packageDefinitionResolver->resolveById((int) $request->input('package_definition_id'));
+        $packageType = $packageDefinition->type;
 
-        if ($request->input('packageType') === PackageTypeEnum::STAKING->value) {
+        Log::debug('[UserResource.createPackage] start', [
+            'admin_id' => auth()->id(),
+            'target_user_id' => $userId,
+            'package_definition_id' => $packageDefinition->id,
+            'package_slug' => $packageDefinition->slug,
+            'package_type' => $packageType->value,
+            'requested_amount' => $request->input('amount'),
+            'requested_percent' => $request->input('percent'),
+            'requested_duration' => $request->input('duration'),
+        ]);
+
+        $shouldRecalculateRanks = false;
+
+        if ($packageType === PackageTypeEnum::STAKING) {
             $package = CreateStakingPackageAction::make()
-                ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'));
+                ->run($userId, (float) $request->input('amount'), (float) $request->input('percent'), $packageDefinition->id);
 
             new StakingAccrualService()
                 ->accrueAdminTopUpBonus($package, (float) $request->input('amount'), $userId);
+
+            $shouldRecalculateRanks = true;
         } else {
-            $isPresent = $request->input('packageType') === PackageTypeEnum::PRESENT->value;
+            $isPresent = $packageType === PackageTypeEnum::PRESENT;
+            $durationMonths = $isPresent
+                ? (int) $request->input('duration')
+                : $packageDefinition->duration_months;
+            $profitPercent = $request->input('percent') ?: $packageDefinition->default_profit_percent;
+
+            Log::debug('[UserResource.createPackage] resolved package definition', [
+                'admin_id' => auth()->id(),
+                'target_user_id' => $userId,
+                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+                'default_profit_percent' => $packageDefinition->default_profit_percent,
+                'selected_profit_percent' => $profitPercent,
+                'definition_duration_months' => $packageDefinition->duration_months,
+                'selected_duration_months' => $durationMonths,
+            ]);
 
             /* DTO транзакции */
             $dto = new CreateTransactionDto(
@@ -584,12 +596,13 @@ class UserResource extends ModelResource
 
             /* Данные пакета */
             $packageData = [
-                'type' => $request->input('packageType'),
-                'month_profit_percent' => $request->input('percent'),
+                'package_definition_id' => $packageDefinition->id,
+                'type' => $packageType,
+                'month_profit_percent' => $profitPercent,
                 'work_to' => $isPresent
-                    ? now()->addMonths((int) $request->input('duration'))
-                    : now()->addWeeks(30),
-                'duration_months' => $request->input('duration'),
+                    ? now()->addMonths($durationMonths)
+                    : now()->addMonths($durationMonths ?? 0),
+                'duration_months' => $durationMonths,
             ];
 
             /* Создание через репозиторий */
@@ -599,6 +612,19 @@ class UserResource extends ModelResource
                 transactionRepo: $transactionRepo,
                 skipBalance: $isPresent
             );
+
+            $shouldRecalculateRanks = ! $isPresent;
+
+            Log::info('[UserResource.createPackage] package creation completed', [
+                'admin_id' => auth()->id(),
+                'target_user_id' => $userId,
+                'package_type' => $packageType->value,
+                'package_definition_id' => $packageDefinition->id,
+            ]);
+        }
+
+        if ($shouldRecalculateRanks) {
+            Artisan::call('user:use-rank');
         }
 
         $url = to_page(
@@ -614,8 +640,9 @@ class UserResource extends ModelResource
 
     public function saveLevelOverride(MoonShineRequest $request): MoonShineJsonResponse
     {
+        $data = [];
+
         try {
-            Log::channel('source')->debug($request->session()->token());
             $data = $request->all();
 
             $userId = $data['user_id'] ?? null;
@@ -628,6 +655,16 @@ class UserResource extends ModelResource
             // Статусы галочек
             $overrideEnabled = (bool) ($data['override_enabled'] ?? false);
             $overriddenRank = (bool) ($data['overridden_rank'] ?? false);
+
+            Log::debug('[UserResource.saveLevelOverride] start', [
+                'user_id' => $user->id,
+                'old_rank' => $user->rank,
+                'requested_rank' => $data['rank'] ?? null,
+                'old_overridden_rank' => (bool) $user->overridden_rank,
+                'requested_overridden_rank' => $overriddenRank,
+                'old_overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                'override_enabled' => $overrideEnabled,
+            ]);
 
             $url = to_page(
                 page: new UserDetailPage(),
@@ -646,15 +683,42 @@ class UserResource extends ModelResource
             }
 
             if (! $overriddenRank && $user->overridden_rank) {
-                $user->overridden_rank = false;
-                $user->overridden_rank_from = null;
-                $user->save();
-                Artisan::call('user:use-rank --no-bonus', ['--user' => $user->id]);
+                $oldRank = (int) $user->rank;
+
+                $user->forceFill([
+                    'overridden_rank' => false,
+                    'overridden_rank_from' => null,
+                ])->save();
+
+                $user->refresh();
+                app(UserRankServices::class)->recalculateAndUpdateRank($user, false);
+                $user->refresh();
+
+                Log::info('[UserResource.saveLevelOverride] manual rank disabled and natural rank restored', [
+                    'user_id' => $user->id,
+                    'old_rank' => $oldRank,
+                    'natural_rank' => $user->rank,
+                    'overridden_rank' => (bool) $user->overridden_rank,
+                    'overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                ]);
             } else {
+                $resetOverrideDate = $overriddenRank
+                    && (! $user->overridden_rank || (int) $user->rank !== (int) $rank);
+
                 $user->rank = $rank;
                 $user->overridden_rank = $overriddenRank;
-                $user->overridden_rank_from = $overriddenRank ? now() : null;
+                $user->overridden_rank_from = $overriddenRank
+                    ? ($resetOverrideDate ? now() : $user->overridden_rank_from)
+                    : null;
                 $user->save();
+
+                Log::debug('[UserResource.saveLevelOverride] manual rank state saved', [
+                    'user_id' => $user->id,
+                    'rank' => $user->rank,
+                    'overridden_rank' => (bool) $user->overridden_rank,
+                    'overridden_rank_from' => $user->overridden_rank_from?->toDateTimeString(),
+                    'reset_override_date' => $resetOverrideDate,
+                ]);
             }
 
             if (! $overrideEnabled) {
@@ -723,6 +787,12 @@ class UserResource extends ModelResource
                 ->toast('Сохранено')
                 ->redirect($url);
         } catch (Throwable $e) {
+            Log::error('[UserResource.saveLevelOverride] failed', [
+                'user_id' => $data['user_id'] ?? null,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
             return MoonShineJsonResponse::make()
                 ->toast('Ошибка: ' . $e->getMessage(), 'error');
         }

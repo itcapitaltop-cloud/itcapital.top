@@ -2,9 +2,7 @@
 
 namespace App\Livewire\Account\Dashboard;
 
-use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Enums\Itc\PackageTypeEnum;
-use App\Enums\Transactions\BalanceTypeEnum;
 use App\Models\ItcPackage;
 use App\Services\Package\Staking\StakingPerformanceService;
 use Illuminate\Support\Facades\Auth;
@@ -30,20 +28,27 @@ class BalancePill extends Component
             ]);
         }
 
-        $transactionRepo = app(TransactionRepositoryContract::class);
-
-        $packages = ItcPackage::query()
-            ->whereHas('transaction', fn ($query) => $query->where('user_id', auth()->id()))
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
-            ->get()
-            ->filter(fn (ItcPackage $package) => $package->type === PackageTypeEnum::STAKING);
-
-        $balanceStaking = app(StakingPerformanceService::class)->forPackages($packages)['total_tokens'];
+        $userSummary = auth()->user()->summary;
 
         return view('livewire.account.dashboard.balance-pill', [
-            'mainBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::MAIN),
-            'partnerBalanceAmount' => $transactionRepo->getBalanceAmountByUserIdAndType(Auth::id(), BalanceTypeEnum::PARTNER),
-            'balanceStaking' => $balanceStaking,
+            'mainBalanceAmount' => $userSummary->investments_sum,
+            'partnerBalanceAmount' => $userSummary->partner_balance,
+            'balanceStaking' => $this->stakingBalance(),
         ]);
+    }
+
+    private function stakingBalance(): float
+    {
+        $packages = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', fn ($query) => $query->where('user_id', auth()->id()))
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases', 'packageDefinition'])
+            ->get();
+
+        if ($packages->isEmpty()) {
+            return 0.0;
+        }
+
+        return app(StakingPerformanceService::class)->forPackages($packages)['total_tokens'];
     }
 }

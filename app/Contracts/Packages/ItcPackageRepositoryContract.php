@@ -7,10 +7,12 @@ use App\Dto\Transactions\CreateTransactionDto;
 use App\Models\User;
 use Brick\Math\BigDecimal;
 use Closure;
+use Illuminate\Support\Collection;
 
 interface ItcPackageRepositoryContract
 {
     public function getCurrentProfitAmountByPackageUuid(string $uuid): BigDecimal;
+
     public function whenCurrentProfitAmountIsPositive(string $uuid, Closure $callback): void;
 
     public function closePackage(
@@ -32,11 +34,20 @@ interface ItcPackageRepositoryContract
      */
     public function personalDepositToPackage(User $user): float;
 
-
     /**
      * @param \App\Models\User $user
      * @param \DateTime|null $fromDate
      * @return float
      */
     public function personalDepositSince(User $user, ?\DateTime $fromDate): float;
+
+    /**
+     * Сумма реинвестов по пользователям в окне [fromDate, toDate).
+     *
+     * @param \Illuminate\Support\Collection<int, int> $userIds
+     * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по created_at реинвеста)
+     * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по created_at реинвеста)
+     * @return float
+     */
+    public function reinvestAmountForUsers(Collection $userIds, ?\DateTimeInterface $fromDate = null, ?\DateTimeInterface $toDate = null): float;
 }

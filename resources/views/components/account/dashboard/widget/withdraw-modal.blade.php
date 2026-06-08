@@ -16,7 +16,7 @@
                 </x-ui.input>
                 <p x-show="$wire.withdrawForm.amount >= 10" class="text-white px-4 pt-1.5">
                     {{ __('components_account_dashboard_widget_deposit_modal_withdraw_amount_to_withdraw') }}
-                    <span x-text="($wire.withdrawForm.amount * 0.98 - 2).toFixed(2)"></span>
+                    <span x-text="Math.floor($wire.withdrawForm.amount * 0.98 - 2)"></span>
                 </p>
                 <x-ui.input class="mt-4" name="withdrawForm.address" placeholder="WALLET_ADDRESS">
                     {{ __('components_account_dashboard_widget_deposit_modal_withdraw_address_label') }} (USDT {{config('wallet.network')}}):

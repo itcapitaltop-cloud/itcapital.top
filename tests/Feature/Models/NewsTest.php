@@ -5,20 +5,15 @@ use App\Models\News;
 
 it('shows only published academy news on the public index page', function () {
     $publishedNews = News::factory()->create([
-        'title' => [
-            'ru' => 'Опубликованная новость',
-            'en' => 'Published news',
-            'zh' => '已发布新闻',
-        ],
         'category' => NewsCategoryEnum::Analytics,
     ]);
+    $publishedNews->translations()->where('locale', 'ru')->update([
+        'title' => 'Опубликованная новость',
+    ]);
 
-    $draftNews = News::factory()->unpublished()->create([
-        'title' => [
-            'ru' => 'Черновик',
-            'en' => 'Draft',
-            'zh' => '草稿',
-        ],
+    $draftNews = News::factory()->unpublished()->create();
+    $draftNews->translations()->where('locale', 'ru')->update([
+        'title' => 'Черновик',
     ]);
 
     $response = $this->withSession(['locale' => 'ru'])
@@ -34,27 +29,13 @@ it('shows only published academy news on the public index page', function () {
 
 it('renders localized public academy news content', function () {
     $news = News::factory()->create([
-        'title' => [
-            'ru' => 'Русский заголовок',
-            'en' => 'English title',
-            'zh' => '中文标题',
-        ],
-        'mobile_preview' => [
-            'ru' => 'Короткий русский анонс',
-            'en' => 'Short English teaser',
-            'zh' => '中文短预览',
-        ],
-        'web_preview' => [
-            'ru' => 'Русский веб-анонс',
-            'en' => 'English web teaser',
-            'zh' => '中文网页预览',
-        ],
-        'content' => [
-            'ru' => 'Русский текст новости',
-            'en' => 'English news body',
-            'zh' => '中文新闻正文',
-        ],
         'category' => NewsCategoryEnum::ItCapitalNews,
+    ]);
+    $news->translations()->where('locale', 'zh')->update([
+        'title' => '中文标题',
+        'mobile_preview' => '中文短预览',
+        'web_preview' => '中文网页预览',
+        'content' => '中文新闻正文',
     ]);
 
     $response = $this->withSession(['locale' => 'zh'])

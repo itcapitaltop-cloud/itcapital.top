@@ -12,6 +12,7 @@ use App\Models\ItcPackage;
 use App\Models\StakingPurchase;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\Token\TokenRateResolver;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 
 final class StakingPurchaseService
@@ -21,7 +22,7 @@ final class StakingPurchaseService
         private readonly StakingAccrualService $stakingAccrualService,
     ) {}
 
-    public function createPackage(int $userId, float $amountUsd, float $monthProfitPercent = 2.0): ItcPackage
+    public function createPackage(int $userId, float $amountUsd, ?float $monthProfitPercent = null): ItcPackage
     {
         return DB::transaction(function () use ($userId, $amountUsd, $monthProfitPercent): ItcPackage {
             $package = CreateStakingPackageAction::make()->run($userId, $amountUsd, $monthProfitPercent);
@@ -35,7 +36,7 @@ final class StakingPurchaseService
     public function addPurchase(ItcPackage $package, float $amountUsd, int $userId): StakingPurchase
     {
         return DB::transaction(function () use ($package, $amountUsd, $userId): StakingPurchase {
-            $package->transaction()->increment('amount', $amountUsd);
+            $this->incrementTransactionAmount($package, $amountUsd);
 
             return $this->recordPurchase(
                 $package->fresh(['transaction']),
@@ -52,7 +53,7 @@ final class StakingPurchaseService
             $purchaseRate = $this->tokenRateResolver->currentRate();
             $amountUsd = round($tokenAmount * $purchaseRate, 2);
 
-            $package->transaction()->increment('amount', $amountUsd);
+            $this->incrementTransactionAmount($package, $amountUsd);
 
             $purchase = $package->stakingPurchases()->create([
                 'user_id' => $userId,
@@ -66,6 +67,20 @@ final class StakingPurchaseService
 
             return $purchase;
         });
+    }
+
+    /**
+     * Increase the package's transaction amount through Eloquent so the
+     * `updated` event fires and TransactionObserver recomputes user_summary.
+     * A raw `increment()` bypasses model events and leaves the projection stale.
+     */
+    private function incrementTransactionAmount(ItcPackage $package, float $amountUsd): void
+    {
+        $transaction = $package->transaction;
+
+        $transaction->update([
+            'amount' => (string) BigDecimal::of($transaction->amount)->plus($amountUsd),
+        ]);
     }
 
     public function recordPurchase(
@@ -95,6 +110,7 @@ final class StakingPurchaseService
                     'amount' => (string) round($amountUsd, 2),
                     'package_uuid' => $package->uuid,
                     'package_type' => $package->type->value,
+                    'package_definition_id' => $package->package_definition_id,
                     'token_amount' => $tokenAmount,
                     'purchase_rate' => round($purchaseRate, 6),
                 ],

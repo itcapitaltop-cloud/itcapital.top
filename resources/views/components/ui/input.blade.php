@@ -4,6 +4,7 @@
     'placeholder'  => '',
     'required' => false,
     'readonly' => false,
+    'disabled' => false,
     'validate'     => null,
     'confirmWith'  => null,
     'notice'       => null,
@@ -34,6 +35,7 @@
         type="{{ $type }}"
         name="{{ $name }}"
         @if ($readonly) readonly @endif
+        @if ($disabled) disabled @endif
         value="{{ $value }}"
         @unless ($readonly)
             wire:model.defer="{{ $name }}"

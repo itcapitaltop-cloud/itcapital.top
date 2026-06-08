@@ -75,6 +75,7 @@ Route::get('/email/verified', static function () {
 })->middleware('auth')->name('email.verified');
 
 Route::get('/', 'App\Http\Controllers\IndexController@index')->name('index');
+Route::view('/reviews', 'pages.reviews')->name('reviews');
 
 Route::middleware('guest')->group(function () {
     Route::view('sign-up', 'pages.auth.sign-up')->name('sign-up');
@@ -117,6 +118,7 @@ Route::controller(CommonFundController::class)->middleware(['auth', 'verified'])
 Route::controller(AdminController::class)->middleware(Authenticate::class)->prefix('itcapitalmoonshineadminpanel')->group(function () {
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
     Route::post('itc-packages/profits/recalculate', 'recalculate');
+    Route::post('promo-codes/generate', 'generatePromoCode')->name('admin.promo-codes.generate');
     Route::post('itc-staking/change/percentage', [ItcStakingController::class, 'changePercentage']);
     Route::post('itc-staking/change/start-bonus-percentage', [ItcStakingController::class, 'changeStartBonusPercentage'])->name('admin.itc-staking.change-start-bonus-percentage');
     Route::post('itc-staking/change/regular-percentage', [ItcStakingController::class, 'changeRegularPercentage'])->name('admin.itc-staking.change-regular-percentage');
@@ -135,6 +137,7 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('partners', 'addPartner')->name('add-partner');
     Route::post('partners/{partner_id}', 'updatePartner');
     Route::get('users/suggest', 'suggestUsers')->name('admin.users.suggest');
+    Route::get('users/{userId}/operations/export', 'exportUserOperations')->name('admin.users.operations.export');
     Route::post('partners/rank', 'updateRank');
 });
 

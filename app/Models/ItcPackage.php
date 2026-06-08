@@ -4,12 +4,14 @@ namespace App\Models;
 
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Itc\StakingTransactionAccrualEnum;
+use App\Models\Package\PackageDefinition;
 use App\Models\Package\Staking\StakingTransactionAccrual;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * @property int $id
  * @property string $uuid
+ * @property int|null $package_definition_id
  * @property string $month_profit_percent
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -58,6 +61,7 @@ class ItcPackage extends Model
 
     protected $fillable = [
         'uuid',
+        'package_definition_id',
         'month_profit_percent',
         'type',
         'work_to',
@@ -70,6 +74,11 @@ class ItcPackage extends Model
     public function transaction(): HasOne
     {
         return $this->hasOne(Transaction::class, 'uuid', 'uuid');
+    }
+
+    public function packageDefinition(): BelongsTo
+    {
+        return $this->belongsTo(PackageDefinition::class)->withTrashed();
     }
 
     public function zeroing(): HasOne
@@ -204,6 +213,7 @@ class ItcPackage extends Model
         'closed_at' => 'datetime',
         'prolonged_to' => 'datetime',
         'type' => PackageTypeEnum::class,
+        'package_definition_id' => 'integer',
     ];
 
     /**
@@ -237,7 +247,7 @@ class ItcPackage extends Model
     {
         return $query
             ->whereHas('transaction', fn ($q) => $q->where('user_id', $userId))
-            ->with(['transaction', 'zeroing'])
+            ->with(['transaction', 'zeroing', 'packageDefinition'])
             ->withSum(['profits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestProfitsAll' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
@@ -263,7 +273,7 @@ class ItcPackage extends Model
             ->whereHas('transaction', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
-            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->with(['packageDefinition', 'transaction' => fn ($query) => $query->where('user_id', $userId)])
             ->withSum(['transaction as transaction_sum' => fn ($q) => $q->where('user_id', $userId)], 'amount')
             ->withSum(
                 ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100')),
@@ -282,7 +292,7 @@ class ItcPackage extends Model
             ->whereHas('transaction', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
-            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->with(['packageDefinition', 'transaction' => fn ($query) => $query->where('user_id', $userId)])
             ->withSum(
                 ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))->whereNotIn('type', [StakingTransactionAccrualEnum::TopUpBonus])->whereBetween('created_at', [$start, $end]),
                 ],
@@ -297,7 +307,7 @@ class ItcPackage extends Model
             ->whereHas('transaction', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
-            ->with(['transaction' => fn ($query) => $query->where('user_id', $userId)])
+            ->with(['packageDefinition', 'transaction' => fn ($query) => $query->where('user_id', $userId)])
             ->withSum(
                 ['stakingTransactionAccruals as staking_accruals_sum' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0) / 100'))->whereNotIn('type', [StakingTransactionAccrualEnum::TopUpBonus]),
                 ],

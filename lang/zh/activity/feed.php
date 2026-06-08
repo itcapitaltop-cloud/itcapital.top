@@ -57,6 +57,8 @@ return [
         'became_referral_of_user' => '用户已成为 @:username 的推荐人',
         'partner_regular_bonus_received' => '已从第 :line 线推荐人 @:username 获得常规奖金 :amount ITC',
         'partner_start_bonus_received' => '已从第 :line 线推荐人 @:username 获得启动奖金 :amount ITC',
+        'partner_rank_increased' => '伙伴等级已从 :old_rank 提升到 :new_rank',
+        'partner_rank_decreased' => '伙伴等级已从 :old_rank 降到 :new_rank',
         'staking_regular_bonus_received' => '已从推荐人 @:username 获得质押常规奖金 :amount ITC',
         'staking_start_bonus_received' => '已从推荐人 @:username 获得质押启动奖金 :amount ITC',
         'partner_to_main_transferred' => '已将 :amount ITC 从伙伴余额转入主余额',
@@ -65,6 +67,7 @@ return [
         'regular_bonus_transferred_to_partner' => '已将 :amount ITC 从常规奖金余额转入伙伴余额',
         'staking_package_purchased' => '已购买质押套餐 :uuid，金额 :amount ITC:rate',
         'staking_package_topped_up' => '已向质押套餐 :uuid 添加 :amount ITC:rate',
+        'promo_code_applied' => '已应用促销码 :promo_code，门槛从 :original_threshold ITC 降至 :effective_threshold ITC',
         'staking_profit_accrued' => '质押套餐 :uuid 已获得收益 :profit ITC:rate',
     ],
 ];

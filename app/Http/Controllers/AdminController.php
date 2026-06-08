@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\PromoCodes\GeneratePromoCodeAction;
 use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
@@ -14,6 +15,7 @@ use App\Enums\Transactions\TransactionStatusEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Helpers\Notify;
 use App\Models\ItcPackage;
+use App\Models\Package\PackageDefinition;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitWithdraw;
@@ -22,6 +24,7 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
@@ -36,10 +39,16 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
+use MoonShine\Permissions\Models\MoonshineUser;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class AdminController extends Controller
@@ -141,6 +150,156 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()
             ->toast('Отредактировано', ToastType::SUCCESS)
             ->redirect(request()->headers->get('referer'));
+    }
+
+    public function exportUserOperations(Request $request, int $userId): StreamedResponse
+    {
+        $user = User::withoutGlobalScope('notBanned')->findOrFail($userId);
+
+        $rules = [
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+        ];
+
+        if ($request->filled('date_from')) {
+            $rules['date_to'][] = 'after_or_equal:date_from';
+        }
+
+        $validated = $request->validate($rules);
+
+        $dateFrom = filled($validated['date_from'] ?? null)
+            ? Carbon::parse($validated['date_from'])->startOfDay()
+            : null;
+        $dateTo = filled($validated['date_to'] ?? null)
+            ? Carbon::parse($validated['date_to'])->endOfDay()
+            : null;
+
+        $filename = sprintf('user-%d-journal-%s.xlsx', $user->id, now()->format('Ymd-His'));
+
+        return response()->streamDownload(
+            function () use ($user, $dateFrom, $dateTo): void {
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+                $sheet->setTitle('Журнал пользователя');
+
+                $sheet->fromArray([
+                    'Событие',
+                    'Сумма операции',
+                    'Пользователь',
+                    'Дата',
+                ], null, 'A1');
+
+                $row = 2;
+
+                foreach (app(ActivityFeedService::class)->userDetailUserFeed($user->id, null, $dateFrom, $dateTo) as $log) {
+                    $sheet->fromArray([
+                        $log['type'],
+                        $log['operation_amount'],
+                        $log['from_user'],
+                        $log['date'],
+                    ], null, "A{$row}");
+                    $row++;
+                }
+
+                foreach (range('A', 'D') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                (new Xlsx($spreadsheet))->save('php://output');
+            },
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
+    }
+
+    public function generatePromoCode(MoonShineRequest $request): MoonShineJsonResponse
+    {
+        $admin = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+        $admin = $admin instanceof MoonshineUser ? $admin : null;
+
+        Log::debug('[AdminController.generatePromoCode] start', [
+            'admin_id' => $admin?->id,
+            'package_definition_id' => $request->input('package_definition_id'),
+            'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
+        ]);
+
+        $validator = validator($request->all(), [
+            'package_definition_id' => [
+                'required',
+                Rule::exists('package_definitions', 'id')->whereNotIn('type', [
+                    PackageTypeEnum::ARCHIVE->value,
+                    PackageTypeEnum::STAKING->value,
+                ]),
+            ],
+            'reduced_minimum_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $validator->after(function (Validator $validator) use ($request): void {
+            if ($validator->errors()->has('package_definition_id') || $validator->errors()->has('reduced_minimum_amount')) {
+                return;
+            }
+
+            $packageDefinition = PackageDefinition::query()->find((int) $request->input('package_definition_id'));
+
+            if (! $packageDefinition instanceof PackageDefinition) {
+                $validator->errors()->add('package_definition_id', 'Выбранный пакет не найден.');
+
+                return;
+            }
+
+            $reducedMinimumAmount = BigDecimal::of((string) $request->input('reduced_minimum_amount'));
+            $defaultMinimumAmount = BigDecimal::of($packageDefinition->min_start_amount);
+
+            if ($reducedMinimumAmount->isGreaterThanOrEqualTo($defaultMinimumAmount)) {
+                $validator->errors()->add(
+                    'reduced_minimum_amount',
+                    'Сумма сниженного порога должна быть меньше минимальной суммы тарифа ('
+                        . $packageDefinition->min_start_amount
+                        . ').'
+                );
+            }
+        });
+
+        if ($validator->fails()) {
+            Log::warning('[AdminController.generatePromoCode] validation failed', [
+                'admin_id' => $admin?->id,
+                'errors' => $validator->errors()->keys(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast($validator->errors()->first(), ToastType::ERROR);
+        }
+
+        $packageDefinition = PackageDefinition::query()->findOrFail((int) $request->input('package_definition_id'));
+
+        try {
+            $promoCode = GeneratePromoCodeAction::make()->run(
+                $packageDefinition,
+                (string) $request->input('reduced_minimum_amount'),
+                $admin,
+            );
+        } catch (Throwable $throwable) {
+            Log::error('[AdminController.generatePromoCode] generation failed', [
+                'admin_id' => $admin?->id,
+                'package_definition_id' => $packageDefinition->id,
+                'reduced_minimum_amount' => $request->input('reduced_minimum_amount'),
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось сгенерировать промокод: ' . $throwable->getMessage(), ToastType::ERROR);
+        }
+
+        Log::info('[AdminController.generatePromoCode] generated', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCode->id,
+            'package_definition_id' => $promoCode->package_definition_id,
+        ]);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Промокод создан: ' . $promoCode->code, ToastType::SUCCESS)
+            ->redirect($request->headers->get('referer'));
     }
 
     public function updateItcPackage(string $uuid, MoonShineRequest $request)

@@ -28,6 +28,8 @@ enum ActivityEventTypeEnum: string
     case BecameReferralOfUser = 'became_referral_of_user';
     case PartnerRegularBonusReceived = 'partner_regular_bonus_received';
     case PartnerStartBonusReceived = 'partner_start_bonus_received';
+    case PartnerRankIncreased = 'partner_rank_increased';
+    case PartnerRankDecreased = 'partner_rank_decreased';
     case StakingRegularBonusReceived = 'staking_regular_bonus_received';
     case StakingStartBonusReceived = 'staking_start_bonus_received';
     case PartnerToMainTransferred = 'partner_to_main_transferred';
@@ -38,4 +40,6 @@ enum ActivityEventTypeEnum: string
     case StakingPackagePurchased = 'staking_package_purchased';
     case StakingPackageToppedUp = 'staking_package_topped_up';
     case StakingProfitAccrued = 'staking_profit_accrued';
+
+    case PromoCodeApplied = 'promo_code_applied';
 }

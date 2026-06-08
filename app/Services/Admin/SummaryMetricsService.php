@@ -10,11 +10,204 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\ItcPackage;
 use App\Models\PackageProfit;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\Package\Staking\StakingPerformanceService;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 final class SummaryMetricsService
 {
+    /**
+     * Cache key for the fully computed admin dashboard snapshot.
+     */
+    public const string CACHE_KEY = 'admin.summary.dashboard';
+
+    /**
+     * How long a computed snapshot stays warm. The dashboard does not need
+     * second-level accuracy, so we trade freshness for a near-instant page.
+     */
+    public const int CACHE_TTL_SECONDS = 600;
+
+    /**
+     * Compute (or read from cache) every dashboard metric in a single pass.
+     *
+     * All counts and sums exclude test users (`is_test = true`) and banned
+     * users (filtered globally via the `notBanned` scope on every `user`
+     * relationship chain), so the snapshot is the single audited source for
+     * the admin summary page.
+     *
+     * @return array{
+     *     users: array{total: int, week: int, today: int},
+     *     deposits: array{total_count: int, total_sum: float, week_count: int, week_sum: float, month_count: int, month_sum: float},
+     *     withdraws: array{total_count: int, total_sum: float, week_count: int, week_sum: float, month_count: int, month_sum: float},
+     *     packages: array<string, float>,
+     *     balances: array{main: float, package_dividends: float, partner: float, regular_premium: float, token: float},
+     *     accruals: array{dividends_month: float, dividends_week: float, start_bonus_month: float, start_bonus_week: float, regular_premium_month: float, regular_premium_week: float, rank_bonus_month: float, rank_bonus_week: float, staking_profits_month: float, staking_profits_week: float}
+     * }
+     */
+    public function snapshot(): array
+    {
+        $snapshot = Cache::remember(self::CACHE_KEY, self::CACHE_TTL_SECONDS, fn (): array => $this->compute());
+
+        $snapshot['packages'] = $this->packageTotalsWithDefaults($snapshot['packages'] ?? []);
+
+        return $snapshot;
+    }
+
+    /**
+     * Force a fresh computation and refill the cache. Used by scheduled warming.
+     *
+     * @return array<string, mixed>
+     */
+    public function refresh(): array
+    {
+        $snapshot = $this->compute();
+
+        Cache::put(self::CACHE_KEY, $snapshot, self::CACHE_TTL_SECONDS);
+
+        return $snapshot;
+    }
+
+    public function forget(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function compute(): array
+    {
+        $packages = $this->totalPackagesAmount();
+
+        return [
+            'users' => [
+                'total' => $this->usersTotal(),
+                'week' => $this->usersNewThisWeek(),
+                'today' => $this->usersNewToday(),
+            ],
+            'deposits' => [
+                'total_count' => $this->depositCount(),
+                'total_sum' => $this->depositSum(),
+                'week_count' => $this->depositCount(now()->startOfWeek()),
+                'week_sum' => $this->depositSum(now()->startOfWeek()),
+                'month_count' => $this->depositCount(now()->startOfMonth()),
+                'month_sum' => $this->depositSum(now()->startOfMonth()),
+            ],
+            'withdraws' => [
+                'total_count' => $this->withdrawCount(),
+                'total_sum' => $this->withdrawSum(),
+                'week_count' => $this->withdrawCount(now()->startOfWeek()),
+                'week_sum' => $this->withdrawSum(now()->startOfWeek()),
+                'month_count' => $this->withdrawCount(now()->startOfMonth()),
+                'month_sum' => $this->withdrawSum(now()->startOfMonth()),
+            ],
+            'packages' => $packages,
+            'balances' => [
+                'main' => (float) $this->mainBalance(),
+                'package_dividends' => (float) $this->packageDividends(),
+                'partner' => (float) $this->partnerBalance(),
+                'regular_premium' => $this->regularPremiumNet(),
+                // Reuse the staking total already computed above instead of
+                // recomputing the full staking performance a second time.
+                'token' => (float) ($packages[PackageTypeEnum::STAKING->value] ?? 0),
+            ],
+            'accruals' => [
+                'dividends_month' => (float) $this->dividendsMonth(),
+                'dividends_week' => (float) $this->dividendsWeek(),
+                'start_bonus_month' => (float) $this->startBonusMonth(),
+                'start_bonus_week' => (float) $this->startBonusWeek(),
+                'regular_premium_month' => (float) $this->regularPremiumMonth(),
+                'regular_premium_week' => (float) $this->regularPremiumWeek(),
+                'rank_bonus_month' => (float) $this->rankBonusMonth(),
+                'rank_bonus_week' => (float) $this->rankBonusWeek(),
+                'staking_profits_month' => (float) $this->stakingProfitsMonth(),
+                'staking_profits_week' => (float) $this->stakingProfitsWeek(),
+            ],
+        ];
+    }
+
+    public function usersTotal(): int
+    {
+        return User::query()->where('is_test', false)->count();
+    }
+
+    public function usersNewThisWeek(): int
+    {
+        return User::query()
+            ->where('is_test', false)
+            ->where('created_at', '>=', now()->startOfWeek())
+            ->count();
+    }
+
+    public function usersNewToday(): int
+    {
+        return User::query()
+            ->where('is_test', false)
+            ->whereDate('created_at', today())
+            ->count();
+    }
+
+    public function depositCount(?CarbonInterface $since = null): int
+    {
+        return Transaction::query()
+            ->withoutTestUsers()
+            ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
+            ->whereNotNull('accepted_at')
+            ->when($since !== null, fn ($q) => $q->where('accepted_at', '>=', $since))
+            ->count();
+    }
+
+    public function depositSum(?CarbonInterface $since = null): float
+    {
+        return round((float) Transaction::query()
+            ->withoutTestUsers()
+            ->where('trx_type', TrxTypeEnum::DEPOSIT->value)
+            ->whereNotNull('accepted_at')
+            ->when($since !== null, fn ($q) => $q->where('accepted_at', '>=', $since))
+            ->sum('amount'), 2);
+    }
+
+    public function withdrawCount(?CarbonInterface $since = null): int
+    {
+        return Transaction::query()
+            ->withoutTestUsers()
+            ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
+            ->when($since !== null, fn ($q) => $q->where('created_at', '>=', $since))
+            ->count();
+    }
+
+    public function withdrawSum(?CarbonInterface $since = null): float
+    {
+        return round((float) Transaction::query()
+            ->withoutTestUsers()
+            ->where('trx_type', TrxTypeEnum::WITHDRAW->value)
+            ->when($since !== null, fn ($q) => $q->where('created_at', '>=', $since))
+            ->sum('amount'), 2);
+    }
+
+    /**
+     * Net regular-premium balance (debits minus credits), excluding test and
+     * banned users. Replaces the unfiltered TransactionRepository::getRegularBonus.
+     */
+    public function regularPremiumNet(): float
+    {
+        $debit = (float) Transaction::query()
+            ->withoutTestUsers()
+            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
+            ->whereIn('trx_type', TrxTypeEnum::getDebits())
+            ->sum('amount');
+
+        $credit = (float) Transaction::query()
+            ->withoutTestUsers()
+            ->where('balance_type', BalanceTypeEnum::REGULAR_PREMIUM)
+            ->whereIn('trx_type', TrxTypeEnum::getCredits())
+            ->sum('amount');
+
+        return round($debit - $credit, 2);
+    }
+
     public function totalPackagesAmount(): array
     {
         $totals = ItcPackage::query()
@@ -52,12 +245,32 @@ final class SummaryMetricsService
             $totals[PackageTypeEnum::STAKING->value] = app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
         }
 
-        return $totals;
+        return $this->packageTotalsWithDefaults($totals);
     }
 
-    public function mainBalance(): string
+    /**
+     * @param array<string, float|int|string> $totals
+     * @return array<string, float>
+     */
+    private function packageTotalsWithDefaults(array $totals): array
     {
-        return Transaction::query()
+        $defaults = [
+            PackageTypeEnum::PRIVILEGE->value => 0.0,
+            PackageTypeEnum::STANDARD->value => 0.0,
+            PackageTypeEnum::VIP->value => 0.0,
+            PackageTypeEnum::PRESENT->value => 0.0,
+            PackageTypeEnum::STAKING->value => 0.0,
+        ];
+
+        return array_map(
+            static fn (float|int|string $total): float => (float) $total,
+            array_replace($defaults, array_intersect_key($totals, $defaults))
+        );
+    }
+
+    public function mainBalance(): float
+    {
+        return (float) Transaction::query()
             ->withoutTestUsers()
             ->where('balance_type', BalanceTypeEnum::MAIN)
             ->whereNotNull('accepted_at')
@@ -70,18 +283,18 @@ final class SummaryMetricsService
     "));
     }
 
-    public function packageDividends(): string
+    public function packageDividends(): float
     {
-        return PackageProfit::query()
+        return (float) PackageProfit::query()
             ->withoutTestUsers()
             ->whereDoesntHave('reinvestLink')
             ->whereDoesntHave('withdraw')
             ->sum('amount');
     }
 
-    public function partnerBalance(): string
+    public function partnerBalance(): float
     {
-        return Transaction::query()
+        return (float) Transaction::query()
             ->withoutTestUsers()
             ->where('balance_type', BalanceTypeEnum::PARTNER)
             ->whereNotNull('accepted_at')
@@ -125,17 +338,6 @@ final class SummaryMetricsService
             TrxTypeEnum::REGULAR_PREMIUM_TO_PARTNER_MIRROR,
         ])
         ->sum('amount');
-    }
-
-    public function tokenBalance(): int|float
-    {
-        $packages = ItcPackage::query()
-            ->active(PackageTypeEnum::STAKING)
-            ->withoutTestUsers()
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases'])
-            ->get();
-
-        return app(StakingPerformanceService::class)->forPackages($packages)['total_tokens'];
     }
 
     public function sumByPeriod(TrxTypeEnum $type, string $period): int|float|string

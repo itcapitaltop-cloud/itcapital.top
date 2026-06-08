@@ -1,20 +1,82 @@
 {
     "github": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-github"
+        ],
         "env": {
             "GITHUB_TOKEN": "${GITHUB_TOKEN}"
         }
     },
     "postgres": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-postgres"],
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-postgres"
+        ],
         "env": {
             "DATABASE_URL": "${localhost:5432}"
         }
     },
     "filesystem": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "."
+        ]
+    },
+    "mcpServers": {
+        "github": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+            ],
+            "env": {
+                "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+            }
+        },
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "."
+            ]
+        },
+        "postgres": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-postgres"
+            ],
+            "env": {
+                "DATABASE_URL": "${DATABASE_URL}"
+            }
+        },
+        "chromeDevtools": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "chrome-devtools-mcp@latest",
+                "--no-usage-statistics"
+            ]
+        },
+        "playwright": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@playwright/mcp@latest"
+            ]
+        },
+        "laravel-boost": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "boost:mcp"
+            ]
+        }
     }
 }

@@ -15,6 +15,7 @@ use App\Models\Deposit;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\Withdraw;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -25,11 +26,12 @@ final class ActivityFeedService
     ) {}
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{date:string,event:string}>
+     * @return Collection<int, array{date:string,event:string}>
      */
     public function packageFeed(int $userId, int $limit = 200): Collection
     {
-        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Packages, $limit)
+        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Packages)
+            ->limit($limit)
             ->get()
             ->map(fn (BusinessActivity $activity): array => [
                 'date' => $activity->created_at?->format('d.m.Y, H:i') ?? '',
@@ -38,11 +40,12 @@ final class ActivityFeedService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{date:string,user:string,level:string|int,event:string}>
+     * @return Collection<int, array{date:string,user:string,level:string|int,event:string}>
      */
     public function partnerFeed(int $userId, int $limit = 200): Collection
     {
-        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Partners, $limit)
+        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Partners)
+            ->limit($limit)
             ->get()
             ->map(fn (BusinessActivity $activity): array => [
                 'date' => $activity->created_at?->format('d.m.Y, H:i') ?? '',
@@ -56,11 +59,12 @@ final class ActivityFeedService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{created_at:mixed,amount:mixed,arrow:string,type:string,status:string}>
+     * @return Collection<int, array{created_at:mixed,amount:mixed,arrow:string,type:string,status:string}>
      */
     public function financeFeed(int $userId, int $limit = 200): Collection
     {
-        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Finance, $limit)
+        return $this->baseFeedQuery($userId, ActivityFeedTypeEnum::Finance)
+            ->limit($limit)
             ->get()
             ->map(fn (BusinessActivity $activity): array => [
                 'created_at' => $activity->created_at,
@@ -72,13 +76,17 @@ final class ActivityFeedService
     }
 
     /**
-     * @return array<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
+     * Страница пользовательских логов карточки. simplePaginate не делает COUNT —
+     * безопасно по памяти даже при огромном числе записей.
+     *
+     * @return Paginator<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
      */
-    public function userDetailUserFeed(int $userId, int $limit = 200): array
+    public function userDetailUserFeed(int $userId, int $perPage = 50): Paginator
     {
-        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $limit)
-            ->get()
-            ->map(function (BusinessActivity $activity): array {
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser)
+            ->simplePaginate($perPage, pageName: 'user_logs_page')
+            ->withQueryString()
+            ->through(function (BusinessActivity $activity): array {
                 $amount = $activity->getExtraProperty('amount');
 
                 return [
@@ -91,20 +99,23 @@ final class ActivityFeedService
                     ?? ''),
                     'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
                 ];
-            })
-            ->toArray();
+            });
     }
 
     /**
-     * @return array<int, array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}>
+     * Страница админских логов карточки. simplePaginate не делает COUNT —
+     * безопасно по памяти даже при огромном числе записей.
+     *
+     * @return Paginator<int, array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}>
      */
-    public function userDetailAdminFeed(int $userId, int $limit = 200): array
+    public function userDetailAdminFeed(int $userId, int $perPage = 50): Paginator
     {
-        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin, $limit)
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin)
             ->where('description', '!=', LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT->value)
             ->where('description', '!=', LogActionTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT->value)
-            ->get()
-            ->map(function (BusinessActivity $activity): array {
+            ->simplePaginate($perPage, pageName: 'admin_logs_page')
+            ->withQueryString()
+            ->through(function (BusinessActivity $activity): array {
                 $oldValues = collect((array) $activity->getExtraProperty('old_values', []));
                 $newValues = collect((array) $activity->getExtraProperty('new_values', []));
                 $actionType = LogActionTypeEnum::tryFrom($activity->description);
@@ -147,8 +158,42 @@ final class ActivityFeedService
                         ->implode("\n"),
                     'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
                 ];
-            })
+            });
+    }
+
+    /**
+     * @return array<int, array{action:string,admin_login:string,old_values:string,new_values:string,date:string}>
+     */
+    public function globalAdminFeed(?int $limit = 200): array
+    {
+        $query = BusinessActivity::query()
+            ->forFeed(ActivityFeedTypeEnum::GlobalAdmin)
+            ->with(['causer', 'subject'])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query
+            ->get()
+            ->map(fn (BusinessActivity $activity): array => $this->globalAdminFeedRow($activity))
             ->toArray();
+    }
+
+    /**
+     * @return array{action:string,admin_login:string,old_values:string,new_values:string,date:string}
+     */
+    public function globalAdminFeedRow(BusinessActivity $activity): array
+    {
+        return [
+            'action' => $this->adminActionLabel($activity),
+            'admin_login' => $this->activityAdminLogin($activity),
+            'old_values' => $this->formatActivityValues((array) $activity->getExtraProperty('old_values', [])),
+            'new_values' => $this->formatActivityValues((array) $activity->getExtraProperty('new_values', [])),
+            'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+        ];
     }
 
     /**
@@ -199,19 +244,19 @@ final class ActivityFeedService
         ];
     }
 
-    private function baseFeedQuery(int $userId, ActivityFeedTypeEnum $feed, int $limit): Builder
+    private function baseFeedQuery(int $userId, ActivityFeedTypeEnum $feed): Builder
     {
         return BusinessActivity::query()
             ->forUser($userId)
             ->forFeed($feed)
+            ->with('subject')
             ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->limit($limit);
+            ->orderByDesc('id');
     }
 
-    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed, int $limit): Builder
+    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed): Builder
     {
-        return $this->baseFeedQuery($userId, $feed, $limit)
+        return $this->baseFeedQuery($userId, $feed)
             ->where(function (Builder $query): void {
                 $query
                     ->where('properties->package_type', '!=', PackageTypeEnum::STAKING->value)
@@ -334,6 +379,12 @@ final class ActivityFeedService
         $actionType = LogActionTypeEnum::tryFrom($activity->description);
 
         if ($actionType !== null) {
+            if ($actionType === LogActionTypeEnum::UPSERT_TOKEN_RATE) {
+                return $activity->getExtraProperty('old_values') === []
+                    ? __('activity/log_action.create_token_rate')
+                    : __('activity/log_action.update_token_rate');
+            }
+
             $transactionActionLabel = $this->transactionAdminActionLabel($activity, $actionType);
 
             if ($transactionActionLabel !== null) {
@@ -455,5 +506,64 @@ final class ActivityFeedService
         }
 
         return (string) $value;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function formatActivityValues(array $values): string
+    {
+        if ($values === []) {
+            return '—';
+        }
+
+        return collect($values)
+            ->map(fn (mixed $value, string|int $key): string => $this->formatActivityKey($key) . ': ' . $this->formatActivityValue($value))
+            ->implode("\n");
+    }
+
+    private function formatActivityKey(string|int $key): string
+    {
+        return match ($key) {
+            'effective_from' => 'Дата',
+            'rate' => 'Курс',
+            default => (string) $key,
+        };
+    }
+
+    private function formatActivityValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '—';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Да' : 'Нет';
+        }
+
+        if (is_numeric($value)) {
+            return $this->formatAmount((string) $value);
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+    }
+
+    private function activityAdminLogin(BusinessActivity $activity): string
+    {
+        $causer = $activity->causer;
+
+        foreach (['username', 'login', 'email', 'name'] as $attribute) {
+            $value = data_get($causer, $attribute);
+
+            if (is_scalar($value) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return (string) ($activity->getExtraProperty('admin_login') ?? '');
     }
 }

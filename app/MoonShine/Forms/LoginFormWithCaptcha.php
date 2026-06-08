@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Forms;
 
+use Anhskohbo\NoCaptcha\Facades\NoCaptcha;
+use MoonShine\Components\FlexibleRender;   // «чистый» HTML/Blade компонент :contentReference[oaicite:2]{index=2}
 use MoonShine\Components\FormBuilder;
 use MoonShine\Fields\Password;
 use MoonShine\Fields\Switcher;
 use MoonShine\Fields\Text;
-use MoonShine\Components\FlexibleRender;   // «чистый» HTML/Blade компонент :contentReference[oaicite:2]{index=2}
-use Anhskohbo\NoCaptcha\Facades\NoCaptcha;
 
 class LoginFormWithCaptcha
 {
@@ -29,19 +29,29 @@ class LoginFormWithCaptcha
                 Password::make(__('moonshine::ui.login.password'), 'password')
                     ->required(),
 
-                // ===== reCAPTCHA =====
-                FlexibleRender::make(
-                    fn () =>
-                        '<div style="margin-bottom:20px">' .
-                        NoCaptcha::display() .
-                        '</div>' .
-                        NoCaptcha::renderJs('', false, 'recaptchaLoaded')
-                ),
+                ...$this->recaptchaFields(),
 
                 Switcher::make(__('moonshine::ui.login.remember_me'), 'remember'),
             ])
             ->submit(__('moonshine::ui.login.login'), [
                 'class' => 'btn-primary btn-lg w-full',
             ]);
+    }
+
+    private function recaptchaFields(): array
+    {
+        if (app()->environment(['local', 'dev'])) {
+            return [];
+        }
+
+        return [
+            FlexibleRender::make(
+                fn () =>
+                    '<div style="margin-bottom:20px">' .
+                    NoCaptcha::display() .
+                    '</div>' .
+                    NoCaptcha::renderJs('', false, 'recaptchaLoaded')
+            ),
+        ];
     }
 }

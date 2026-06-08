@@ -9,9 +9,13 @@ use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\ActivityLogResource;
 use App\MoonShine\Resources\AdminUserResource;
 use App\MoonShine\Resources\DepositResource;
+use App\MoonShine\Resources\GlobalAdminActivityResource;
 use App\MoonShine\Resources\ItcPackageResource;
 use App\MoonShine\Resources\ItcStakingResource;
 use App\MoonShine\Resources\NewsResource;
+use App\MoonShine\Resources\PackageDefinitionResource;
+use App\MoonShine\Resources\PromoCodeResource;
+use App\MoonShine\Resources\ReviewResource;
 use App\MoonShine\Resources\SummaryResource;
 use App\MoonShine\Resources\UserResource;
 use App\MoonShine\Resources\VerifyingUserResource;
@@ -85,6 +89,9 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             new AdminUserResource(),
             new MoonShineUserRoleResource(),
             new ActivityLogResource(),
+            new GlobalAdminActivityResource(),
+            new PromoCodeResource(),
+            new PackageDefinitionResource(),
         ];
     }
 
@@ -115,16 +122,24 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
                 ->canSee($this->canSeeResource(WithdrawResource::class)),
             MenuItem::make('Пакеты', new ItcPackageResource())
                 ->canSee($this->canSeeResource(ItcPackageResource::class)),
+            MenuItem::make('Настройки пакетов', new PackageDefinitionResource())
+                ->canSee($this->canSeeResource(PackageDefinitionResource::class)),
             MenuItem::make('Верификация', new VerifyingUserResource())
                 ->canSee($this->canSeeResource(VerifyingUserResource::class)),
             MenuItem::make('Cтейкинг', new ItcStakingResource())
                 ->canSee($this->canSeeResource(ItcStakingResource::class)),
             MenuItem::make('Новости', new NewsResource())
                 ->canSee($this->canSeeResource(NewsResource::class)),
+            MenuItem::make('Отзывы', new ReviewResource())
+                ->canSee($this->canSeeResource(ReviewResource::class)),
             MenuItem::make('Админы', new AdminUserResource())
                 ->canSee($this->canSeeResource(AdminUserResource::class)),
+            MenuItem::make('Журнал действий', new GlobalAdminActivityResource())
+                ->canSee($this->canSeeResource(GlobalAdminActivityResource::class)),
             MenuItem::make('Роли', new MoonShineUserRoleResource())
                 ->canSee($this->canSeeResource(MoonShineUserRoleResource::class)),
+            MenuItem::make('Документация', '/itcapitalmoonshineadminpanel/docs')
+                ->canSee($this->canSeeMoonShineUser()),
         ];
     }
 
@@ -140,7 +155,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
     {
         parent::boot();
 
-        moonShineAssets()->add([
+        $assets = [
             '/vendor/moonshine/css/moonshine-overrides.css',
             '/vendor/moonshine/js/multi-sort.js',
             '/vendor/moonshine/js/copy-tooltip.js',
@@ -155,8 +170,13 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             '/vendor/moonshine/js/set-names-for-override-percents-fields.js',
             '/vendor/moonshine/js/set-names-for-requirements-fields.js',
             '/vendor/moonshine/js/set-names-for-common-percents-fields.js',
-            Vite::asset('resources/css/app.css'),
-        ]);
+        ];
+
+        if (! $this->app->runningInConsole()) {
+            $assets[] = Vite::asset('resources/css/app.css');
+        }
+
+        moonShineAssets()->add($assets);
     }
 
     private function canSeeResource(string $resourceClass): Closure
@@ -173,6 +193,13 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             }
 
             return $user->isSuperUser();
+        };
+    }
+
+    private function canSeeMoonShineUser(): Closure
+    {
+        return function (): bool {
+            return auth(config('moonshine.auth.guard', 'moonshine'))->user() instanceof MoonshineUser;
         };
     }
 

@@ -34,6 +34,7 @@ app/View/Components/ Blade component classes
 bootstrap/           Laravel bootstrap files
 config/              Laravel and package configuration
 database/            Migrations, factories, seeders, and settings data
+.devcontainer/       Dev Container manifest, Compose override, and bootstrap script
 docker/              Docker build contexts for app, nginx, PostgreSQL, and Redis
 lang/                Localization files
 public/              Public web root and built/static assets
@@ -59,6 +60,9 @@ tests/               Pest/PHPUnit test suite
 | `composer.json` | PHP dependencies and autoload configuration |
 | `package.json` | JavaScript dependencies and frontend scripts |
 | `docker-compose.yml` | Local app, nginx, PostgreSQL, and Redis services |
+| `.devcontainer/devcontainer.json` | Dev Container IDE/runtime manifest |
+| `.devcontainer/docker-compose.devcontainer.yml` | Dev Container Compose override |
+| `.devcontainer/post-create.sh` | Dev Container bootstrap script |
 | `phpstan.neon` | PHPStan/Larastan configuration |
 | `phpunit.xml` | Test runner configuration |
 | `pint.json` | Laravel Pint formatting configuration |
@@ -69,6 +73,11 @@ tests/               Pest/PHPUnit test suite
 | Document | Path | Description |
 |----------|------|-------------|
 | README | `README.md` | Project notes, refactoring warning, Pest and PHPStan rules |
+| User Documentation Index | `resources/docs/1.0/index.md` | Versioned business documentation navigation |
+| Package Definitions | `resources/docs/1.0/package-definitions.md` | Admin tariffs, statuses, audit log |
+| Manual Rank | `resources/docs/1.0/manual-rank.md` | Manual partner rank behavior |
+| Rank Maintenance | `resources/docs/1.0/rank-maintenance.md` | Monthly rank maintenance, demotion, one-time bonus |
+| Documentation Overview | `resources/docs/1.0/overview.md` | Business docs purpose and format |
 | Project Description | `.ai-factory/DESCRIPTION.md` | AI Factory project specification and tech stack |
 | Architecture | `.ai-factory/ARCHITECTURE.md` | Architecture decisions and dependency guidelines |
 | Project Map | `AGENTS.md` | This file: structural map for AI agents |

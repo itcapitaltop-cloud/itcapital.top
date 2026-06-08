@@ -10,6 +10,7 @@ use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Models\Transaction;
 use App\Services\ActivityLog\ActivityFeedService;
+use App\Services\User\UserBalanceCalculator;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
@@ -35,35 +36,7 @@ class TransactionRepository implements TransactionRepositoryContract
 
     public function getBalanceAmountByUserIdAndType(int $userId, BalanceTypeEnum $balanceType): string
     {
-
-        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
-        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
-
-        $debitsList = "'" . implode("','", $debits) . "'";
-        $creditsList = "'" . implode("','", $credits) . "'";
-
-        $sum = Transaction::query()
-            ->where('user_id', $userId)
-            ->where('balance_type', $balanceType)
-            ->selectRaw("
-            SUM(
-                CASE
-                    WHEN trx_type IN ($debitsList)
-                         AND accepted_at IS NOT NULL
-                         AND rejected_at IS NULL
-                        THEN amount
-
-                    WHEN trx_type IN ($creditsList)
-                         AND rejected_at IS NULL
-                        THEN -amount
-
-                    ELSE 0
-                END
-            ) as balance
-        ")
-            ->value('balance');
-
-        return (string) ($sum ?? 0);
+        return app(UserBalanceCalculator::class)->balanceFor($userId, $balanceType);
     }
 
     public function store(CreateTransactionDto $dto, Closure $callback): mixed
@@ -94,32 +67,17 @@ class TransactionRepository implements TransactionRepositoryContract
         ];
     }
 
-    /** баланс партнёрского счёта на конец $moment */
+    /**
+     * Партнёрский баланс на конец $moment.
+     *
+     * Делегирует в UserBalanceCalculator, чтобы правила знаков и фильтрации
+     * (accepted_at / rejected_at, исключение стейкинговых начислений) были
+     * идентичны живому балансу и не расходились с ним.
+     */
     private function balanceUpTo(Carbon $moment): float
     {
-        $debits = collect(TrxTypeEnum::getDebits())->map(fn ($e) => $e->value)->toArray();
-        $credits = collect(TrxTypeEnum::getCredits())->map(fn ($e) => $e->value)->toArray();
-
-        $debitsList = "'" . implode("','", $debits) . "'";
-        $creditsList = "'" . implode("','", $credits) . "'";
-
-        $sum = Transaction::query()
-            ->where('user_id', Auth::id())
-            ->where('balance_type', BalanceTypeEnum::PARTNER)
-            ->whereNull('rejected_at')
-            ->where('accepted_at', '<=', $moment)
-            ->selectRaw("
-            SUM(
-                CASE
-                    WHEN trx_type IN ($debitsList) THEN amount
-                    WHEN trx_type IN ($creditsList) THEN -amount
-                    ELSE 0
-                END
-            ) as balance
-        ")
-            ->value('balance');
-
-        return (float) ($sum ?? 0);
+        return (float) app(UserBalanceCalculator::class)
+            ->balanceFor(Auth::id(), BalanceTypeEnum::PARTNER, $moment);
     }
 
     /**
@@ -132,7 +90,8 @@ class TransactionRepository implements TransactionRepositoryContract
         return DB::transaction(function () use ($dto, $callback) {
             DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
 
-            $amount = $this->getBalanceAmountByUserIdAndType($dto->userId, $dto->balanceType);
+            $amount = app(UserBalanceCalculator::class)
+                ->balanceFor($dto->userId, $dto->balanceType, forceFresh: true);
             //            Log::channel('source')->debug($amount);
 
             if ($amount - $dto->amount < 0) {

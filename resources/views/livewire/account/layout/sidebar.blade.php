@@ -18,6 +18,8 @@
         </ul>
     </nav>
 
-    <livewire:news.index position="sidebar" limit="3" />
+    @unless(request()->routeIs('news.index'))
+        <livewire:news.index position="sidebar" limit="3" />
+    @endunless
 
 </aside>
