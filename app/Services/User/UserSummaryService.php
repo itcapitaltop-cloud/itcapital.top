@@ -40,8 +40,12 @@ class UserSummaryService
     public function computeFor(int $userId): array
     {
         return [
-            'investments_sum' => $this->balanceCalculator->balanceFor($userId, BalanceTypeEnum::MAIN),
-            'partner_balance' => $this->balanceCalculator->balanceFor($userId, BalanceTypeEnum::PARTNER),
+            // forceFresh: recompute is the authoritative write path and runs inside the
+            // Transaction "created"/"updated" event — before Transaction::booted() forgets
+            // the memoized balance on "saved". A memoized read here would persist a stale
+            // pre-write balance into user_summary.
+            'investments_sum' => $this->balanceCalculator->balanceFor($userId, BalanceTypeEnum::MAIN, forceFresh: true),
+            'partner_balance' => $this->balanceCalculator->balanceFor($userId, BalanceTypeEnum::PARTNER, forceFresh: true),
             'reinvests_sum' => $this->reinvestsSum($userId),
             'buy_packages_sum' => $this->buyPackagesSum($userId),
             'partners_count' => $this->partnersCount($userId),
