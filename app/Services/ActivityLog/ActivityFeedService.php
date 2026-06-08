@@ -15,6 +15,7 @@ use App\Models\Deposit;
 use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\Withdraw;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -91,6 +92,40 @@ final class ActivityFeedService
 
                 return [
                     'action' => $this->userDetailAction($activity),
+                    'type' => $this->activityManager->resolve($activity),
+                    'operation_amount' => $amount === null ? '' : $this->formatAmount((string) $amount),
+                    'from_user' => (string) ($activity->getExtraProperty('from_username')
+                    ?? $activity->getExtraProperty('username')
+                    ?? $activity->getExtraProperty('to_username')
+                    ?? ''),
+                    'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+                ];
+            });
+    }
+
+    /**
+     * Полная (без пагинации) выборка пользовательского журнала за период — для экспорта в файл.
+     *
+     * @return Collection<int, array{type:string,operation_amount:string,from_user:string,date:string}>
+     */
+    public function userDetailUserFeedForExport(int $userId, ?Carbon $dateFrom = null, ?Carbon $dateTo = null): Collection
+    {
+        $query = $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser);
+
+        if ($dateFrom !== null) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo !== null) {
+            $query->where('created_at', '<=', $dateTo);
+        }
+
+        return $query
+            ->get()
+            ->map(function (BusinessActivity $activity): array {
+                $amount = $activity->getExtraProperty('amount');
+
+                return [
                     'type' => $this->activityManager->resolve($activity),
                     'operation_amount' => $amount === null ? '' : $this->formatAmount((string) $amount),
                     'from_user' => (string) ($activity->getExtraProperty('from_username')

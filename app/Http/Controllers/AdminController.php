@@ -191,7 +191,7 @@ class AdminController extends Controller
 
                 $row = 2;
 
-                foreach (app(ActivityFeedService::class)->userDetailUserFeed($user->id, null, $dateFrom, $dateTo) as $log) {
+                foreach (app(ActivityFeedService::class)->userDetailUserFeedForExport($user->id, $dateFrom, $dateTo) as $log) {
                     $sheet->fromArray([
                         $log['type'],
                         $log['operation_amount'],

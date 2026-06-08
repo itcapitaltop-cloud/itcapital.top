@@ -9,6 +9,7 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\User\UserBalanceCalculator;
 use Carbon\Carbon;
@@ -88,7 +89,7 @@ class TransactionRepository implements TransactionRepositoryContract
     public function checkBalanceAndStore(CreateTransactionDto $dto, Closure $callback): AfterCreateTransactionDto
     {
         return DB::transaction(function () use ($dto, $callback) {
-            DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            User::query()->whereKey($dto->userId)->lockForUpdate()->firstOrFail();
 
             $amount = app(UserBalanceCalculator::class)
                 ->balanceFor($dto->userId, $dto->balanceType, forceFresh: true);

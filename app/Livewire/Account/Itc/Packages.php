@@ -917,18 +917,22 @@ class Packages extends Component
 
     public function profitReinvest(string $uuid, ItcPackageRepositoryContract $itcPackageRepo): void
     {
-        $toReinvestAmount = $itcPackageRepo->getCurrentProfitAmountByPackageUuid($uuid);
+        DB::transaction(function () use ($uuid, $itcPackageRepo) {
+            ItcPackage::query()->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
 
-        if ($toReinvestAmount->isNegativeOrZero()) {
-            throw new InvalidAmountException(__('livewire_itc_packages_insufficient_dividends_reinvest'));
-        }
+            $toReinvestAmount = $itcPackageRepo->getCurrentProfitAmountByPackageUuid($uuid);
 
-        PackageProfitReinvest::query()->create([
-            'uuid' => 'PPR-' . Str::random(10),
-            'package_uuid' => $uuid,
-            'amount' => $toReinvestAmount,
-            'matured_at' => Carbon::now()->addDays(180),
-        ]);
+            if ($toReinvestAmount->isNegativeOrZero()) {
+                throw new InvalidAmountException(__('livewire_itc_packages_insufficient_dividends_reinvest'));
+            }
+
+            PackageProfitReinvest::query()->create([
+                'uuid' => 'PPR-' . Str::random(10),
+                'package_uuid' => $uuid,
+                'amount' => $toReinvestAmount,
+                'matured_at' => Carbon::now()->addDays(180),
+            ]);
+        });
 
         Artisan::call('user:use-rank');
 
@@ -1040,14 +1044,12 @@ class Packages extends Component
     public function withdrawProfit(string $uuid, ItcPackageRepositoryContract $itcPackageRepo, TransactionRepositoryContract $transactionRepo): void
     {
         DB::transaction(function () use ($uuid, $itcPackageRepo, $transactionRepo) {
-            DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            ItcPackage::query()->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
 
             $toWithdrawAmount = $itcPackageRepo->getCurrentProfitAmountByPackageUuid($uuid);
 
             if ($toWithdrawAmount->isNegativeOrZero()) {
                 throw new InvalidAmountException(__('livewire_itc_packages_insufficient_dividends_withdraw'));
-
-                return;
             }
 
             $transaction = $transactionRepo->commonStore(new CreateTransactionDto(

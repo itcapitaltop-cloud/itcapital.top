@@ -55,7 +55,7 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
     public function whenCurrentProfitAmountIsPositive(string $uuid, Closure $callback): void
     {
         DB::transaction(function () use ($uuid, $callback) {
-            DB::raw('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            ItcPackage::query()->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
 
             $amount = $this->getCurrentProfitAmountByPackageUuid($uuid);
 

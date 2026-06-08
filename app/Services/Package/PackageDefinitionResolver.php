@@ -23,7 +23,10 @@ final class PackageDefinitionResolver
 
         try {
             $definition = PackageDefinition::query()
-                ->when($type !== PackageTypeEnum::STAKING, fn ($query) => $query->active())
+                ->when(
+                    ! in_array($type, [PackageTypeEnum::STAKING, PackageTypeEnum::PRESENT], true),
+                    fn ($query) => $query->active()
+                )
                 ->where('slug', $type->value)
                 ->orderBy('sort_order')
                 ->orderBy('id')
