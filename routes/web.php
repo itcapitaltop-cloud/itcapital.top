@@ -76,6 +76,7 @@ Route::get('/email/verified', static function () {
 
 Route::get('/', 'App\Http\Controllers\IndexController@index')->name('index');
 Route::view('/reviews', 'pages.reviews')->name('reviews');
+Route::view('/reviews/create', 'pages.reviews-create')->middleware('auth')->name('reviews.create');
 
 Route::middleware('guest')->group(function () {
     Route::view('sign-up', 'pages.auth.sign-up')->name('sign-up');

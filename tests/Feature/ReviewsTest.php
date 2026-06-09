@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ReviewStatusEnum;
+use App\Livewire\Reviews\Create;
 use App\Livewire\Reviews\Index;
 use App\Models\Review;
 use App\Models\User;
@@ -10,16 +11,15 @@ test('reviews page is accessible to guests', function () {
     $this->get(route('reviews'))->assertOk();
 });
 
-test('guest sees login prompt instead of review form', function () {
-    Livewire::test(Index::class)
-        ->assertSee(__('reviews_form_guest_prompt'));
+test('reviews create page redirects guests to login', function () {
+    $this->get(route('reviews.create'))->assertRedirect(route('login'));
 });
 
 test('authenticated user can submit a review', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test(Index::class)
+        ->test(Create::class)
         ->set('rating', 4)
         ->set('body', 'Отличная инвестиционная платформа, рекомендую!')
         ->call('submit')
@@ -36,7 +36,7 @@ test('review body validation requires minimum 10 characters', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
-        ->test(Index::class)
+        ->test(Create::class)
         ->set('rating', 5)
         ->set('body', 'Кратко')
         ->call('submit')
