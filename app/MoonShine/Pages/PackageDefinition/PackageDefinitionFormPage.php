@@ -46,8 +46,10 @@ class PackageDefinitionFormPage extends FormPage
                     ])
                     ->required(),
                 Number::make('Срок работы, месяцев', 'duration_months')
+                    ->required()
+                    ->hint('Минимум 1 месяц.')
                     ->customAttributes([
-                        'min' => 0,
+                        'min' => 1,
                         'max' => 120,
                         'step' => 1,
                     ]),

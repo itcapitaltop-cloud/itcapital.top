@@ -63,11 +63,15 @@ final class PackageDefinition extends Model
     protected static function booted(): void
     {
         self::saving(function (PackageDefinition $definition): void {
-            if (filled($definition->slug)) {
-                return;
+            if (blank($definition->slug)) {
+                $definition->slug = self::makeUniqueSlug((string) $definition->name, $definition->id);
             }
 
-            $definition->slug = self::makeUniqueSlug((string) $definition->name, $definition->id);
+            // sort_order is a NOT NULL column (default 0). An empty admin field
+            // submits NULL, which the database rejects — coerce it back to 0.
+            if ($definition->sort_order === null) {
+                $definition->sort_order = 0;
+            }
         });
     }
 

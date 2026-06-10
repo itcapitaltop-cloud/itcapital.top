@@ -215,6 +215,14 @@ class PackageDefinitionResource extends ModelResource
      */
     public function rules(Model $item): array
     {
+        $submittedType = request('type', $item instanceof PackageDefinition ? $item->type?->value : null);
+
+        $isPurchasable = in_array($submittedType, [
+            PackageTypeEnum::STANDARD->value,
+            PackageTypeEnum::PRIVILEGE->value,
+            PackageTypeEnum::VIP->value,
+        ], true);
+
         return [
             'slug' => [
                 'nullable',
@@ -231,7 +239,9 @@ class PackageDefinitionResource extends ModelResource
             'name' => ['required', 'string', 'max:100'],
             'default_profit_percent' => ['required', 'numeric', 'min:0', 'max:999.99'],
             'min_start_amount' => ['required', 'numeric', 'min:0'],
-            'duration_months' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'duration_months' => $isPurchasable
+                ? ['required', 'integer', 'min:1', 'max:120']
+                : ['required', 'integer', 'min:0', 'max:120'],
             'card_image_path' => ['nullable', 'image', 'max:3072', Rule::dimensions()->maxWidth(3000)->maxHeight(3000)],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
