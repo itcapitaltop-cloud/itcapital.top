@@ -842,5 +842,6 @@
     "reviews_page_be_first": "Leave a review",
     "reviews_form_you_are_as": "You are leaving a review as",
     "reviews_form_disclaimer": "IT Capital reserves the right to edit your review to correct grammatical and punctuation errors. The meaning of the review will not be distorted.",
-    "reviews_back": "Back to reviews"
+    "reviews_back": "Back to reviews",
+    "reviews_form_rating_of": "of 5"
 }

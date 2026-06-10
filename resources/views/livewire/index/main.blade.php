@@ -81,7 +81,7 @@
                             <div class="flex items-center gap-2">
                                 <div class="flex items-center gap-[4px]">
                                     @for ($i = 1; $i <= 5; $i++)
-                                        <img src="{{ vite()->icon('/main/star.svg') }}" alt="" class="{{ $reviewTotalCount > 0 && $i <= round($reviewAverageRating) ? '' : 'opacity-30' }}" />
+                                        <x-review-star :filled="$reviewTotalCount > 0 && $i <= round($reviewAverageRating)" />
                                     @endfor
                                 </div>
                                 @if($reviewTotalCount > 0)
@@ -137,7 +137,7 @@
                     <div class="flex items-center gap-2">
                         <div class="flex items-center gap-[4px]">
                             @for ($i = 1; $i <= 5; $i++)
-                                <img src="{{ vite()->icon('/main/star.svg') }}" alt="" class="{{ $reviewTotalCount > 0 && $i <= round($reviewAverageRating) ? '' : 'opacity-30' }}" />
+                                <x-review-star :filled="$reviewTotalCount > 0 && $i <= round($reviewAverageRating)" />
                             @endfor
                         </div>
                         @if($reviewTotalCount > 0)
