@@ -305,6 +305,7 @@ class PackageDefinitionResource extends ModelResource
                     'old_values' => $this->labelAuditValues($values['old']),
                     'new_values' => $this->labelAuditValues($values['new']),
                     'package_definition_id' => $packageDefinition->id,
+                    'package_name' => $packageDefinition->name,
                     'package_slug' => $packageDefinition->slug,
                     'admin_id' => $admin?->id,
                     'admin_login' => $admin?->email,

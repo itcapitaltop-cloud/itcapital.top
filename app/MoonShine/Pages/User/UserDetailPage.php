@@ -51,7 +51,6 @@ use MoonShine\Fields\Switcher;
 use MoonShine\Fields\Template;
 use MoonShine\Fields\Text;
 use MoonShine\Fields\Url;
-use MoonShine\Fields\Range;
 use MoonShine\Http\Requests\MoonShineFormRequest;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\Pages\Crud\DetailPage;
@@ -614,17 +613,18 @@ class UserDetailPage extends DetailPage
 
         if ($referralDepositsDateRange) {
             $dates = $referralDepositsDateRange;
-            if (!empty($dates['from'])) {
+
+            if (! empty($dates['from'])) {
 
                 $referralDepositsQuery->whereDate('transactions.accepted_at', '>=', Carbon::parse($dates['from'])->startOfDay());
             }
 
-            if (!empty($dates['to'])) {
+            if (! empty($dates['to'])) {
                 $referralDepositsQuery->whereDate('transactions.accepted_at', '<=', Carbon::parse($dates['to'])->endOfDay());
             }
         }
 
-        if (!empty($referralDepositsLines)) {
+        if (! empty($referralDepositsLines)) {
             $referralDepositsQuery->whereIn('partner_closures.depth', $referralDepositsLines);
         }
 
@@ -637,8 +637,8 @@ class UserDetailPage extends DetailPage
             ->pluck('depth')
             ->sort()
             ->values()
-            ->filter(fn($depth) => $depth > 0)
-            ->mapWithKeys(fn($depth) => [$depth => "Линия $depth"])
+            ->filter(fn ($depth) => $depth > 0)
+            ->mapWithKeys(fn ($depth) => [$depth => "Линия $depth"])
             ->toArray();
 
         $referralDepositsTab = Tab::make(
@@ -661,27 +661,27 @@ class UserDetailPage extends DetailPage
                         ->submit('Фильтровать', attributes: ['class' => 'btn-primary'])
                         ->buttons([
                             ActionButton::make('Сбросить', to_page(page: new UserDetailPage(), resource: new UserResource(), params: ['resourceItem' => $item->id, 'tab' => 'referral_deposits']))
-                                ->secondary()
+                                ->secondary(),
                         ]),
                 ]),
                 Divider::make(),
                 Block::make([
-                    Heading::make("Общая сумма: " . number_format((float)$referralDepositsTotalSum, 2, '.', ' ') . " $")->h(3),
+                    Heading::make('Общая сумма: ' . number_format((float) $referralDepositsTotalSum, 2, '.', ' ') . ' $')->h(3),
                     TableBuilder::make()
                         ->withNotFound()
                         ->fields([
-                            Text::make('Пользователь', 'user.username', formatted: fn($trx) => $trx->user?->username ?? 'Н/Д'),
-                            Text::make('Email', 'user.email', formatted: fn($trx) => $trx->user?->email ?? 'Н/Д'),
+                            Text::make('Пользователь', 'user.username', formatted: fn ($trx) => $trx->user?->username ?? 'Н/Д'),
+                            Text::make('Email', 'user.email', formatted: fn ($trx) => $trx->user?->email ?? 'Н/Д'),
                             Text::make('Линия', 'line'),
-                            Text::make('Сумма', 'amount', formatted: fn($trx) => number_format((float)$trx->amount, 2, '.', ' ') . " $"),
+                            Text::make('Сумма', 'amount', formatted: fn ($trx) => number_format((float) $trx->amount, 2, '.', ' ') . ' $'),
                             Date::make('Дата одобрения', 'accepted_at')->format('d.m.Y H:i:s'),
                         ])
                         ->cast(ModelCast::make(Transaction::class))
-                        ->items($referralDeposits)
-                ])
+                        ->items($referralDeposits),
+                ]),
             ]
         )->name('referral_deposits')
-            ->active(fn() => $activeTab === 'referral_deposits');
+            ->active(fn () => $activeTab === 'referral_deposits');
 
         $in = Transaction::query()
             ->where('user_id', $item->id)
@@ -1126,7 +1126,7 @@ class UserDetailPage extends DetailPage
                                         ])
                                         ->items($adminLogs),
                                 ]
-                            )->active(fn () => ! request()->has('user_logs_page')),
+                            )->active(fn (): bool => $this->activeJournalTab() === 'admin'),
                             Tab::make('Пользователь', [
                                 TableBuilder::make()
                                     ->withNotFound()
@@ -1150,7 +1150,7 @@ class UserDetailPage extends DetailPage
 
                                         return $attributes->merge(['style' => "color: {$color};"]);
                                     }),
-                            ])->active(fn () => request()->has('user_logs_page')),
+                            ])->active(fn (): bool => $this->activeJournalTab() === 'user'),
                         ]),
                     ]
                 )
@@ -1167,6 +1167,17 @@ class UserDetailPage extends DetailPage
     public function giveGift(MoonShineFormRequest $request): MoonShineJsonResponse
     {
         return MoonShineJsonResponse::make();
+    }
+
+    /**
+     * Активная вложенная вкладка журнала («Администратор»/«Пользователь»).
+     * Ссылки пагинации каждой вкладки несут явный маркер journal_tab (его ставит
+     * ActivityFeedService), иначе после листания «Пользователя» его user_logs_page
+     * остался бы в URL и пагинация «Администратора» возвращала бы не на ту вкладку.
+     */
+    private function activeJournalTab(): string
+    {
+        return (string) request('journal_tab', request()->has('user_logs_page') ? 'user' : 'admin');
     }
 
     /**

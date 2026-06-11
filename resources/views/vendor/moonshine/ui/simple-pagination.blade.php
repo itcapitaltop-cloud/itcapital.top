@@ -1,57 +1,33 @@
 {{--
-    Переопределение simple-пагинации MoonShine.
-
-    Отличия от стандартной:
-    - если листать некуда (вся история на одной странице) — блок не показывается,
-      чтобы админ не кликал по «мёртвым» кнопкам;
-    - показываем номер текущей страницы — видно, что идёт листание;
-    - недоступная кнопка явно погашена (полупрозрачная, некликабельная).
+    Переопределение simple-пагинации MoonShine (simplePaginate, без общего количества)
+    в стиле журнала «Настройки пакетов»: кнопки «Назад»/«Вперёд» и номер текущей
+    страницы. Если листать некуда (всё на одной странице) — блок не показывается.
 --}}
 @php
     $hasPrev = ! $paginator->onFirstPage();
     $hasNext = $paginator->hasMorePages();
-    $disabledStyle = 'opacity:.4;cursor:not-allowed;pointer-events:none;';
 @endphp
 
 @if ($hasPrev || $hasNext)
-    <ul class="pagination-list simple">
-        {{-- Назад --}}
-        <li>
-            @if ($hasPrev)
-                <a href="{{ $paginator->previousPageUrl() }}"
-                   @if($async ?? false) @click.prevent="asyncRequest" @endif
-                   class="pagination-simple"
-                >
-                    {!! __('moonshine::pagination.previous') !!}
-                </a>
-            @else
-                <span class="pagination-simple disabled" style="{{ $disabledStyle }}">
-                    {!! __('moonshine::pagination.previous') !!}
-                </span>
-            @endif
-        </li>
+    <div class="mt-4 flex items-center gap-2">
+        @if ($hasPrev)
+            <a class="btn btn-primary"
+               href="{{ $paginator->previousPageUrl() }}"
+               @if($async ?? false) @click.prevent="asyncRequest" @endif
+            >Назад</a>
+        @else
+            <span class="btn pointer-events-none opacity-50">Назад</span>
+        @endif
 
-        {{-- Текущая страница --}}
-        <li>
-            <span class="pagination-simple" style="pointer-events:none;background:transparent;border:none;font-weight:600;">
-                {{ __('Страница') }} {{ $paginator->currentPage() }}
-            </span>
-        </li>
+        <span>Страница {{ $paginator->currentPage() }}</span>
 
-        {{-- Вперёд --}}
-        <li>
-            @if ($hasNext)
-                <a href="{{ $paginator->nextPageUrl() }}"
-                   @if($async ?? false) @click.prevent="asyncRequest" @endif
-                   class="pagination-simple"
-                >
-                    {!! __('moonshine::pagination.next') !!}
-                </a>
-            @else
-                <span class="pagination-simple disabled" style="{{ $disabledStyle }}">
-                    {!! __('moonshine::pagination.next') !!}
-                </span>
-            @endif
-        </li>
-    </ul>
+        @if ($hasNext)
+            <a class="btn btn-primary"
+               href="{{ $paginator->nextPageUrl() }}"
+               @if($async ?? false) @click.prevent="asyncRequest" @endif
+            >Вперёд</a>
+        @else
+            <span class="btn pointer-events-none opacity-50">Вперёд</span>
+        @endif
+    </div>
 @endif

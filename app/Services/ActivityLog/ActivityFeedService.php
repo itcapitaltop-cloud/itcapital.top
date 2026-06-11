@@ -16,7 +16,7 @@ use App\Models\ItcPackage;
 use App\Models\Transaction;
 use App\Models\Withdraw;
 use Carbon\Carbon;
-use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -77,16 +77,18 @@ final class ActivityFeedService
     }
 
     /**
-     * Страница пользовательских логов карточки. simplePaginate не делает COUNT —
-     * безопасно по памяти даже при огромном числе записей.
+     * Страница пользовательских логов карточки. Полный paginate (с COUNT) нужен,
+     * чтобы пагинация показывала сводку «Показано от X до Y из Z» и число страниц —
+     * единое оформление журналов админки.
      *
-     * @return Paginator<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
+     * @return LengthAwarePaginator<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
      */
-    public function userDetailUserFeed(int $userId, int $perPage = 50): Paginator
+    public function userDetailUserFeed(int $userId, int $perPage = 50): LengthAwarePaginator
     {
         return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser)
-            ->simplePaginate($perPage, pageName: 'user_logs_page')
+            ->paginate($perPage, pageName: 'user_logs_page')
             ->withQueryString()
+            ->appends(['journal_tab' => 'user'])
             ->through(function (BusinessActivity $activity): array {
                 $amount = $activity->getExtraProperty('amount');
 
@@ -138,18 +140,20 @@ final class ActivityFeedService
     }
 
     /**
-     * Страница админских логов карточки. simplePaginate не делает COUNT —
-     * безопасно по памяти даже при огромном числе записей.
+     * Страница админских логов карточки. Полный paginate (с COUNT) нужен,
+     * чтобы пагинация показывала сводку «Показано от X до Y из Z» и число страниц —
+     * единое оформление журналов админки.
      *
-     * @return Paginator<int, array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}>
+     * @return LengthAwarePaginator<int, array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}>
      */
-    public function userDetailAdminFeed(int $userId, int $perPage = 50): Paginator
+    public function userDetailAdminFeed(int $userId, int $perPage = 50): LengthAwarePaginator
     {
         return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin)
             ->where('description', '!=', LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT->value)
             ->where('description', '!=', LogActionTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT->value)
-            ->simplePaginate($perPage, pageName: 'admin_logs_page')
+            ->paginate($perPage, pageName: 'admin_logs_page')
             ->withQueryString()
+            ->appends(['journal_tab' => 'admin'])
             ->through(function (BusinessActivity $activity): array {
                 $oldValues = collect((array) $activity->getExtraProperty('old_values', []));
                 $newValues = collect((array) $activity->getExtraProperty('new_values', []));

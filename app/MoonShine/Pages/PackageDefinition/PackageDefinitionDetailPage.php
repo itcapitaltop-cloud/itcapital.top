@@ -8,6 +8,7 @@ use App\Models\BusinessActivity;
 use App\Models\Package\PackageDefinition;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use MoonShine\Components\FlexibleRender;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Components\TableBuilder;
@@ -33,18 +34,11 @@ class PackageDefinitionDetailPage extends DetailPage
             return [];
         }
 
-        $activeTab = request('tab', 'data');
         $eventSearch = trim((string) request('package_definition_activity_event', ''));
-        $activities = BusinessActivity::query()
-            ->where('subject_type', PackageDefinition::class)
-            ->where('subject_id', $packageDefinition->id)
-            ->with('causer')
-            ->when($eventSearch !== '', function (Builder $query) use ($eventSearch): void {
-                $query->whereRaw('lower(description) like ?', ['%' . mb_strtolower($eventSearch) . '%']);
-            })
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->paginate(15, ['*'], 'package_definition_activity_page');
+
+        // Keep the "Журнал" tab open after paginating or searching its table.
+        $onJournal = request()->has('package_definition_activity_page') || $eventSearch !== '';
+        $activeTab = $onJournal ? 'logs' : request('tab', 'data');
 
         return [
             Tabs::make([
@@ -60,26 +54,72 @@ class PackageDefinitionDetailPage extends DetailPage
                     Text::make('Статус', formatted: fn (PackageDefinition $item): string => $item->trashed() ? 'Архив' : ($item->is_active ? 'Доступен в ЛК' : 'Только в админке')),
                     Number::make('Сортировка', 'sort_order'),
                 ])->active(fn (): bool => $activeTab === 'data'),
-                Tab::make('Журнал', [
-                    FlexibleRender::make(fn (): string => $this->activitySearchForm($eventSearch)),
-                    TableBuilder::make()
-                        ->withNotFound()
-                        ->fields([
-                            Text::make('Событие', 'event'),
-                            Text::make('Администратор', 'admin_login'),
-                            Text::make('Старые значения', 'old_values'),
-                            Text::make('Новые значения', 'new_values'),
-                            Text::make('Дата', 'date'),
-                        ])
-                        ->items($activities->through(fn (BusinessActivity $activity): array => [
-                            'event' => $activity->description,
-                            'admin_login' => $this->activityAdminLogin($activity),
-                            'old_values' => $this->formatActivityValues((array) $activity->getExtraProperty('old_values', [])),
-                            'new_values' => $this->formatActivityValues((array) $activity->getExtraProperty('new_values', [])),
-                            'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
-                        ])),
-                ])->active(fn (): bool => $activeTab === 'logs'),
+                Tab::make('Журнал', $this->journalComponents($packageDefinition->id, $eventSearch))
+                    ->active(fn (): bool => $activeTab === 'logs'),
             ]),
+        ];
+    }
+
+    /**
+     * @return list<MoonShineComponent>
+     */
+    private function journalComponents(int $packageDefinitionId, string $eventSearch): array
+    {
+        $activities = BusinessActivity::query()
+            ->where('subject_type', PackageDefinition::class)
+            ->where('subject_id', $packageDefinitionId)
+            ->with('causer')
+            ->when($eventSearch !== '', function (Builder $query) use ($eventSearch): void {
+                $query->whereRaw('lower(description) like ?', ['%' . mb_strtolower($eventSearch) . '%']);
+            })
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(15, ['*'], 'package_definition_activity_page')
+            ->appends(array_filter([
+                'tab' => 'logs',
+                'resourceItem' => request('resourceItem'),
+                'package_definition_activity_event' => $eventSearch !== '' ? $eventSearch : null,
+            ]));
+
+        $rows = collect($activities->items())
+            ->map(fn (BusinessActivity $activity): array => [
+                'event' => $activity->description,
+                'admin_login' => $this->activityAdminLogin($activity),
+                'old_values' => $this->formatActivityValues((array) $activity->getExtraProperty('old_values', [])),
+                'new_values' => $this->formatActivityValues((array) $activity->getExtraProperty('new_values', [])),
+                'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+            ])
+            ->all();
+
+        return [
+            FlexibleRender::make(fn (): string => $this->activitySearchForm($eventSearch)),
+            TableBuilder::make()
+                ->withNotFound()
+                ->fields([
+                    Text::make('Событие', 'event'),
+                    Text::make('Администратор', 'admin_login'),
+                    Text::make('Старые значения', 'old_values'),
+                    Text::make('Новые значения', 'new_values'),
+                    Text::make('Дата', 'date'),
+                ])
+                ->items($rows),
+            ...$this->journalPagination($activities),
+        ];
+    }
+
+    /**
+     * Render the journal pagination ourselves, inside the journal tab, through the shared
+     * admin pagination view (resources/views/vendor/moonshine/ui/pagination.blade.php).
+     * Passing a plain array to the table (instead of a paginator) stops MoonShine from
+     * rendering its own paginator block, which otherwise leaked under the "Данные" tab.
+     *
+     * @param LengthAwarePaginator $paginator
+     * @return list<MoonShineComponent>
+     */
+    private function journalPagination(LengthAwarePaginator $paginator): array
+    {
+        return [
+            FlexibleRender::make(fn (): string => $paginator->links('moonshine::ui.pagination')->toHtml()),
         ];
     }
 
