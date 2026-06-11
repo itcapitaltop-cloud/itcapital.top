@@ -185,7 +185,11 @@ final class ProgressBarAction extends Action
                     : 0.0;
                 $current = $factualTurnover + $topUp;
             } else {
-                $factualTurnover = $actual;
+                // После понижения ранга к повышению засчитывается только оборот,
+                // сгенерированный после базлайна понижения.
+                $factualTurnover = $user->rank_demoted_at
+                    ? $this->calcTurnoverByLine($user->id, $line, $user->rank_demoted_at->toDateTimeString())
+                    : $actual;
                 $topUp = 0.0;
                 $current = $factualTurnover;
                 $displayTarget = $target;

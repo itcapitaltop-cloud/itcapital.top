@@ -56,9 +56,13 @@ use Illuminate\Notifications\Notifiable;
  *
  * @property int $rank
  * @property int $max_rank_awarded
+ * @property \Illuminate\Support\Carbon|null $rank_demoted_at
+ * @property \Illuminate\Support\Carbon|null $rank_demotion_period_end
  *
  * @method static \Illuminate\Database\Eloquent\Builder|User whereRank($value)
  * @method static \Illuminate\Database\Eloquent\Builder|User whereMaxRankAwarded($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|User whereRankDemotedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|User whereRankDemotionPeriodEnd($value)
  *
  * @mixin \Eloquent
  */
@@ -78,6 +82,8 @@ final class User extends Authenticatable implements MustVerifyEmail
         'email',
         'rank',
         'max_rank_awarded',
+        'rank_demoted_at',
+        'rank_demotion_period_end',
         'password',
         'banned_at',
         'session_version',
@@ -116,6 +122,8 @@ final class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'banned_at' => 'datetime',
             'overridden_rank_from' => 'datetime',
+            'rank_demoted_at' => 'datetime',
+            'rank_demotion_period_end' => 'datetime',
             'settings' => AsCollection::class,
         ];
     }

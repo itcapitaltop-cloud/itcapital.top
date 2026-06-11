@@ -119,7 +119,7 @@ class PackageDefinitionDetailPage extends DetailPage
     private function journalPagination(LengthAwarePaginator $paginator): array
     {
         return [
-            FlexibleRender::make(fn (): string => $paginator->links('moonshine::ui.pagination')->toHtml()),
+            FlexibleRender::make(fn (): string => $paginator->links('moonshine::ui.pagination', ['async' => false])->toHtml()),
         ];
     }
 

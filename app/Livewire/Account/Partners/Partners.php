@@ -522,7 +522,11 @@ class Partners extends Component
                     : 0.0;
                 $current = $factualTurnover + $topUp;
             } else {
-                $factualTurnover = $actual;
+                // После понижения ранга к повышению засчитывается только оборот,
+                // сгенерированный после базлайна понижения.
+                $factualTurnover = $user->rank_demoted_at
+                    ? $this->calcTurnoverByLine($line, $user->rank_demoted_at->toDateTimeString())
+                    : $actual;
                 $topUp = 0.0;
                 $current = $factualTurnover;
                 $displayTarget = $target;

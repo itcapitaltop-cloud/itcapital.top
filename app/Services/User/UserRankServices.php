@@ -59,6 +59,11 @@ final class UserRankServices
      * выполняется исключительно ежемесячным заданием обслуживания
      * (по одному шагу). Бонус начисляется один раз за ранг —
      * только когда новый ранг превышает `max_rank_awarded`.
+     *
+     * После понижения (`rank_demoted_at` установлен) повышение возможно
+     * только за счёт оборота, сгенерированного после понижения. Когда
+     * пользователь снова достигает своего пикового ранга (`max_rank_awarded`),
+     * базлайн понижения сбрасывается и оборот снова считается за всё время.
      */
     public function recalculateAndUpdateRank(User $user, bool $withBonus = true): bool
     {
@@ -119,6 +124,10 @@ final class UserRankServices
                 $attributes['max_rank_awarded'] = $newRank;
             }
 
+            if (! is_null($user->rank_demoted_at) && $newRank >= $maxRankAwarded) {
+                $attributes['rank_demoted_at'] = null;
+            }
+
             $user->update($attributes);
         });
 
@@ -140,7 +149,13 @@ final class UserRankServices
      * Для сохранения ранга `N` пользователь должен за расчётный месяц выполнить
      * требования по линиям ранга `N-2`. Если хотя бы одна линия не выполнена —
      * ранг понижается ровно на один шаг (`N → N-1`). Кумулятивный оборот и
-     * `max_rank_awarded` при этом не изменяются.
+     * `max_rank_awarded` при этом не изменяются, но фиксируется базлайн
+     * `rank_demoted_at`: для возврата ранга учитывается только оборот,
+     * сгенерированный после понижения.
+     *
+     * Метод идемпотентен в пределах расчётного окна: повторный запуск за уже
+     * обработанное окно (`rank_demotion_period_end >= periodEnd`) понижение
+     * не применяет — один проваленный месяц наказывается ровно один раз.
      *
      * @param \App\Models\User $user
      * @param \Carbon\CarbonInterface $periodStart Начало расчётного окна включительно
@@ -162,6 +177,19 @@ final class UserRankServices
             Log::debug('[UserRankServices.applyMonthlyMaintenance] skipped: manual override', [
                 'user_id' => $user->id,
                 'rank' => $currentRank,
+            ]);
+
+            return false;
+        }
+
+        // Идемпотентность: за один проваленный месяц ранг понижается не более
+        // одного раза, повторный запуск за то же окно ничего не меняет.
+        if (! is_null($user->rank_demotion_period_end) && $user->rank_demotion_period_end->gte($periodEnd)) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] skipped: window already processed', [
+                'user_id' => $user->id,
+                'rank' => $currentRank,
+                'rank_demotion_period_end' => $user->rank_demotion_period_end->toDateTimeString(),
+                'period_end' => $periodEnd->toDateTimeString(),
             ]);
 
             return false;
@@ -260,7 +288,11 @@ final class UserRankServices
         }
 
         DB::transaction(function () use ($user, $currentRank, $newRank, $periodStart, $periodEnd): void {
-            $user->update(['rank' => $newRank]);
+            $user->update([
+                'rank' => $newRank,
+                'rank_demoted_at' => $periodEnd,
+                'rank_demotion_period_end' => $periodEnd,
+            ]);
 
             Notify::rankDecreased($user, $newRank);
 
@@ -447,8 +479,12 @@ final class UserRankServices
         $lineIds = $this->getDescendantIds($user->id, $line);
 
         if (! $this->useManualRankBaseline) {
-            $buyAmount = $this->calculateBuyAmount($lineIds, null);
-            $reinvestAmount = $this->calculateReinvestAmount($lineIds, null);
+            // После понижения для повышения засчитывается только оборот,
+            // сгенерированный после базлайна понижения.
+            $demotedAt = $user->rank_demoted_at;
+
+            $buyAmount = $this->calculateBuyAmount($lineIds, $demotedAt);
+            $reinvestAmount = $this->calculateReinvestAmount($lineIds, $demotedAt);
 
             $turnover = $buyAmount + $reinvestAmount;
 
@@ -458,6 +494,7 @@ final class UserRankServices
                 'buy_amount' => $buyAmount,
                 'reinvest_amount' => $reinvestAmount,
                 'turnover' => $turnover,
+                'rank_demoted_at' => $demotedAt?->toDateTimeString(),
                 'mode' => 'natural',
             ]);
 

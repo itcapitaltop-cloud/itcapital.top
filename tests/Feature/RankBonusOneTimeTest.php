@@ -32,13 +32,21 @@ it('pays the rank bonus only once even after losing and re-achieving the rank', 
         ->and((int) $user->max_rank_awarded)->toBe(2)
         ->and($bonusTransactions())->toBe(1);
 
-    // Simulate losing the rank (e.g. monthly demotion) while keeping max_rank_awarded.
-    $user->update(['rank' => 0]);
+    // Simulate losing the rank via the monthly demotion: the baseline is recorded
+    // and max_rank_awarded is kept.
+    $user->update(['rank' => 1, 'rank_demoted_at' => now()->subDay()]);
 
-    // Re-achieving rank 2 persists the rank again but pays no second bonus.
+    // Pre-demotion turnover alone must not re-achieve the rank.
+    expect($this->service->recalculateAndUpdateRank($user))->toBeFalse()
+        ->and((int) $user->refresh()->rank)->toBe(1);
+
+    // Fresh post-demotion turnover re-achieves rank 2 but pays no second bonus.
+    addPartnerLineTurnover($user, 1_200.0, now());
+
     expect($this->service->recalculateAndUpdateRank($user))->toBeTrue();
     $user->refresh();
 
     expect((int) $user->rank)->toBe(2)
+        ->and($user->rank_demoted_at)->toBeNull()
         ->and($bonusTransactions())->toBe(1);
 });

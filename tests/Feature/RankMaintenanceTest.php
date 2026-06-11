@@ -48,13 +48,51 @@ it('demotes one step per consecutive failing month', function (): void {
     createPartnerRank(3, lineRequired: 1000.0); // threshold for rank 5
 
     $user = User::factory()->create(['rank' => 5]);
-    // No turnover inside the window → maintenance fails every month.
+    // No turnover inside either window → maintenance fails every month.
 
     $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
     expect((int) $user->refresh()->rank)->toBe(4);
 
-    $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
+    // The next month's run evaluates the next window and demotes one more step.
+    $nextPeriodEnd = $this->periodEnd->copy()->addMonthNoOverflow();
+
+    $this->service->applyMonthlyMaintenance($user, $this->periodEnd, $nextPeriodEnd);
     expect((int) $user->refresh()->rank)->toBe(3);
+});
+
+it('demotes at most once per evaluated window on repeated runs', function (): void {
+    createPartnerRank(2, lineRequired: 1000.0); // threshold for rank 4
+    createPartnerRank(3, lineRequired: 1000.0); // threshold for rank 5
+
+    $user = User::factory()->create(['rank' => 5]);
+
+    expect($this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd))->toBeTrue()
+        ->and((int) $user->refresh()->rank)->toBe(4);
+
+    // Re-running maintenance for the same window must not demote again.
+    expect($this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd))->toBeFalse()
+        ->and((int) $user->refresh()->rank)->toBe(4);
+});
+
+it('does not demote again for the same window after the rank was regained', function (): void {
+    createPartnerRank(1); // always-met fallback
+    createPartnerRank(3, lineRequired: 1_000.0);
+    createPartnerRank(5, lineRequired: 5_000.0);
+
+    $user = User::factory()->create(['rank' => 5, 'max_rank_awarded' => 5]);
+    addPartnerLineTurnover($user, 999_999.0, $this->periodStart->copy()->subMonths(2));
+
+    $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
+    expect((int) $user->refresh()->rank)->toBe(4);
+
+    // Fresh post-demotion turnover regains rank 5 and clears the baseline.
+    addPartnerLineTurnover($user, 5_000.0, now());
+    $this->service->recalculateAndUpdateRank($user);
+    expect((int) $user->refresh()->rank)->toBe(5);
+
+    // The already-punished month must not demote the regained rank again.
+    expect($this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd))->toBeFalse()
+        ->and((int) $user->refresh()->rank)->toBe(5);
 });
 
 it('preserves cumulative line turnover when demoting', function (): void {
@@ -118,6 +156,84 @@ it('does not persist demotions on a --dry-run', function (): void {
     Artisan::call('partner:rank-maintenance', ['--user' => $user->id, '--dry-run' => true]);
 
     expect((int) $user->refresh()->rank)->toBe(5);
+});
+
+it('stamps the demotion baseline when demoting', function (): void {
+    createPartnerRank(3, lineRequired: 1000.0);
+
+    $user = User::factory()->create(['rank' => 5]);
+
+    $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
+
+    expect($user->refresh()->rank_demoted_at?->toDateTimeString())
+        ->toBe($this->periodEnd->toDateTimeString());
+});
+
+it('does not re-promote a demoted user from pre-demotion turnover', function (): void {
+    createPartnerRank(1); // always-met fallback
+    createPartnerRank(3, lineRequired: 1_000.0); // maintenance threshold for rank 5
+    createPartnerRank(5, lineRequired: 5_000.0);
+
+    $user = User::factory()->create(['rank' => 5, 'max_rank_awarded' => 5]);
+    // Lifetime turnover meets rank 5, but it was generated before the demotion.
+    addPartnerLineTurnover($user, 999_999.0, $this->periodStart->copy()->subMonths(2));
+
+    $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
+    expect((int) $user->refresh()->rank)->toBe(4);
+
+    // The real-time recalculation must not bounce the rank back from old turnover.
+    $changed = $this->service->recalculateAndUpdateRank($user);
+
+    expect($changed)->toBeFalse()
+        ->and((int) $user->refresh()->rank)->toBe(4);
+});
+
+it('regains the rank with post-demotion turnover, clears the baseline and pays no second bonus', function (): void {
+    createPartnerRank(1); // always-met fallback
+    createPartnerRank(3, lineRequired: 1_000.0);
+    createPartnerRank(5, lineRequired: 5_000.0, bonus: 100.0);
+
+    $user = User::factory()->create(['rank' => 5, 'max_rank_awarded' => 5]);
+    addPartnerLineTurnover($user, 999_999.0, $this->periodStart->copy()->subMonths(2));
+
+    $this->service->applyMonthlyMaintenance($user, $this->periodStart, $this->periodEnd);
+    expect((int) $user->refresh()->rank)->toBe(4);
+
+    // Fresh turnover generated after the demotion meets the rank 5 requirement again.
+    addPartnerLineTurnover($user, 5_000.0, now());
+
+    expect($this->service->recalculateAndUpdateRank($user))->toBeTrue();
+    $user->refresh();
+
+    $bonusTransactions = Transaction::query()
+        ->where('user_id', $user->id)
+        ->where('trx_type', TrxTypeEnum::RANK_BONUS_ACCRUAL)
+        ->count();
+
+    expect((int) $user->rank)->toBe(5)
+        ->and($user->rank_demoted_at)->toBeNull()
+        ->and($bonusTransactions)->toBe(0);
+});
+
+it('keeps the demotion baseline while the user is below the previous peak', function (): void {
+    createPartnerRank(1); // always-met fallback
+    createPartnerRank(3, lineRequired: 1_000.0);
+    createPartnerRank(5, lineRequired: 5_000.0);
+
+    $user = User::factory()->create([
+        'rank' => 2,
+        'max_rank_awarded' => 5,
+        'rank_demoted_at' => now()->subDays(10),
+    ]);
+
+    // Post-demotion turnover meets rank 3 but not the previous peak (rank 5).
+    addPartnerLineTurnover($user, 1_500.0, now()->subDay());
+
+    expect($this->service->recalculateAndUpdateRank($user))->toBeTrue();
+    $user->refresh();
+
+    expect((int) $user->rank)->toBe(3)
+        ->and($user->rank_demoted_at)->not->toBeNull();
 });
 
 it('never persists a downgrade through the real-time recalculation', function (): void {
