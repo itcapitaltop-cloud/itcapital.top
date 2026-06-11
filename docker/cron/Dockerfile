@@ -1,6 +1,9 @@
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE}
 USER root
+
+ARG WWWGROUP=1000
+ARG WWWUSER=1000
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
@@ -23,14 +26,19 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Create symlink for php command
 RUN ln -s /usr/bin/php8.4 /usr/local/bin/php
 
+# Create the sail user/group so scheduled tasks run as the same uid/gid (1000)
+# as php-fpm in the app container — keeps storage/logs ownership consistent
+RUN groupadd --force -g $WWWGROUP sail \
+    && useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u $WWWUSER sail
+
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy crontab
+# Copy crontab and install it for the sail user (cron daemon runs jobs as sail)
 COPY crontab /etc/cron.d/app
 RUN chmod 0644 /etc/cron.d/app && \
     chown root:root /etc/cron.d/app && \
-    crontab /etc/cron.d/app
+    crontab -u sail /etc/cron.d/app
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
