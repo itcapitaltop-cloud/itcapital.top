@@ -44,6 +44,7 @@ use Illuminate\Validation\Validator;
 use MoonShine\Enums\ToastType;
 use MoonShine\Http\Responses\MoonShineJsonResponse;
 use MoonShine\MoonShineRequest;
+use MoonShine\MoonShineUI;
 use MoonShine\Permissions\Models\MoonshineUser;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -152,7 +153,7 @@ class AdminController extends Controller
             ->redirect(request()->headers->get('referer'));
     }
 
-    public function exportUserOperations(Request $request, int $userId): StreamedResponse
+    public function exportUserOperations(Request $request, int $userId): StreamedResponse|RedirectResponse
     {
         $user = User::withoutGlobalScope('notBanned')->findOrFail($userId);
 
@@ -174,10 +175,18 @@ class AdminController extends Controller
             ? Carbon::parse($validated['date_to'])->endOfDay()
             : null;
 
+        $logs = app(ActivityFeedService::class)->userDetailUserFeedForExport($user->id, $dateFrom, $dateTo);
+
+        if ($logs->isEmpty()) {
+            MoonShineUI::toast('За выбранный период нет данных для выгрузки', ToastType::WARNING->value);
+
+            return redirect()->back();
+        }
+
         $filename = sprintf('user-%d-journal-%s.xlsx', $user->id, now()->format('Ymd-His'));
 
         return response()->streamDownload(
-            function () use ($user, $dateFrom, $dateTo): void {
+            function () use ($logs): void {
                 $spreadsheet = new Spreadsheet();
                 $sheet = $spreadsheet->getActiveSheet();
                 $sheet->setTitle('Журнал пользователя');
@@ -191,7 +200,7 @@ class AdminController extends Controller
 
                 $row = 2;
 
-                foreach (app(ActivityFeedService::class)->userDetailUserFeedForExport($user->id, $dateFrom, $dateTo) as $log) {
+                foreach ($logs as $log) {
                     $sheet->fromArray([
                         $log['type'],
                         $log['operation_amount'],
