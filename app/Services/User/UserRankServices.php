@@ -39,9 +39,9 @@ final class UserRankServices
     private bool $useManualRankBaseline = false;
 
     /**
-     * @param \App\Contracts\Repositories\PartnerRepositoryContract $partnerRepository
-     * @param \App\Contracts\Packages\ItcPackageRepositoryContract $itcPackageRepository
-     * @param \App\Tasks\User\AwardUserRankBonusTask $awardUserRankBonusTask
+     * @param PartnerRepositoryContract $partnerRepository
+     * @param ItcPackageRepositoryContract $itcPackageRepository
+     * @param AwardUserRankBonusTask $awardUserRankBonusTask
      */
     public function __construct(
         private readonly PartnerRepositoryContract $partnerRepository,
@@ -144,6 +144,63 @@ final class UserRankServices
     }
 
     /**
+     * Снять ручной ранг и пересчитать его до фактического (натурального).
+     *
+     * В отличие от реалтайм-пересчёта (`recalculateAndUpdateRank`), который
+     * работает только на повышение, этот метод выставляет натуральный ранг в
+     * обе стороны: при отключении ручного ранга он должен опуститься до реально
+     * заработанного по оборотам линий. Бонус повторно не начисляется, а
+     * `max_rank_awarded` не понижается (зафиксированный пик сохраняется).
+     *
+     * @param User $user
+     * @return bool Изменился ли ранг
+     */
+    public function syncRankToNatural(User $user): bool
+    {
+        $this->resetCaches();
+
+        $oldRank = (int) $user->rank;
+        $naturalRank = $this->calculateNaturalRank($user);
+
+        if ($naturalRank === $oldRank) {
+            return false;
+        }
+
+        DB::transaction(function () use ($user, $oldRank, $naturalRank): void {
+            $this->activityLogger->write(new WriteBusinessActivityData(
+                type: $naturalRank > $oldRank
+                    ? ActivityEventTypeEnum::PartnerRankIncreased
+                    : ActivityEventTypeEnum::PartnerRankDecreased,
+                userId: $user->id,
+                subject: $user,
+                feeds: [ActivityFeedTypeEnum::Partners, ActivityFeedTypeEnum::UserDetailUser],
+                properties: [
+                    'old_rank' => $oldRank,
+                    'new_rank' => $naturalRank,
+                    'reason' => 'manual_override_disabled',
+                ],
+                causer: $user,
+                logName: 'partners',
+                context: 'rank',
+            ));
+
+            $attributes = ['rank' => $naturalRank];
+
+            if ($naturalRank > (int) $user->max_rank_awarded) {
+                $attributes['max_rank_awarded'] = $naturalRank;
+            }
+
+            if (! is_null($user->rank_demoted_at) && $naturalRank >= (int) $user->max_rank_awarded) {
+                $attributes['rank_demoted_at'] = null;
+            }
+
+            $user->update($attributes);
+        });
+
+        return true;
+    }
+
+    /**
      * Применить ежемесячное обслуживание ранга (постепенное понижение).
      *
      * Для сохранения ранга `N` пользователь должен за расчётный месяц выполнить
@@ -157,9 +214,9 @@ final class UserRankServices
      * обработанное окно (`rank_demotion_period_end >= periodEnd`) понижение
      * не применяет — один проваленный месяц наказывается ровно один раз.
      *
-     * @param \App\Models\User $user
-     * @param \Carbon\CarbonInterface $periodStart Начало расчётного окна включительно
-     * @param \Carbon\CarbonInterface $periodEnd Конец расчётного окна исключительно
+     * @param User $user
+     * @param CarbonInterface $periodStart Начало расчётного окна включительно
+     * @param CarbonInterface $periodEnd Конец расчётного окна исключительно
      * @param bool $dryRun Только рассчитать и залогировать понижение, не сохраняя его
      * @return bool Был ли (или был бы при dry-run) понижен ранг
      */
@@ -351,7 +408,7 @@ final class UserRankServices
     /**
      * Рассчитать ранг пользователя
      *
-     * @param \App\Models\User $user
+     * @param User $user
      * @return int
      */
     public function calculateRank(User $user): int
@@ -414,7 +471,7 @@ final class UserRankServices
     /**
      * Проверка соответствия требованиям ранга
      *
-     * @param \App\Models\User $user
+     * @param User $user
      * @param object $rankData
      * @param float $personalDeposit
      * @return bool
@@ -466,7 +523,7 @@ final class UserRankServices
     /**
      * Получить оборот по линии с кэшированием
      *
-     * @param \App\Models\User $user
+     * @param User $user
      * @param int $line
      * @return float
      */
@@ -545,7 +602,7 @@ final class UserRankServices
     /**
      * Получить базовое требование по линии (для override ранга)
      *
-     * @param \App\Models\User $user
+     * @param User $user
      * @param int $line
      * @return float
      */
@@ -575,7 +632,7 @@ final class UserRankServices
      *
      * @param int $userId
      * @param int $line
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     private function getDescendantIds(int $userId, int $line): Collection
     {
@@ -587,7 +644,7 @@ final class UserRankServices
     /**
      * Рассчитать сумму покупок в окне [fromDate, toDate).
      *
-     * @param \Illuminate\Support\Collection $userIds
+     * @param Collection $userIds
      * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по accepted_at)
      * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по accepted_at)
      * @return float
@@ -613,7 +670,7 @@ final class UserRankServices
     /**
      * Рассчитать сумму реинвестов в окне [fromDate, toDate).
      *
-     * @param \Illuminate\Support\Collection $userIds
+     * @param Collection $userIds
      * @param \DateTimeInterface|null $fromDate Нижняя граница включительно (по created_at реинвеста)
      * @param \DateTimeInterface|null $toDate Верхняя граница исключительно (по created_at реинвеста)
      * @return float
@@ -626,7 +683,7 @@ final class UserRankServices
     /**
      * Рассчитать личный депозит пользователя
      *
-     * @param \App\Models\User $user
+     * @param User $user
      * @return float
      */
     private function calculatePersonalDeposit(User $user, bool $useManualRankBaseline): float

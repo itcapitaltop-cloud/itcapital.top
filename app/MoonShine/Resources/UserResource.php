@@ -691,7 +691,7 @@ class UserResource extends ModelResource
                 ])->save();
 
                 $user->refresh();
-                app(UserRankServices::class)->recalculateAndUpdateRank($user, false);
+                app(UserRankServices::class)->syncRankToNatural($user);
                 $user->refresh();
 
                 Log::info('[UserResource.saveLevelOverride] manual rank disabled and natural rank restored', [
