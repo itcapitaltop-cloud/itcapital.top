@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoonShine\Pages\PackageDefinition;
 
 use App\Enums\Itc\PackageTypeEnum;
+use App\Models\Package\PackageDefinition;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Decorations\Block;
 use MoonShine\Fields\Field;
@@ -72,10 +73,21 @@ class PackageDefinitionFormPage extends FormPage
      */
     private function packageTypeOptions(): array
     {
-        return collect(PackageTypeEnum::cases())
-            ->reject(fn (PackageTypeEnum $packageType): bool => $packageType === PackageTypeEnum::STAKING)
-            ->reject(fn (PackageTypeEnum $packageType): bool => $packageType === PackageTypeEnum::ARCHIVE)
-            ->mapWithKeys(fn (PackageTypeEnum $packageType): array => [$packageType->value => $packageType->getName()])
-            ->all();
+        $options = [
+            PackageTypeEnum::STANDARD->value => 'Обычный',
+            PackageTypeEnum::PRESENT->value => 'Подарочный',
+        ];
+
+        $currentItem = $this->getResource()?->getItem();
+
+        if ($currentItem instanceof PackageDefinition
+            && $currentItem->type instanceof PackageTypeEnum
+            && ! array_key_exists($currentItem->type->value, $options)
+            && ! in_array($currentItem->type, [PackageTypeEnum::STAKING, PackageTypeEnum::ARCHIVE], true)
+        ) {
+            $options[$currentItem->type->value] = $currentItem->type->getName();
+        }
+
+        return $options;
     }
 }
