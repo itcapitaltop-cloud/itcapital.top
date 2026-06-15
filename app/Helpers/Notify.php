@@ -141,13 +141,13 @@ class Notify
         ));
     }
 
-    public static function packageBought(User $user, string $packageType, string $amount): void
+    public static function packageBought(User $user, string $packageName, string $amount): void
     {
         $icon = vite()->icon('currency/itc.svg');
         $amountEsc = e($amount);
-        $typeEsc = e($packageType);
+        $nameEsc = e($packageName);
 
-        $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Вы приобрели пакет {$typeEsc} на сумму <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
+        $title = "<span class='inline-flex items-center gap-[4px] whitespace-nowrap'>Вы приобрели пакет {$nameEsc} на сумму <img src='{$icon}' alt='' class='inline-block w-[8px] align-[-2px]' /><span class='font-bold'>{$amountEsc}</span></span>";
 
         $user->notify(new InAppNotification(
             title: $title,

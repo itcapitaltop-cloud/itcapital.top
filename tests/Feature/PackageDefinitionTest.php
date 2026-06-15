@@ -10,9 +10,11 @@ use App\Models\ItcPackage;
 use App\Models\Package\PackageDefinition;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Notifications\InAppNotification;
 use App\Services\Package\PackageDefinitionResolver;
 use App\Services\Package\Staking\StakingPurchaseService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 function fundPackageDefinitionTestBalance(User $user, string $amount = '1000.00000000'): void
@@ -69,6 +71,38 @@ it('snapshots configured standard package defaults during account purchase', fun
         ->and($package->month_profit_percent)->toBe('9.75')
         ->and($package->duration_months)->toBe(4)
         ->and($package->work_to->toDateString())->toBe('2026-09-25');
+});
+
+it('notifies the buyer with the configured package name', function () {
+    Notification::fake();
+
+    $definition = PackageDefinition::query()
+        ->where('type', PackageTypeEnum::PRIVILEGE)
+        ->firstOrFail();
+
+    $definition->update([
+        'name' => 'Configured Privilege',
+        'min_start_amount' => '150.00000000',
+        'is_active' => true,
+    ]);
+
+    $user = User::factory()->create();
+    fundPackageDefinitionTestBalance($user);
+
+    $this->actingAs($user);
+
+    Livewire::test(ItcPackages::class)
+        ->set('selectedPackageDefinitionId', $definition->id)
+        ->set('amount', '150')
+        ->call('buyPackage')
+        ->assertHasNoErrors();
+
+    Notification::assertSentTo(
+        $user,
+        InAppNotification::class,
+        fn (InAppNotification $notification): bool => str_contains($notification->title, 'Configured Privilege')
+            && ! str_contains($notification->title, 'STANDARD'),
+    );
 });
 
 it('requires an explicit package selection before applying promo code or buying', function () {

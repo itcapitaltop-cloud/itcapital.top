@@ -734,7 +734,7 @@ class Packages extends Component
             throw $throwable;
         }
 
-        Notify::packageBought($user, 'STANDARD', $this->amount);
+        Notify::packageBought($user, $packageDefinition->name, $this->amount);
 
         Log::info('[Packages.buyPackage] purchased', [
             'user_id' => $user->id,
