@@ -101,6 +101,10 @@ class UserSummaryService
 
     /**
      * Total reinvested for the user's packages, minus reinvest withdrawals.
+     *
+     * Soft-deleted reinvests are excluded so this figure matches what the user sees in
+     * their cabinet (the `reinvestProfits` relation respects the soft-delete scope). Raw
+     * query builder does not apply Eloquent global scopes, so the deleted_at guard is explicit.
      */
     private function reinvestsSum(int $userId): string
     {
@@ -108,6 +112,7 @@ class UserSummaryService
             ->join('itc_packages as p', 'p.uuid', '=', 'r.package_uuid')
             ->join('transactions as t', 't.uuid', '=', 'p.uuid')
             ->where('t.user_id', $userId)
+            ->whereNull('r.deleted_at')
             ->sum('r.amount');
 
         $withdrawn = (string) DB::table('package_profit_reinvest_withdraws as rw')
@@ -115,6 +120,7 @@ class UserSummaryService
             ->join('itc_packages as p', 'p.uuid', '=', 'r.package_uuid')
             ->join('transactions as t', 't.uuid', '=', 'p.uuid')
             ->where('t.user_id', $userId)
+            ->whereNull('r.deleted_at')
             ->sum('r.amount');
 
         return (string) BigDecimal::of($reinvested === '' ? '0' : $reinvested)

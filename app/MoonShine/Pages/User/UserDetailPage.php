@@ -351,11 +351,7 @@ class UserDetailPage extends DetailPage
                     'profits as profits_sum_amount' => fn ($q) => $q
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')
-                ->withSum('reinvestProfitsAll', 'amount')
                 ->withSum('withdrawProfitsTransactions', 'amount')
-                ->withSum([
-                    'reinvestProfitsAll as reinvest_total_all' => fn ($q) => $q->withTrashed(),
-                ], 'amount')
                 ->withSum([
                     'profits as profits_total_all' => fn ($q) => $q->withTrashed(),
                 ], 'amount')
@@ -374,7 +370,7 @@ class UserDetailPage extends DetailPage
                     'amount' => $pkg->transaction->amount,
                     'type' => $pkg->type,
                     'month_profit_percent' => $pkg->month_profit_percent,
-                    'reinvest_total_all' => (float) ($pkg->reinvest_total_all ?? 0),
+                    'reinvest_total_all' => (float) ($pkg->reinvest_profits_sum_amount ?? 0),
                     'profits_total_all' => (float) ($pkg->profits_total_all ?? 0),
                     'itc_created_at' => $pkg->created_at,
                     'reinvest_profits' => $pkg->reinvestProfits
