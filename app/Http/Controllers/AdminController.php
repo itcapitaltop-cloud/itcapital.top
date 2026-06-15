@@ -328,6 +328,12 @@ class AdminController extends Controller
         $package->type = $request->input('type');
         $package->month_profit_percent = $request->input('profit_percent');
 
+        // A manual per-package edit pins the rate so a later package-definition
+        // edit does not cascade over the admin's intentional override.
+        if ((float) $oldPercent !== (float) $package->month_profit_percent) {
+            $package->profit_percent_overridden = true;
+        }
+
         $package->transaction->save();
         $package->save();
 

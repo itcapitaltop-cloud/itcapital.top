@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\MoonShine\Resources;
 
 use App\Enums\Itc\PackageTypeEnum;
+use App\Models\ItcPackage;
 use App\Models\Package\PackageDefinition;
 use App\MoonShine\Pages\PackageDefinition\PackageDefinitionDetailPage;
 use App\MoonShine\Pages\PackageDefinition\PackageDefinitionFormPage;
 use App\MoonShine\Pages\PackageDefinition\PackageDefinitionIndexPage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use MoonShine\Fields\Select;
@@ -182,17 +184,65 @@ class PackageDefinitionResource extends ModelResource
     protected function afterUpdated(Model $item): Model
     {
         if ($item instanceof PackageDefinition) {
+            $changes = $item->getChanges();
             $newValues = $this->auditableValues($item);
 
             $this->writeAuditLog(
                 packageDefinition: $item,
                 event: self::EVENT_UPDATED,
-                oldValues: array_intersect_key($this->oldValues, $item->getChanges()),
-                newValues: array_intersect_key($newValues, $item->getChanges()),
+                oldValues: array_intersect_key($this->oldValues, $changes),
+                newValues: array_intersect_key($newValues, $changes),
             );
+
+            if (array_key_exists('default_profit_percent', $changes)) {
+                $this->cascadeProfitPercentToPackages($item);
+            }
+
+            if (array_key_exists('duration_months', $changes)) {
+                $this->cascadeDurationToPackages($item);
+            }
         }
 
         return $item;
+    }
+
+    /**
+     * Propagate the definition's new profit percent to every package bought from it.
+     *
+     * Packages snapshot the percent at purchase, so without this an admin edit would
+     * never reach already-bought packages. Packages whose rate an admin pinned manually
+     * (profit_percent_overridden) keep their override, and legacy packages without a
+     * definition (package_definition_id IS NULL) keep their own stored rate — both untouched.
+     */
+    private function cascadeProfitPercentToPackages(PackageDefinition $packageDefinition): void
+    {
+        ItcPackage::query()
+            ->where('package_definition_id', $packageDefinition->id)
+            ->where('profit_percent_overridden', false)
+            ->update(['month_profit_percent' => $packageDefinition->default_profit_percent]);
+    }
+
+    /**
+     * Propagate the definition's new term to every package bought from it.
+     *
+     * duration_months is updated and work_to is recomputed from each package's own
+     * created_at + the new term, so the actual end date stays consistent with the term.
+     * Legacy packages without a definition (package_definition_id IS NULL) are untouched.
+     */
+    private function cascadeDurationToPackages(PackageDefinition $packageDefinition): void
+    {
+        $durationMonths = $packageDefinition->duration_months;
+
+        if ($durationMonths === null) {
+            return;
+        }
+
+        ItcPackage::query()
+            ->where('package_definition_id', $packageDefinition->id)
+            ->update([
+                'duration_months' => $durationMonths,
+                'work_to' => DB::raw("created_at + (interval '1 month' * {$durationMonths})"),
+            ]);
     }
 
     protected function afterDeleted(Model $item): Model

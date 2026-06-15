@@ -9,12 +9,14 @@ use App\Models\Package\Staking\StakingTransactionAccrual;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,8 +24,8 @@ use Illuminate\Support\Facades\DB;
  * @property string $uuid
  * @property int|null $package_definition_id
  * @property string $month_profit_percent
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  *
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage newQuery()
@@ -34,7 +36,7 @@ use Illuminate\Support\Facades\DB;
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ItcPackage whereUuid($value)
  *
- * @property-read \App\Models\Transaction|null $transaction
+ * @property-read Transaction|null $transaction
  * @property string $type
  * @property string $work_to
  *
@@ -44,11 +46,11 @@ use Illuminate\Support\Facades\DB;
  * @method static Builder|ItcPackage active(PackageTypeEnum ...$enum)
  * @method static Builder|ItcPackage userPackagesWithFinancials(int $userId)
  *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PackageProfit> $profits
+ * @property-read Collection<int, PackageProfit> $profits
  * @property-read int|null $profits_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\PackageProfitReinvest> $reinvestProfits
+ * @property-read Collection<int, PackageProfitReinvest> $reinvestProfits
  * @property-read int|null $reinvest_profits_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Transaction> $withdrawProfitsTransactions
+ * @property-read Collection<int, Transaction> $withdrawProfitsTransactions
  * @property-read int|null $withdraw_profits_transactions_count
  *
  * @mixin \Eloquent
@@ -63,6 +65,7 @@ class ItcPackage extends Model
         'uuid',
         'package_definition_id',
         'month_profit_percent',
+        'profit_percent_overridden',
         'type',
         'work_to',
         'duration_months',
@@ -214,11 +217,12 @@ class ItcPackage extends Model
         'prolonged_to' => 'datetime',
         'type' => PackageTypeEnum::class,
         'package_definition_id' => 'integer',
+        'profit_percent_overridden' => 'boolean',
     ];
 
     /**
-     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     * @param Builder<ItcPackage> $query
+     * @return Builder<ItcPackage>
      */
     #[Scope]
     public function notActive(Builder $query): Builder
@@ -227,9 +231,9 @@ class ItcPackage extends Model
     }
 
     /**
-     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
-     * @param \App\Enums\Itc\PackageTypeEnum ...$enum
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     * @param Builder<ItcPackage> $query
+     * @param PackageTypeEnum ...$enum
+     * @return Builder<ItcPackage>
      */
     #[Scope]
     public function active(Builder $query, PackageTypeEnum ...$enum): Builder
@@ -238,9 +242,9 @@ class ItcPackage extends Model
     }
 
     /**
-     * @param \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage> $query
+     * @param Builder<ItcPackage> $query
      * @param int $userId
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\ItcPackage>
+     * @return Builder<ItcPackage>
      */
     #[Scope]
     public function userPackagesWithFinancials(Builder $query, int $userId): Builder

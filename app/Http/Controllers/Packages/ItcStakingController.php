@@ -27,8 +27,8 @@ use MoonShine\MoonShineRequest;
 final class ItcStakingController extends Controller
 {
     /**
-     * @param \MoonShine\MoonShineRequest $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @param MoonShineRequest $request
+     * @return RedirectResponse
      */
     public function changePercentage(MoonShineRequest $request): RedirectResponse
     {
@@ -53,9 +53,9 @@ final class ItcStakingController extends Controller
     }
 
     /**
-     * @param \MoonShine\MoonShineRequest $request
+     * @param MoonShineRequest $request
      * @param \App\Settings\GeneralSetting $generalSetting
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function changeStartBonusPercentage(MoonShineRequest $request, GeneralSetting $generalSetting): RedirectResponse
     {
@@ -93,9 +93,9 @@ final class ItcStakingController extends Controller
     }
 
     /**
-     * @param \MoonShine\MoonShineRequest $request
+     * @param MoonShineRequest $request
      * @param \App\Settings\GeneralSetting $generalSetting
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function changeRegularPercentage(MoonShineRequest $request, GeneralSetting $generalSetting): RedirectResponse
     {
@@ -199,9 +199,9 @@ final class ItcStakingController extends Controller
     }
 
     /**
-     * @param \MoonShine\MoonShineRequest $request
+     * @param MoonShineRequest $request
      * @param string $uuid
-     * @return \MoonShine\Http\Responses\MoonShineJsonResponse
+     * @return MoonShineJsonResponse
      */
     public function editStaking(MoonShineRequest $request, string $uuid): MoonShineJsonResponse
     {
@@ -242,9 +242,16 @@ final class ItcStakingController extends Controller
                 ->accrue($package, $manualAccrualType, $manualProfit, $package->transaction->user_id);
         }
 
-        $package->update([
-            'month_profit_percent' => $request->input('profit_percent'),
-        ]);
+        $newPercent = $request->input('profit_percent');
+        $packageAttributes = ['month_profit_percent' => $newPercent];
+
+        // A manual per-package edit pins the rate so a later package-definition
+        // edit does not cascade over the admin's intentional override.
+        if ((float) $oldPercent !== (float) $newPercent) {
+            $packageAttributes['profit_percent_overridden'] = true;
+        }
+
+        $package->update($packageAttributes);
 
         $newTotalTokens = app(StakingPerformanceService::class)->forPackage($package)['total_tokens'];
 
