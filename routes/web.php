@@ -120,6 +120,9 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('itc-packages/profits/mass', 'createItcPackagesProfits');
     Route::post('itc-packages/profits/recalculate', 'recalculate');
     Route::post('promo-codes/generate', 'generatePromoCode')->name('admin.promo-codes.generate');
+    Route::post('promo-codes/{promoCode}/amount', 'updatePromoCodeAmount')->name('admin.promo-codes.update-amount');
+    Route::post('promo-codes/{promoCode}/restore', 'restorePromoCode')->name('admin.promo-codes.restore');
+    Route::delete('promo-codes/{promoCode}', 'deletePromoCode')->name('admin.promo-codes.delete');
     Route::post('itc-staking/change/percentage', [ItcStakingController::class, 'changePercentage']);
     Route::post('itc-staking/change/start-bonus-percentage', [ItcStakingController::class, 'changeStartBonusPercentage'])->name('admin.itc-staking.change-start-bonus-percentage');
     Route::post('itc-staking/change/regular-percentage', [ItcStakingController::class, 'changeRegularPercentage'])->name('admin.itc-staking.change-regular-percentage');

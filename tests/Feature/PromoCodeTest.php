@@ -11,7 +11,10 @@ use App\Models\Package\PackageDefinition;
 use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\PromoCodes\PackagePromoCodeService;
 use Livewire\Livewire;
+
+const PROMO_ADMIN_INDEX_REFERER = '/itcapitalmoonshineadminpanel/resource/promo-code-resource/index-page';
 
 function activePackageDefinition(PackageTypeEnum $packageType, string $minimumAmount = '250.00000000'): PackageDefinition
 {
@@ -394,4 +397,112 @@ it('rejects package purchase below the promo reduced threshold', function () {
         ->where('user_id', $user->id)
         ->where('trx_type', TrxTypeEnum::BUY_PACKAGE)
         ->exists())->toBeFalse();
+});
+
+it('soft deletes a promo code from the admin panel', function () {
+    $this->withoutMiddleware();
+
+    $definition = activeStandardPackageDefinition('250.00000000');
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create();
+
+    $response = $this->from(PROMO_ADMIN_INDEX_REFERER)
+        ->delete(route('admin.promo-codes.delete', ['promoCode' => $promoCode->id]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('messageType', 'success');
+
+    $this->assertSoftDeleted('promo_codes', ['id' => $promoCode->id]);
+    expect(PromoCode::query()->whereKey($promoCode->id)->exists())->toBeFalse();
+});
+
+it('restores a soft-deleted promo code from the admin panel', function () {
+    $this->withoutMiddleware();
+
+    $definition = activeStandardPackageDefinition('250.00000000');
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create();
+    $promoCode->delete();
+
+    $response = $this->from(PROMO_ADMIN_INDEX_REFERER)
+        ->post(route('admin.promo-codes.restore', ['promoCode' => $promoCode->id]));
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('messageType', 'success');
+
+    $this->assertNotSoftDeleted('promo_codes', ['id' => $promoCode->id]);
+    expect(PromoCode::query()->whereKey($promoCode->id)->exists())->toBeTrue();
+});
+
+it('updates a promo code amount from the admin panel', function () {
+    $this->withoutMiddleware();
+
+    $definition = activeStandardPackageDefinition('250.00000000');
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create([
+        'reduced_minimum_amount' => '50.00000000',
+    ]);
+
+    $response = $this->from(PROMO_ADMIN_INDEX_REFERER)
+        ->post(route('admin.promo-codes.update-amount', ['promoCode' => $promoCode->id]), [
+            'reduced_minimum_amount' => '75',
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('messageType', 'success');
+
+    expect($promoCode->refresh()->reduced_minimum_amount)->toBe('75.00000000');
+});
+
+it('rejects a promo code amount update at or above the package minimum', function () {
+    $this->withoutMiddleware();
+
+    $definition = activeStandardPackageDefinition('250.00000000');
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create([
+        'reduced_minimum_amount' => '50.00000000',
+    ]);
+
+    $response = $this->from(PROMO_ADMIN_INDEX_REFERER)
+        ->post(route('admin.promo-codes.update-amount', ['promoCode' => $promoCode->id]), [
+            'reduced_minimum_amount' => '300',
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('messageType', 'error')
+        ->assertJsonMissingPath('redirect');
+
+    expect($promoCode->refresh()->reduced_minimum_amount)->toBe('50.00000000');
+});
+
+it('treats a soft-deleted promo code as invalid during purchase validation', function () {
+    $user = User::factory()->create();
+    $definition = activeStandardPackageDefinition('250.00000000');
+
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create([
+        'code' => 'DELME50',
+        'reduced_minimum_amount' => '50.00000000',
+    ]);
+    $promoCode->delete();
+
+    $result = app(PackagePromoCodeService::class)
+        ->validateForPurchase($user, $definition, '50', 'DELME50');
+
+    expect($result->errorCode)->toBe(PackagePromoCodeService::ERROR_INVALID)
+        ->and($result->promoCode)->toBeNull();
+});
+
+it('cannot redeem a soft-deleted promo code', function () {
+    $user = User::factory()->create();
+    $definition = activeStandardPackageDefinition('250.00000000');
+
+    $promoCode = PromoCode::factory()->forPackageDefinition($definition)->create([
+        'reduced_minimum_amount' => '50.00000000',
+    ]);
+    $promoCode->delete();
+
+    expect(fn () => app(PackagePromoCodeService::class)->redeem($promoCode, $user, $definition))
+        ->toThrow(RuntimeException::class);
+
+    expect($promoCode->usages()->count())->toBe(0);
 });
