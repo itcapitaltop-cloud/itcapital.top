@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\PromoCodes\GeneratePromoCodeAction;
+use App\Actions\PromoCodes\UpdatePromoCodeAmountAction;
 use App\Contracts\Logs\LogRepositoryContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Packages\PackageReinvestRepositoryContract;
@@ -21,6 +22,7 @@ use App\Models\PackageProfitReinvest;
 use App\Models\PackageProfitWithdraw;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
+use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
@@ -308,6 +310,133 @@ class AdminController extends Controller
 
         return MoonShineJsonResponse::make()
             ->toast('Промокод создан: ' . $promoCode->code, ToastType::SUCCESS)
+            ->redirect($request->headers->get('referer'));
+    }
+
+    public function updatePromoCodeAmount(int $promoCode, MoonShineRequest $request): MoonShineJsonResponse
+    {
+
+        $promoCodeModel = PromoCode::query()->findOrFail($promoCode);
+
+        $validator = validator($request->all(), [
+            'reduced_minimum_amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $validator->after(function (Validator $validator) use ($request, $promoCodeModel): void {
+            if ($validator->errors()->has('reduced_minimum_amount')) {
+                return;
+            }
+
+            $packageDefinition = $promoCodeModel->packageDefinition;
+
+            if (! $packageDefinition instanceof PackageDefinition) {
+                $validator->errors()->add('reduced_minimum_amount', 'У промокода отсутствует тариф.');
+
+                return;
+            }
+
+            $reducedMinimumAmount = BigDecimal::of((string) $request->input('reduced_minimum_amount'));
+            $defaultMinimumAmount = BigDecimal::of($packageDefinition->min_start_amount);
+
+            if ($reducedMinimumAmount->isGreaterThanOrEqualTo($defaultMinimumAmount)) {
+                $validator->errors()->add(
+                    'reduced_minimum_amount',
+                    'Сумма сниженного порога должна быть меньше минимальной суммы тарифа ('
+                        . $packageDefinition->min_start_amount
+                        . ').'
+                );
+            }
+        });
+
+        if ($validator->fails()) {
+            return MoonShineJsonResponse::make()
+                ->toast($validator->errors()->first(), ToastType::ERROR);
+        }
+
+        try {
+            UpdatePromoCodeAmountAction::make()->run(
+                $promoCodeModel,
+                (string) $request->input('reduced_minimum_amount'),
+            );
+        } catch (Throwable $throwable) {
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось обновить сумму промокода: ' . $throwable->getMessage(), ToastType::ERROR);
+        }
+
+        return MoonShineJsonResponse::make()
+            ->toast('Сумма промокода обновлена', ToastType::SUCCESS)
+            ->redirect($request->headers->get('referer'));
+    }
+
+    public function deletePromoCode(int $promoCode, MoonShineRequest $request): MoonShineJsonResponse
+    {
+        $admin = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+        $admin = $admin instanceof MoonshineUser ? $admin : null;
+
+        $promoCodeModel = PromoCode::query()->findOrFail($promoCode);
+
+        Log::debug('[AdminController.deletePromoCode] start', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCodeModel->id,
+        ]);
+
+        try {
+            $promoCodeModel->delete();
+        } catch (Throwable $throwable) {
+            Log::error('[AdminController.deletePromoCode] delete failed', [
+                'admin_id' => $admin?->id,
+                'promo_code_id' => $promoCodeModel->id,
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось удалить промокод: ' . $throwable->getMessage(), ToastType::ERROR);
+        }
+
+        Log::info('[AdminController.deletePromoCode] deleted', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCodeModel->id,
+        ]);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Промокод удалён', ToastType::SUCCESS)
+            ->redirect($request->headers->get('referer'));
+    }
+
+    public function restorePromoCode(int $promoCode, MoonShineRequest $request): MoonShineJsonResponse
+    {
+        $admin = auth(config('moonshine.auth.guard', 'moonshine'))->user();
+        $admin = $admin instanceof MoonshineUser ? $admin : null;
+
+        $promoCodeModel = PromoCode::onlyTrashed()->findOrFail($promoCode);
+
+        Log::debug('[AdminController.restorePromoCode] start', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCodeModel->id,
+        ]);
+
+        try {
+            $promoCodeModel->restore();
+        } catch (Throwable $throwable) {
+            Log::error('[AdminController.restorePromoCode] restore failed', [
+                'admin_id' => $admin?->id,
+                'promo_code_id' => $promoCodeModel->id,
+                'exception' => $throwable::class,
+                'message' => $throwable->getMessage(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось восстановить промокод: ' . $throwable->getMessage(), ToastType::ERROR);
+        }
+
+        Log::info('[AdminController.restorePromoCode] restored', [
+            'admin_id' => $admin?->id,
+            'promo_code_id' => $promoCodeModel->id,
+        ]);
+
+        return MoonShineJsonResponse::make()
+            ->toast('Промокод восстановлен', ToastType::SUCCESS)
             ->redirect($request->headers->get('referer'));
     }
 

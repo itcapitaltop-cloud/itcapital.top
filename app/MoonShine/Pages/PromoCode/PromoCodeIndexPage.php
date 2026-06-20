@@ -14,6 +14,7 @@ use MoonShine\Components\FormBuilder;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Components\TableBuilder;
 use MoonShine\Decorations\Block;
+use MoonShine\Decorations\Heading;
 use MoonShine\Decorations\Tab;
 use MoonShine\Decorations\Tabs;
 use MoonShine\Fields\Date;
@@ -104,12 +105,29 @@ class PromoCodeIndexPage extends IndexPage
             ->orderByDesc('id')
             ->get()
             ->map(fn (PromoCode $item) => [
+                'id' => $item->id,
                 'code' => $item->code,
                 'package_definition' => $item->packageDefinition?->name ?? '-',
                 'reduced_minimum_amount' => round((float) $item->reduced_minimum_amount, 2),
+                'amount_value' => number_format((float) $item->reduced_minimum_amount, 2, '.', ''),
                 'is_used' => $item->usages()->exists() ? 'Да' : 'Нет',
                 'usages_count' => (string) $item->usages()->count(),
                 'created_at' => $item->created_at?->format('d.m.Y H:i:s') ?? '-',
+            ])
+            ->toArray();
+
+        $deletedData = PromoCode::onlyTrashed()
+            ->with(['usages', 'createdByAdmin', 'packageDefinition'])
+            ->orderByDesc('deleted_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (PromoCode $item) => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'package_definition' => $item->packageDefinition?->name ?? '-',
+                'reduced_minimum_amount' => round((float) $item->reduced_minimum_amount, 2),
+                'created_at' => $item->created_at?->format('d.m.Y H:i:s') ?? '-',
+                'deleted_at' => $item->deleted_at?->format('d.m.Y H:i:s') ?? '-',
             ])
             ->toArray();
 
@@ -162,6 +180,10 @@ class PromoCodeIndexPage extends IndexPage
                                 Number::make('Кол-во использований', 'usages_count')->showOnExport(),
                                 Text::make('Дата создания', 'created_at')->showOnExport(),
                             ])
+                            ->buttons([
+                                $this->editAmountButton(),
+                                $this->deleteButton(),
+                            ])
                             ->items($listData),
                     ]),
                 Tab::make(
@@ -180,7 +202,88 @@ class PromoCodeIndexPage extends IndexPage
                             ])
                             ->items($logsData),
                     ]),
+                Tab::make('Удалённые')
+                    ->active(fn () => $activeTab === 'deleted')
+                    ->fields([
+                        ...($activeTab !== 'deleted' ? [$deferredTab('deleted', 'Загрузить удалённые')] : []),
+                        TableBuilder::make()
+                            ->withNotFound()
+                            ->fields([
+                                Text::make('Промокод', 'code')->showOnExport(),
+                                Text::make('Пакет', 'package_definition')->showOnExport(),
+                                Number::make('Порог покупки', 'reduced_minimum_amount')->showOnExport(),
+                                Text::make('Дата создания', 'created_at')->showOnExport(),
+                                Text::make('Дата удаления', 'deleted_at')->showOnExport(),
+                            ])
+                            ->buttons([
+                                $this->restoreButton(),
+                            ])
+                            ->items($deletedData),
+                    ]),
             ]),
         ];
+    }
+
+    private function editAmountButton(): ActionButton
+    {
+        return ActionButton::make('Восстановить')
+            ->inModal(
+                title: fn () => 'Редактирование суммы промокода',
+                content: fn (array $item) => Block::make([
+                    FormBuilder::make()
+                        ->action(route('admin.promo-codes.update-amount', ['promoCode' => $item['id']]))
+                        ->fields([
+                            Number::make('Снизить порог до суммы', 'reduced_minimum_amount')
+                                ->customAttributes([
+                                    'min' => 0,
+                                    'step' => 'any',
+                                ])
+                                ->fill($item['amount_value'])
+                                ->required(),
+                        ])
+                        ->method('POST')
+                        ->async()
+                        ->submit('Сохранить'),
+                ]),
+                name: 'promo-code-edit-amount-modal'
+            )
+            ->icon('heroicons.pencil')
+            ->primary()
+            ->onClick(fn () => 'event.stopPropagation()', 'stop');
+    }
+
+    private function deleteButton(): ActionButton
+    {
+        return ActionButton::make('')
+            ->inModal(
+                title: fn () => 'Подтверждение',
+                content: fn (array $item) => Block::make([
+                    Heading::make('Удалить промокод ' . $item['code'] . '?')->h(4),
+                    Heading::make('Промокод можно будет восстановить во вкладке «Удалённые».')->h(6),
+                    ActionButton::make(
+                        'Удалить',
+                        fn () => route('admin.promo-codes.delete', ['promoCode' => $item['id']])
+                    )
+                        ->icon('heroicons.trash')
+                        ->async(method: 'DELETE')
+                        ->error(),
+                ]),
+                name: 'promo-code-delete-modal'
+            )
+            ->icon('heroicons.trash')
+            ->error()
+            ->onClick(fn () => 'event.stopPropagation()', 'stop');
+    }
+
+    private function restoreButton(): ActionButton
+    {
+        return ActionButton::make(
+            '',
+            fn (array $item) => route('admin.promo-codes.restore', ['promoCode' => $item['id']])
+        )
+            ->icon('heroicons.arrow-uturn-left')
+            ->async(method: 'POST')
+            ->success()
+            ->onClick(fn () => 'event.stopPropagation()', 'stop');
     }
 }
