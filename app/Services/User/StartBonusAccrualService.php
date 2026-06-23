@@ -29,6 +29,10 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
 
     private const int EXTENDED_LINE_START = 6;
 
+    public function __construct(
+        private readonly UserSummaryService $userSummaryService,
+    ) {}
+
     /**
      * @throws \Throwable
      */
@@ -179,8 +183,10 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
             return;
         }
 
+        $affectedUserIds = array_values(array_unique(array_column($transactions, 'user_id')));
+
         // Одна транзакция для всех вставок
-        DB::transaction(function () use ($transactions, $rewards, $notifications) {
+        DB::transaction(function () use ($transactions, $rewards, $notifications, $affectedUserIds) {
             // Bulk insert для производительности
             foreach (array_chunk($transactions, self::CHUNK_SIZE) as $chunk) {
                 Transaction::insert($chunk);
@@ -188,6 +194,10 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
 
             foreach (array_chunk($rewards, self::CHUNK_SIZE) as $chunk) {
                 PartnerReward::insert($chunk);
+            }
+
+            foreach ($affectedUserIds as $userId) {
+                $this->userSummaryService->recompute($userId);
             }
 
             // Отправляем уведомления после успешной транзакции
