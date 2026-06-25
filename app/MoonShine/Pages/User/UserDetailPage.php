@@ -348,6 +348,10 @@ class UserDetailPage extends DetailPage
                     'reinvestProfits as reinvest_profits_sum_amount' => fn ($q) => $q->whereDoesntHave('withdraw'),
                 ], 'amount')
                 ->withSum([
+                    'reinvestProfitsAll as reinvest_profits_all_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum([
                     'profits as profits_sum_amount' => fn ($q) => $q
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')

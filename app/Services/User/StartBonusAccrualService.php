@@ -29,6 +29,12 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
 
     private const int EXTENDED_LINE_START = 6;
 
+    /** @var array<string, float> */
+    private array $percentCache = [];
+
+    /** @var array<string, float|null> */
+    private array $overrideCache = [];
+
     public function __construct(
         private readonly UserSummaryService $userSummaryService,
     ) {}
@@ -87,15 +93,11 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
             return 0;
         }
 
-        // Кешируем запросы процентов
-        static $percentCache = [];
-        static $overrideCache = [];
-
         // Проверяем override
         $overrideKey = "{$ancestorId}:{$level}:{$line}";
 
-        if (! array_key_exists($overrideKey, $overrideCache)) {
-            $overrideCache[$overrideKey] = DB::table('user_level_percent_overrides')
+        if (! array_key_exists($overrideKey, $this->overrideCache)) {
+            $this->overrideCache[$overrideKey] = DB::table('user_level_percent_overrides')
                 ->where('user_id', $ancestorId)
                 ->where('partner_level_id', $level)
                 ->where('bonus_type', 'start')
@@ -103,22 +105,22 @@ final class StartBonusAccrualService implements StartBonusAccrualContract
                 ->value('percent');
         }
 
-        if (! is_null($overrideCache[$overrideKey])) {
-            return (float) $overrideCache[$overrideKey];
+        if (! is_null($this->overrideCache[$overrideKey])) {
+            return (float) $this->overrideCache[$overrideKey];
         }
 
         // Стандартный процент
         $percentKey = "{$level}:{$line}";
 
-        if (! array_key_exists($percentKey, $percentCache)) {
-            $percentCache[$percentKey] = DB::table('partner_level_percents')
+        if (! array_key_exists($percentKey, $this->percentCache)) {
+            $this->percentCache[$percentKey] = DB::table('partner_level_percents')
                 ->where('partner_level_id', $level)
                 ->where('bonus_type', 'start')
                 ->where('line', $line)
                 ->value('percent') ?? 0;
         }
 
-        return (float) $percentCache[$percentKey];
+        return (float) $this->percentCache[$percentKey];
     }
 
     /**
