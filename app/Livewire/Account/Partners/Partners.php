@@ -292,19 +292,11 @@ class Partners extends Component
 
     public function getPartnerDynamicsProperty(): array
     {
-        $rangeCredit = function (Carbon $since): float {
-            return (float) Transaction::query()
-                ->where('user_id', Auth::id())
-                ->where('balance_type', BalanceTypeEnum::PARTNER)
-                ->whereIn('trx_type', TrxTypeEnum::getDebits())
-                ->whereNull('rejected_at')
-                ->where('created_at', '>=', $since)
-                ->sum('amount');
-        };
+        $repo = app(TransactionRepositoryContract::class);
 
         return [
-            'week' => $rangeCredit(now()->subWeek()),
-            'month' => $rangeCredit(now()->subMonth()),
+            'week' => $repo->partnerGrossAccrualSince(now()->subWeek()),
+            'month' => $repo->partnerGrossAccrualSince(now()->subMonth()),
         ];
     }
 

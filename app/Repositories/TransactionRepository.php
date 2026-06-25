@@ -81,6 +81,17 @@ class TransactionRepository implements TransactionRepositoryContract
             ->balanceFor(Auth::id(), BalanceTypeEnum::PARTNER, $moment);
     }
 
+    public function partnerGrossAccrualSince(Carbon $since): float
+    {
+        return (float) Transaction::query()
+            ->where('user_id', Auth::id())
+            ->where('balance_type', BalanceTypeEnum::PARTNER)
+            ->whereIn('trx_type', TrxTypeEnum::getDebits())
+            ->whereNull('rejected_at')
+            ->where('created_at', '>=', $since)
+            ->sum('amount');
+    }
+
     /**
      * @param CreateTransactionDto $dto
      * @param Closure(Transaction $transaction): AfterCreateTransactionDto $callback

@@ -221,13 +221,21 @@ class ItcPackage extends Model
     ];
 
     /**
+     * Package types excluded from the active "Investment Overview" / ITC Packages
+     * tab listing. PRESENT packages are intentionally kept (counted as active).
+     *
+     * @var array<int, PackageTypeEnum>
+     */
+    public const NOT_ACTIVE_EXCLUDED_TYPES = [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING];
+
+    /**
      * @param Builder<ItcPackage> $query
      * @return Builder<ItcPackage>
      */
     #[Scope]
     public function notActive(Builder $query): Builder
     {
-        return $query->whereNotIn('type', [PackageTypeEnum::ARCHIVE, PackageTypeEnum::STAKING]);
+        return $query->whereNotIn('type', self::NOT_ACTIVE_EXCLUDED_TYPES);
     }
 
     /**
