@@ -9,7 +9,7 @@
 
 @php
     $max  = max(1, (float) $max);
-    $perc = min(100, round(($value / $max) * 100));
+    $perc = min(100, floor(($value / $max) * 100));
 @endphp
 
 @if(trim($slot))

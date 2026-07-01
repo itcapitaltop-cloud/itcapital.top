@@ -19,6 +19,13 @@ class RankMaintenanceCommand extends Command
 
     public function handle(UserRankServices $services): int
     {
+        if (! (bool) config('rank.maintenance.enabled', false)) {
+            Log::info('[RankMaintenanceCommand.handle] skipped: rank maintenance disabled');
+            $this->info('Понижение ранга отключено настройкой RANK_MAINTENANCE_ENABLED.');
+
+            return self::SUCCESS;
+        }
+
         $dryRun = (bool) $this->option('dry-run');
         $userId = $this->option('user') ? (int) $this->option('user') : null;
 

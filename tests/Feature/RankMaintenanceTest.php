@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Notification;
 
 beforeEach(function (): void {
     Notification::fake();
+    config()->set('rank.maintenance.enabled', true);
 
     // Previous full calendar month — the window the maintenance job evaluates.
     $this->periodStart = now()->subMonthNoOverflow()->startOfMonth();
@@ -147,6 +148,18 @@ it('runs the partner:rank-maintenance command and demotes via the previous-month
     Artisan::call('partner:rank-maintenance', ['--user' => $user->id]);
 
     expect((int) $user->refresh()->rank)->toBe(4);
+});
+
+it('skips the partner:rank-maintenance command when maintenance is disabled', function (): void {
+    config()->set('rank.maintenance.enabled', false);
+    createPartnerRank(3, lineRequired: 1000.0);
+
+    $user = User::factory()->create(['rank' => 5]);
+
+    Artisan::call('partner:rank-maintenance', ['--user' => $user->id]);
+
+    expect((int) $user->refresh()->rank)->toBe(5)
+        ->and(Artisan::output())->toContain('Понижение ранга отключено');
 });
 
 it('does not persist demotions on a --dry-run', function (): void {
