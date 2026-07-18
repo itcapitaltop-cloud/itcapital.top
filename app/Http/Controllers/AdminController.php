@@ -29,6 +29,7 @@ use App\Models\UserSummary;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Package\Staking\StakingPerformanceService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -213,6 +214,96 @@ class AdminController extends Controller
                 }
 
                 foreach (range('A', 'D') as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
+
+                (new Xlsx($spreadsheet))->save('php://output');
+            },
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
+    }
+
+    public function exportUserCard(int $userId): StreamedResponse
+    {
+        $user = User::withoutGlobalScope('notBanned')->with('referrer')->findOrFail($userId);
+
+        $lineNumber = (int) PartnerClosure::query()
+            ->where('descendant_id', $user->id)
+            ->max('depth');
+
+        /*
+         * «Пакеты Сумма» повторяет «Сумму пакетов» дашборда /account
+         * (App\Livewire\Account\Dashboard\Index): тело пакета
+         * (amount + partnerTransfers + reinvestToBody − balanceWithdraws,
+         * 0 для обнулённых PRESENT) плюс активные реинвесты.
+         */
+        $packagesTotal = ItcPackage::query()
+            ->select('itc_packages.*')
+            ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
+            ->where('transactions.user_id', $user->id)
+            ->notActive()
+            ->with(['transaction', 'zeroing'])
+            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->get()
+            ->sum(function (ItcPackage $package): float {
+                $body = $package->type === PackageTypeEnum::PRESENT && $package->zeroing
+                    ? 0.0
+                    : (float) $package->transaction->amount
+                        + (float) $package->partner_transfers_sum_amount
+                        + (float) $package->reinvest_to_body_sum_amount
+                        - (float) $package->balance_withdraws_sum_amount;
+
+                return $body + (float) $package->reinvest_profits_sum_amount;
+            });
+
+        $stakingPackages = ItcPackage::query()
+            ->active(PackageTypeEnum::STAKING)
+            ->whereHas('transaction', fn ($q) => $q->where('user_id', $user->id))
+            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases', 'packageDefinition'])
+            ->get();
+
+        $tokens = $stakingPackages->isEmpty()
+            ? 0.0
+            : app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
+
+        $telegram = trim((string) $user->telegram);
+
+        $rows = [
+            ['Фамилия Имя', trim("{$user->first_name} {$user->last_name}")],
+            ['Никнейм', $user->username],
+            ['Номер линии', $lineNumber],
+            ['Реферал', $user->referrer?->username ?? ''],
+            ['Город', ''],
+            ['Телефон', ''],
+            ['Социальные сети', $telegram],
+            ['Пакеты Сумма', round($packagesTotal, 2)],
+            ['Токены', $tokens],
+            ['Обучение', ''],
+            ['Ранг', $user->rank],
+        ];
+
+        $filename = sprintf('user-%d-card-%s.xlsx', $user->id, now()->format('Ymd-His'));
+
+        return response()->streamDownload(
+            function () use ($rows, $telegram): void {
+                $spreadsheet = new Spreadsheet();
+                $sheet = $spreadsheet->getActiveSheet();
+                $sheet->setTitle('Карточка');
+
+                $sheet->fromArray($rows, null, 'A1');
+
+                if ($telegram !== '') {
+                    $telegramUrl = str_starts_with($telegram, 'http')
+                        ? $telegram
+                        : 'https://t.me/' . ltrim($telegram, '@');
+                    $sheet->getCell('B7')->getHyperlink()->setUrl($telegramUrl);
+                }
+
+                foreach (['A', 'B'] as $column) {
                     $sheet->getColumnDimension($column)->setAutoSize(true);
                 }
 

@@ -142,6 +142,7 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('partners/{partner_id}', 'updatePartner');
     Route::get('users/suggest', 'suggestUsers')->name('admin.users.suggest');
     Route::get('users/{userId}/operations/export', 'exportUserOperations')->name('admin.users.operations.export');
+    Route::get('users/{userId}/card/export', 'exportUserCard')->name('admin.users.card.export');
     Route::post('partners/rank', 'updateRank');
 });
 

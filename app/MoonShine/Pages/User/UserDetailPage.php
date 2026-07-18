@@ -185,6 +185,14 @@ class UserDetailPage extends DetailPage
             ])
         )->name('export-user-operations-modal');
 
+        $exportCardButton = ActionButton::make(
+            'Выгрузить карточку',
+            route('admin.users.card.export', ['userId' => $item->id])
+        )
+            ->icon('heroicons.arrow-down-tray')
+            ->blank()
+            ->secondary();
+
         $formChangePassword = FormBuilder::make()
             ->asyncMethod('changePassword')
             ->fields([
@@ -798,6 +806,7 @@ class UserDetailPage extends DetailPage
                          {$createPackageModal}
                          {$passwordModal}
                          {$exportOperationsModal}
+                         {$exportCardButton}
                          {$testModeButton}
                      </div>
                  "
