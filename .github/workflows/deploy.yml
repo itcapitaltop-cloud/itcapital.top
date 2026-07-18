@@ -38,6 +38,11 @@ jobs:
         run: npm ci --include=dev --no-audit --no-fund
 
       - name: 🏗️ Compile frontend assets
+        env:
+          VITE_REVERB_APP_KEY: ${{ secrets.REVERB_APP_KEY }}
+          VITE_REVERB_HOST: ${{ vars.REVERB_HOST }}
+          VITE_REVERB_PORT: 443
+          VITE_REVERB_SCHEME: https
         run: npm run build
 
       - name: 🚀 Deploy to server
