@@ -72,6 +72,12 @@ test('account mobile menu shows leave review button', function () {
         ->assertSee(__('reviews_sidebar_button'));
 });
 
+test('reviews page shows back to homepage button', function () {
+    Livewire::test(Index::class)
+        ->assertSee(__('home_page'))
+        ->assertSee(route('index'));
+});
+
 test('main page rating link points to reviews route', function () {
     $this->get(route('index'))
         ->assertOk()

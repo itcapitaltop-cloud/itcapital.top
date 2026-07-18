@@ -4,6 +4,15 @@
     <div class="mt-[95px] min-h-screen bg-[#17162D]">
         <div class="container py-10 md:py-14">
 
+            {{-- Back to homepage --}}
+            <a
+                href="{{ route('index') }}"
+                class="inline-flex items-center gap-2 text-white text-[16px] font-medium mb-6 md:mb-8 hover:text-[#B4FF59] transition-colors duration-200"
+            >
+                <img class="w-[16px]" src="{{ vite()->icon('/actions/arrow-to-main-left-white.svg') }}" alt="" />
+                {{ __('home_page') }}
+            </a>
+
             {{-- Header: title + button --}}
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mb-10 md:mb-12">
                 <h1 class="text-white font-dela text-[24px] sm:text-[32px] md:text-[40px] leading-tight">
