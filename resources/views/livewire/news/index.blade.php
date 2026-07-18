@@ -7,7 +7,7 @@
                 </p>
                 @foreach($new->translations as $translation)
                 <div class="w-full">
-                    <div class="flex align-top justify-between mt-1.5">
+                    <div class="flex align-top justify-between gap-3 mt-1.5">
                         <p class="font-semibold text-sm text-white">
                             {{ $translation->title }}
                         </p>
