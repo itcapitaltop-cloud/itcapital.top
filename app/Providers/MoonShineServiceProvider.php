@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Http\Middleware\AuthorizeDocsAccess;
 use App\MoonShine\Pages\ItcPackage\ItcPackageDepositProfitPage;
 use App\MoonShine\Pages\ItcPackage\ItcPackageFormPage;
 use App\MoonShine\Resources\ActivityLogResource;
@@ -139,7 +140,7 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
             MenuItem::make('Роли', new MoonShineUserRoleResource())
                 ->canSee($this->canSeeResource(MoonShineUserRoleResource::class)),
             MenuItem::make('Документация', '/itcapitalmoonshineadminpanel/docs')
-                ->canSee($this->canSeeMoonShineUser()),
+                ->canSee($this->canSeeDocs()),
         ];
     }
 
@@ -196,10 +197,12 @@ class MoonShineServiceProvider extends MoonShineApplicationServiceProvider
         };
     }
 
-    private function canSeeMoonShineUser(): Closure
+    private function canSeeDocs(): Closure
     {
         return function (): bool {
-            return auth(config('moonshine.auth.guard', 'moonshine'))->user() instanceof MoonshineUser;
+            return AuthorizeDocsAccess::allowsFor(
+                auth(config('moonshine.auth.guard', 'moonshine'))->user()
+            );
         };
     }
 

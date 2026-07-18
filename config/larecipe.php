@@ -17,7 +17,7 @@ return [
         'route' => '/itcapitalmoonshineadminpanel/docs',
         'path' => '/resources/docs',
         'landing' => 'manual-rank',
-        'middleware' => ['web', \MoonShine\Http\Middleware\Authenticate::class],
+        'middleware' => ['web', \MoonShine\Http\Middleware\Authenticate::class, \App\Http\Middleware\AuthorizeDocsAccess::class],
     ],
 
     /*

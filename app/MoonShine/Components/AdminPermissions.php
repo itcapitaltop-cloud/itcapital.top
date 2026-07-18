@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Components;
 
+use App\Http\Middleware\AuthorizeDocsAccess;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use MoonShine\Components\FormBuilder;
+use MoonShine\Contracts\Resources\ResourceContract;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Decorations\Column;
 use MoonShine\Decorations\Divider;
@@ -56,43 +58,27 @@ final class AdminPermissions extends MoonShineComponent
         $values = [];
         $all = true;
 
-        foreach (moonshine()->getResources() as $resource) {
-            $checkboxes = [];
-            $resourceClass = $resource::class;
-            $class = 'ps_' . class_basename($resourceClass);
-            $allSections = true;
+        $resources = moonshine()
+            ->getResources()
+            ->unique(static fn (ResourceContract $resource): string => $resource::class);
 
-            foreach ($resource->gateAbilities() as $ability) {
-                $values['permissions'][$resourceClass][$ability] = $this->getItem()->isHavePermission(
-                    $resourceClass,
-                    $ability
-                );
-
-                if (! $values['permissions'][$resource::class][$ability]) {
-                    $allSections = false;
-                    $all = false;
-                }
-
-                $checkboxes[] = Switcher::make(
-                    $ability,
-                    'permissions.' . $resourceClass . ".{$ability}"
-                )
-                    ->customAttributes(['class' => 'permission_switcher ' . $class])
-                    ->setName("permissions[{$resourceClass}][{$ability}]");
-            }
-
-            $elements[] = Column::make([
-                Switcher::make($resource->title())
-                    ->customAttributes([
-                        'class' => 'permission_switcher_section',
-                        '@change' => "document.querySelectorAll('.{$class}').forEach((el) => { el.checked = event.target.checked; el.value = event.target.checked ? '1' : '0'; el.dispatchEvent(new Event('change')); })",
-                    ])
-                    ->setValue($allSections)
-                    ->hint('Toggle off/on all'),
-                ...$checkboxes,
-                Divider::make(),
-            ])->columnSpan(6);
+        foreach ($resources as $resource) {
+            $elements[] = $this->buildSectionColumn(
+                $resource->title(),
+                $resource::class,
+                $resource->gateAbilities(),
+                $values,
+                $all
+            );
         }
+
+        $elements[] = $this->buildSectionColumn(
+            'Документация',
+            AuthorizeDocsAccess::PERMISSION_KEY,
+            [AuthorizeDocsAccess::ABILITY_VIEW],
+            $values,
+            $all
+        );
 
         return FormBuilder::make($url)
             ->fields([
@@ -106,6 +92,53 @@ final class AdminPermissions extends MoonShineComponent
             ])
             ->fill($values)
             ->submit(__('moonshine::ui.save'));
+    }
+
+    /**
+     * @param list<string> $abilities
+     * @param array{permissions?: array<string, array<string, bool>>} $values
+     */
+    private function buildSectionColumn(
+        string $title,
+        string $permissionKey,
+        array $abilities,
+        array &$values,
+        bool &$all
+    ): Column {
+        $checkboxes = [];
+        $class = 'ps_' . class_basename($permissionKey);
+        $allSections = true;
+
+        foreach ($abilities as $ability) {
+            $values['permissions'][$permissionKey][$ability] = $this->getItem()->isHavePermission(
+                $permissionKey,
+                $ability
+            );
+
+            if (! $values['permissions'][$permissionKey][$ability]) {
+                $allSections = false;
+                $all = false;
+            }
+
+            $checkboxes[] = Switcher::make(
+                $ability,
+                'permissions.' . $permissionKey . ".{$ability}"
+            )
+                ->customAttributes(['class' => 'permission_switcher ' . $class])
+                ->setName("permissions[{$permissionKey}][{$ability}]");
+        }
+
+        return Column::make([
+            Switcher::make($title)
+                ->customAttributes([
+                    'class' => 'permission_switcher_section',
+                    '@change' => "document.querySelectorAll('.{$class}').forEach((el) => { el.checked = event.target.checked; el.value = event.target.checked ? '1' : '0'; el.dispatchEvent(new Event('change')); })",
+                ])
+                ->setValue($allSections)
+                ->hint('Toggle off/on all'),
+            ...$checkboxes,
+            Divider::make(),
+        ])->columnSpan(6);
     }
 
     protected function viewData(): array
