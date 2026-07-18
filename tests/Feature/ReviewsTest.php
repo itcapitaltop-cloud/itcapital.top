@@ -54,6 +54,37 @@ test('only approved reviews are shown on reviews page', function () {
         ->assertDontSee($pending->body);
 });
 
+test('reviews pagination uses branded dark styles', function () {
+    $user = User::factory()->create();
+
+    Review::factory()->count(11)->create([
+        'status' => ReviewStatusEnum::Approved,
+        'user_id' => $user->id,
+    ]);
+
+    Livewire::test(Index::class)
+        ->assertSeeHtml('aria-label="Pagination Navigation"')
+        ->assertSeeHtml('text-[#B4FF59] bg-[#17162D]')
+        ->assertDontSeeHtml('bg-white border border-gray-300')
+        ->assertDontSee(__('Showing'))
+        ->assertSee(__('pagination_previous'))
+        ->assertSee(__('pagination_next'));
+});
+
+test('reviews pagination collapses page numbers when there are many pages', function () {
+    $user = User::factory()->create();
+
+    Review::factory()->count(115)->create([
+        'status' => ReviewStatusEnum::Approved,
+        'user_id' => $user->id,
+    ]);
+
+    Livewire::test(Index::class)
+        ->assertSeeHtml('>...</span>')
+        ->assertSeeHtml('gotoPage(12,')
+        ->assertDontSeeHtml('gotoPage(7,');
+});
+
 test('account sidebar shows leave review button', function () {
     $user = User::factory()->create();
 

@@ -18,7 +18,8 @@ class Index extends Component
         $reviews = Review::query()->approved()
             ->with('user')
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->onEachSide(1);
 
         $averageRating = Review::averageRating();
         $totalCount = Review::approvedCount();

@@ -828,6 +828,8 @@
     "academy_news_read_more": "阅读全文",
     "liveware_news": "财经新闻",
     "liveware_news_not_found": "新闻即将推出",
+    "pagination_previous": "上一页",
+    "pagination_next": "下一页",
     "reviews_page_title": "评价",
     "reviews_page_based_on": "基于 :count 条评价|基于 :count 条评价",
     "reviews_form_title": "发表评价",

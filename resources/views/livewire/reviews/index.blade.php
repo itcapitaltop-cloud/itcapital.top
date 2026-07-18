@@ -74,7 +74,7 @@
 
             @if($reviews->hasPages())
                 <div class="mt-12">
-                    {{ $reviews->links() }}
+                    {{ $reviews->links('livewire.reviews.pagination') }}
                 </div>
             @endif
 

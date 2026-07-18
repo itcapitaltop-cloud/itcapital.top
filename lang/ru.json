@@ -828,6 +828,8 @@
     "academy_news_read_more": "Читать полностью",
     "liveware_news": "Финансовые новости",
     "liveware_news_not_found": "Новости скоро появятся",
+    "pagination_previous": "Назад",
+    "pagination_next": "Вперёд",
     "reviews_page_title": "Отзывы клиентов",
     "reviews_page_based_on": "На основании :count отзыва|На основании :count отзывов|На основании :count отзывов",
     "reviews_form_title": "Оставить отзыв",

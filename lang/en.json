@@ -828,6 +828,8 @@
     "academy_news_read_more": "Read more",
     "liveware_news": "Financial News",
     "liveware_news_not_found": "News coming soon",
+    "pagination_previous": "Previous",
+    "pagination_next": "Next",
     "reviews_page_title": "Client reviews",
     "reviews_page_based_on": "Based on :count review|Based on :count reviews",
     "reviews_form_title": "Leave a review",
