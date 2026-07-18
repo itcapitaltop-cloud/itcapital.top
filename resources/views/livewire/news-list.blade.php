@@ -6,7 +6,7 @@
 
         <section class="w-full px-4 mt-10 sm:px-5 md:px-6 md:mt-6">
             @forelse($news as $new)
-                <article wire:key="news-{{ $new->id }}" class="overflow-hidden">
+                <article wire:key="news-{{ $new->id }}" id="news-{{ $new->id }}" class="overflow-hidden scroll-mt-[190px] md:scroll-mt-[110px] rounded-xl target:animate-news-blink">
                     <p class="font-medium text-base text-white opacity-50">
                         {{ $new->published_at->format('j.m, H:i') }} • {{ $new->category->label() }}
                     </p>

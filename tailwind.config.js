@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -70,7 +72,7 @@ export default {
                 marquee: 'marquee 20s linear infinite',
                 'shine-sweep': 'shine-sweep 10s linear infinite',
                 'comet-hero': 'comet-hero linear 1',
-
+                'news-blink': 'news-blink 1.1s ease-in-out .35s 2 both',
             },
             keyframes: {
                 marquee: {
@@ -88,7 +90,11 @@ export default {
                     '5%':    { opacity: '1', transform: 'translate(10px, -18px) scale(1.03)' },
                     '55%':   { opacity: '1', transform: 'translate(110px, -200px) scale(1.10)' },
                     '100%':  { opacity: '0', transform: 'translate(200px, -360px) scale(1.13)' },
-                }
+                },
+                'news-blink': {
+                    '0%, 100%': { backgroundColor: 'transparent', boxShadow: '0 0 0 12px transparent' },
+                    '40%':      { backgroundColor: 'rgba(180, 255, 89, 0.10)', boxShadow: '0 0 0 12px rgba(180, 255, 89, 0.10)' },
+                },
             },
             fontFamily: {
                 dela: ['"Dela Gothic One"', 'sans-serif'],
@@ -96,5 +102,9 @@ export default {
             },
         },
     },
-    plugins: [],
+    plugins: [
+        plugin(({ addVariant }) => {
+            addVariant('target', '&:target');
+        }),
+    ],
 };

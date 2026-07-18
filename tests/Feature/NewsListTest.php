@@ -26,6 +26,14 @@ it('loads more news when scrolling', function () {
         ->assertSet('hasMorePages', false);
 });
 
+it('renders an anchor id for each news item', function () {
+    $news = News::factory()->create();
+
+    Livewire::test(NewsList::class)
+        ->assertSeeHtml('id="news-' . $news->id . '"')
+        ->assertSeeHtml('target:animate-news-blink');
+});
+
 it('reports no more pages when news fit on a single page', function () {
     News::factory()->count(3)->create();
 
