@@ -208,6 +208,19 @@ class UserResource extends ModelResource
         return [];
     }
 
+    /**
+     * Джойним user_summary, чтобы работали сортировки и фильтры по колонкам
+     * проекции (buy_packages_sum, reinvests_sum, investments_sum,
+     * partner_balance, in_out_saldo). Значения для отображения берутся
+     * из relation summary, join нужен только для ORDER BY / WHERE.
+     */
+    public function query(): Builder
+    {
+        return parent::query()
+            ->leftJoin('user_summary', 'user_summary.user_id', '=', 'users.id')
+            ->select('users.*');
+    }
+
     public function resolveItemQuery(): Builder
     {
         return parent::resolveItemQuery()

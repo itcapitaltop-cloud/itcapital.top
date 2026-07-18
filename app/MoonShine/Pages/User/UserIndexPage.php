@@ -62,10 +62,13 @@ class UserIndexPage extends IndexPage
             Number::make('Реинвесты', 'reinvests_sum', formatted: fn (User $user) => $user->summary->reinvests_sum)
                 ->showOnExport()
                 ->sortable($multi),
-            Number::make('Основной', formatted: fn (User $user) => $user->summary->investments_sum)
+            Number::make('Основной', 'investments_sum', formatted: fn (User $user) => $user->summary->investments_sum)
                 ->showOnExport()
                 ->sortable($multi),
             Number::make('Партнерский', 'partner_balance', formatted: fn (User $user) => $user->summary->partner_balance)
+                ->showOnExport()
+                ->sortable($multi),
+            Number::make('IN/OUT (сальдо)', 'in_out_saldo', formatted: fn (User $user) => $user->summary->in_out_saldo)
                 ->showOnExport()
                 ->sortable($multi),
             Date::make('Дата регистрации', 'created_at')->showOnExport()->sortable($multi),

@@ -35,7 +35,7 @@ class UserSummaryService
      * Compute the summary field values for a user from the ledger, without persisting.
      * Used by recompute() and by the reconcile command's --dry-run comparison.
      *
-     * @return array{investments_sum: string, partner_balance: string, reinvests_sum: string, buy_packages_sum: string, partners_count: int, first_package_at: string|null}
+     * @return array{investments_sum: string, partner_balance: string, reinvests_sum: string, buy_packages_sum: string, partners_count: int, first_package_at: string|null, in_out_saldo: string}
      */
     public function computeFor(int $userId): array
     {
@@ -50,6 +50,7 @@ class UserSummaryService
             'buy_packages_sum' => $this->buyPackagesSum($userId),
             'partners_count' => $this->partnersCount($userId),
             'first_package_at' => $this->firstPackageAt($userId),
+            'in_out_saldo' => $this->inOutSaldo($userId),
         ];
     }
 
@@ -144,6 +145,28 @@ class UserSummaryService
             ->sum('amount');
 
         return (string) ($sum ?? 0);
+    }
+
+    /**
+     * Accepted deposits minus accepted withdraws — the IN / OUT saldo shown in the
+     * admin panel. Uses the same formula as the IN / OUT block on the user detail page.
+     */
+    private function inOutSaldo(int $userId): string
+    {
+        $in = (string) Transaction::query()
+            ->where('user_id', $userId)
+            ->where('trx_type', TrxTypeEnum::DEPOSIT)
+            ->whereNotNull('accepted_at')
+            ->sum('amount');
+
+        $out = (string) Transaction::query()
+            ->where('user_id', $userId)
+            ->where('trx_type', TrxTypeEnum::WITHDRAW)
+            ->whereNotNull('accepted_at')
+            ->sum('amount');
+
+        return (string) BigDecimal::of($in === '' ? '0' : $in)
+            ->minus($out === '' ? '0' : $out);
     }
 
     private function partnersCount(int $userId): int

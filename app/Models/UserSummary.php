@@ -29,5 +29,6 @@ final class UserSummary extends Model
         'partner_balance',
         'partners_count',
         'first_package_at',
+        'in_out_saldo',
     ];
 }
