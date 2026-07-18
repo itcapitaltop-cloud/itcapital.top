@@ -843,5 +843,6 @@
     "reviews_form_you_are_as": "Вы оставляете отзыв как",
     "reviews_form_disclaimer": "IT Capital оставляет за собой право на редактуру отзыва для устранения грамматических и пунктуационных ошибок. Смысл отзыва при этом не будет искажён.",
     "reviews_back": "Вернуться к отзывам",
-    "reviews_form_rating_of": "из 5"
+    "reviews_form_rating_of": "из 5",
+    "reviews_sidebar_button": "Оставить отзыв об IT Capital"
 }

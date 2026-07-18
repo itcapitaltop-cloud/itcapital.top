@@ -54,6 +54,24 @@ test('only approved reviews are shown on reviews page', function () {
         ->assertDontSee($pending->body);
 });
 
+test('account sidebar shows leave review button', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Account\Layout\Sidebar::class)
+        ->assertSee(__('reviews_sidebar_button'))
+        ->assertSee(route('reviews.create'));
+});
+
+test('account mobile menu shows leave review button', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee(__('reviews_sidebar_button'));
+});
+
 test('main page rating link points to reviews route', function () {
     $this->get(route('index'))
         ->assertOk()

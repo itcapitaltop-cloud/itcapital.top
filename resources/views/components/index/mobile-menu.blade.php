@@ -46,6 +46,13 @@
             </div>
 
             <div class="w-full shrink-0 mt-auto">
+                <div class="flex justify-center px-4 pt-4">
+                    <a href="{{ route('reviews.create') }}" @click="$store.menu.open=false"
+                        class="flex h-[35px] w-[259px] max-w-full items-center whitespace-nowrap rounded-lg border border-lime px-4
+                               text-[16px] font-medium leading-[19px] text-lime transition-colors hover:bg-lime hover:text-[#17162D]">
+                        {{ __('reviews_sidebar_button') }}
+                    </a>
+                </div>
                 <div class="items-end justify-center mb-[15px] px-4 py-8 gap-4 pb-[env(safe-area-inset-bottom)]">
                     @auth
                         <livewire:account.dashboard.balance-pill />
