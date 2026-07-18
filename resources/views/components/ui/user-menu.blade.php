@@ -22,7 +22,7 @@
             <img src="{{ vite()->icon('/actions/user.svg') }}" alt="User" class="w-[24px] h-[24px] text-[#B4FF59]" />
             <div class="flex items-center gap-[21px]">
                 <a href="{{ route('dashboard') }}" class="text-white font-medium text-base hover:underline">
-                    {{ Auth::user()->first_name }} {{ Auth::user()->last_name }}
+                    {{ Auth::user()->username }}
                 </a>
                 <form action="{{ route('logout') }}" method="POST" class="inline">
                     @csrf
