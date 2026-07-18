@@ -324,7 +324,7 @@
     "email_body": "Спасибо за регистрацию в IT Capital. Чтобы активировать аккаунт, нажмите кнопку ниже. Ссылка действует :minutes минут.",
     "email_button": "Подтвердить E‑mail",
     "email_fallback": "Если кнопка не работает, скопируйте ссылку в адресную строку браузера:",
-    "livewire_index_main_hero_label": "Более 340 довольных клиентов",
+    "livewire_index_main_hero_label": "Более :count довольных клиентов",
     "livewire_index_main_hero_title": "Инвестиционные стратегии с комфортом",
     "livewire_index_main_hero_description_1": "которые создают капитал для достижения целей каждого участника клуба.",
     "livewire_index_main_hero_description_2": "Создавай вместе с нами источник дохода от ",

@@ -324,7 +324,7 @@
     "email_body": "感谢您注册 IT Capital。请点击下方按钮激活账户。链接有效期为 :minutes 分钟。",
     "email_button": "确认邮箱",
     "email_fallback": "如果按钮无效，请将链接复制到浏览器地址栏：",
-    "livewire_index_main_hero_label": "340 多位满意客户",
+    "livewire_index_main_hero_label": ":count 多位满意客户",
     "livewire_index_main_hero_title": "舒适的投资策略",
     "livewire_index_main_hero_description_1": "为每位俱乐部成员实现目标而构建资本。",
     "livewire_index_main_hero_description_2": "与我们一起打造年化",

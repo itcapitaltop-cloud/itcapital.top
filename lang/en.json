@@ -324,7 +324,7 @@
     "email_body": "Thank you for registering with IT Capital. To activate your account, click the button below. The link is valid for :minutes minutes.",
     "email_button": "Confirm Email",
     "email_fallback": "If the button doesn’t work, copy the link into your browser:",
-    "livewire_index_main_hero_label": "Over 340 satisfied clients",
+    "livewire_index_main_hero_label": "Over :count satisfied clients",
     "livewire_index_main_hero_title": "Comfortable Investment Strategies",
     "livewire_index_main_hero_description_1": "that build capital to help every club member achieve their goals.",
     "livewire_index_main_hero_description_2": "Build an income stream with us starting from",

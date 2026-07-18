@@ -5,6 +5,7 @@ namespace App\Livewire\Index;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Models\Package\PackageDefinition;
 use App\Models\Review;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -25,6 +26,7 @@ class Main extends Component
                 ->get(),
             'reviewAverageRating' => Review::averageRating(),
             'reviewTotalCount' => Review::approvedCount(),
+            'clientsCount' => (int) (floor(User::query()->count() / 10) * 10),
         ]);
     }
 }

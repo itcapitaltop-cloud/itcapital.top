@@ -11,7 +11,7 @@
                 <div class="flex items-center gap-2">
                     <span
                         class="relative flex items-center gap-2 px-3 pb-[4px] pt-[3px] rounded-[6px] bg-[#22223E] text-[12px] text-[#B4FF59] font-medium select-none">
-                        {{ __('livewire_index_main_hero_label') }}
+                        {{ __('livewire_index_main_hero_label', ['count' => $clientsCount]) }}
                         <span
                             class="inline-block w-3 h-3 rounded-full bg-[#B4FF59] shadow-[0_0_12px_2px_#B4FF59] animate-pulse"></span>
                     </span>
@@ -27,7 +27,7 @@
                     <div class="hidden md:flex items-center gap-2">
                         <span
                             class="relative flex items-center gap-2 px-3 pb-[4px] pt-[3px] rounded-[6px] bg-[#22223E] text-[12px] text-[#B4FF59] font-medium select-none">
-                            {{ __('livewire_index_main_hero_label') }}
+                            {{ __('livewire_index_main_hero_label', ['count' => $clientsCount]) }}
                             <span
                                 class="inline-block w-3 h-3 rounded-full bg-[#B4FF59] shadow-[0_0_12px_2px_#B4FF59] animate-pulse"></span>
                         </span>

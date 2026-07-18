@@ -13,13 +13,15 @@ Schedule::command('app:backup-processing-command')
     ->sendOutputTo(storage_path('logs/scheduler.log'));
 
 Schedule::command('quotes:cache')
-    ->cron('*/12 * * * *');
+    ->cron('*/12 * * * *')
+    ->skip(fn (): bool => app()->environment(['local', 'dev']));
 
 Schedule::command('itc:close-present-packages')
     ->cron('* * * * *');
 
 Schedule::command('quotes:cache-alphavantage')
-    ->dailyAt('08:00');
+    ->dailyAt('08:00')
+    ->skip(fn (): bool => app()->environment(['local', 'dev']));
 
 Schedule::command('regular-premium:accrual')
     ->weeklyOn(1, '23:50')
