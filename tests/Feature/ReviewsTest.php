@@ -83,3 +83,18 @@ test('main page rating link points to reviews route', function () {
         ->assertOk()
         ->assertSee(route('reviews'));
 });
+
+test('reviews count is pluralized correctly in russian', function (int $count, string $expected) {
+    app()->setLocale('ru');
+
+    expect(trans_choice('reviews_page_based_on', $count, ['count' => $count]))
+        ->toBe($expected);
+})->with([
+    [1, 'На основании 1 отзыва'],
+    [11, 'На основании 11 отзывов'],
+    [18, 'На основании 18 отзывов'],
+    [20, 'На основании 20 отзывов'],
+    [21, 'На основании 21 отзыва'],
+    [25, 'На основании 25 отзывов'],
+    [111, 'На основании 111 отзывов'],
+]);

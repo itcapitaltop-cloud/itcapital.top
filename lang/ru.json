@@ -829,7 +829,7 @@
     "liveware_news": "Финансовые новости",
     "liveware_news_not_found": "Новости скоро появятся",
     "reviews_page_title": "Отзывы клиентов",
-    "reviews_page_based_on": "На основании :count отзыва|На основании :count отзывов",
+    "reviews_page_based_on": "На основании :count отзыва|На основании :count отзывов|На основании :count отзывов",
     "reviews_form_title": "Оставить отзыв",
     "reviews_form_rating_label": "Ваша оценка",
     "reviews_form_body_label": "Текст отзыва",
