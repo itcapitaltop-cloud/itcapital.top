@@ -510,6 +510,7 @@
     "livewire_sign_up_nickname_label": "Никнейм",
     "livewire_sign_up_nickname_placeholder": "Короткое имя для логина",
     "livewire_sign_up_nickname_notice": "Только латинские символы",
+    "livewire_sign_up_nickname_taken": "Такой никнейм уже занят",
     "livewire_sign_up_first_name_label": "Имя",
     "livewire_sign_up_first_name_placeholder": "Имя пользователя",
     "livewire_sign_up_last_name_label": "Фамилия",

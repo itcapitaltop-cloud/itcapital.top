@@ -510,6 +510,7 @@
     "livewire_sign_up_nickname_label": "Username",
     "livewire_sign_up_nickname_placeholder": "Short login name",
     "livewire_sign_up_nickname_notice": "Latin characters only",
+    "livewire_sign_up_nickname_taken": "This username is already taken",
     "livewire_sign_up_first_name_label": "First Name",
     "livewire_sign_up_first_name_placeholder": "Your first name",
     "livewire_sign_up_last_name_label": "Last Name",

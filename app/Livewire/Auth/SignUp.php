@@ -49,7 +49,7 @@ class SignUp extends Component
     public function onSubmit(): void
     {
         $rules = [
-            'username' => 'required',
+            'username' => 'required|unique:users,username',
             'email' => 'required|email',
             'firstName' => 'required',
             'lastName' => 'required',
@@ -64,6 +64,7 @@ class SignUp extends Component
 
         try {
             $this->validate($rules, [
+                'username.unique' => __('livewire_sign_up_nickname_taken'),
                 'gRecaptchaResponse.required' => 'Подтвердите, что вы не робот',
                 'gRecaptchaResponse.captcha' => 'Капча пройдена неверно',
             ]);

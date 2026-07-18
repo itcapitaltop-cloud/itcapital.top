@@ -510,6 +510,7 @@
     "livewire_sign_up_nickname_label": "用户名",
     "livewire_sign_up_nickname_placeholder": "简短登录名",
     "livewire_sign_up_nickname_notice": "仅限拉丁字符",
+    "livewire_sign_up_nickname_taken": "该用户名已被占用",
     "livewire_sign_up_first_name_label": "名字",
     "livewire_sign_up_first_name_placeholder": "您的名字",
     "livewire_sign_up_last_name_label": "姓氏",
