@@ -32,7 +32,13 @@
                 </x-ui.input>
             </div>
 
-            <div class="mt-[40px]">
+            <label class="mt-[20px] flex items-center gap-[10px] cursor-pointer select-none text-[16px] text-white">
+                <input type="checkbox" wire:model="remember"
+                    class="h-[18px] w-[18px] rounded border-white/20 bg-transparent accent-lime">
+                {{ __('livewire_auth_sign_in_remember_me') }}
+            </label>
+
+            <div class="mt-[24px]">
                 <x-ui.submit-button class="w-full">
                     {{ __('livewire_auth_sign_in_submit_button') }}
                 </x-ui.submit-button>

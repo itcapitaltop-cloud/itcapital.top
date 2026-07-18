@@ -538,6 +538,7 @@
     "livewire_auth_sign_in_login_placeholder": "Никнейм пользователя или адрес почты",
     "livewire_auth_sign_in_password_label": "Пароль",
     "livewire_auth_sign_in_password_placeholder": "Ваш пароль",
+    "livewire_auth_sign_in_remember_me": "Запомнить меня",
     "livewire_auth_sign_in_submit_button": "Войти",
     "livewire_auth_sign_in_forgot_password": "Забыли пароль?",
     "livewire_auth_sign_in_create_account": "Создать аккаунт",

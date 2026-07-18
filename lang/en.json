@@ -538,6 +538,7 @@
     "livewire_auth_sign_in_login_placeholder": "Username or email",
     "livewire_auth_sign_in_password_label": "Password",
     "livewire_auth_sign_in_password_placeholder": "Your password",
+    "livewire_auth_sign_in_remember_me": "Remember me",
     "livewire_auth_sign_in_submit_button": "Sign In",
     "livewire_auth_sign_in_forgot_password": "Forgot password?",
     "livewire_auth_sign_in_create_account": "Create account",

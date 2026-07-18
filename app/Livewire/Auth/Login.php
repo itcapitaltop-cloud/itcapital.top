@@ -17,11 +17,16 @@ use Livewire\Component;
 
 final class Login extends Component
 {
+    private const int REMEMBER_DURATION_MINUTES = 60 * 24 * 30;
+
     #[Validate(['required', 'string'])]
     public string $login = '';
 
     #[Validate(['required', 'string'])]
     public string $password = '';
+
+    #[Validate(['boolean'])]
+    public bool $remember = false;
 
     /**
      * @throws Exception
@@ -77,7 +82,11 @@ final class Login extends Component
             return;
         }
 
-        Auth::login($user, true);
+        if ($this->remember) {
+            Auth::guard('web')->setRememberDuration(self::REMEMBER_DURATION_MINUTES);
+        }
+
+        Auth::login($user, $this->remember);
         session()->regenerate();
 
         $agent = new Agent();
