@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Jenssegers\Agent\Agent;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -27,6 +28,15 @@ final class Login extends Component
 
     #[Validate(['boolean'])]
     public bool $remember = false;
+
+    public function mount(): void
+    {
+        $previousUrl = url()->previous();
+
+        if (Str::before($previousUrl, '?') === route('reviews')) {
+            redirect()->setIntendedUrl($previousUrl);
+        }
+    }
 
     /**
      * @throws Exception
@@ -106,7 +116,7 @@ final class Login extends Component
             'created_at' => now(),
         ]);
 
-        $this->redirectRoute('dashboard');
+        $this->redirectIntended(route('dashboard'));
     }
 
     public function render(): View
