@@ -19,12 +19,14 @@
                     {{ __('reviews_page_title') }}
                 </h1>
                 @auth
-                    <a
-                        href="{{ route('reviews.create') }}"
-                        class="self-start shrink-0 inline-flex items-center justify-center px-4 py-3 rounded-[8px] bg-[#B4FF59] text-[#17162D] font-medium text-[14px] hover:bg-[#C5FF80] hover:shadow-[0_0_16px_0_#B4FF59] transition-all duration-200 whitespace-nowrap"
-                    >
-                        {{ __('reviews_page_be_first') }}
-                    </a>
+                    @unless(auth()->user()->hasReview())
+                        <a
+                            href="{{ route('reviews.create') }}"
+                            class="self-start shrink-0 inline-flex items-center justify-center px-4 py-3 rounded-[8px] bg-[#B4FF59] text-[#17162D] font-medium text-[14px] hover:bg-[#C5FF80] hover:shadow-[0_0_16px_0_#B4FF59] transition-all duration-200 whitespace-nowrap"
+                        >
+                            {{ __('reviews_page_be_first') }}
+                        </a>
+                    @endunless
                 @endauth
             </div>
 

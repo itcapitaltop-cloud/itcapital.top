@@ -18,13 +18,15 @@
         </ul>
     </nav>
 
-    <div class="px-6 pt-8">
-        <a href="{{ route('reviews.create') }}"
-            class="flex h-[35px] w-[259px] max-w-full items-center whitespace-nowrap rounded-lg border border-lime px-4
-                   text-[16px] font-medium leading-[19px] text-lime transition-colors hover:bg-lime hover:text-[#17162D]">
-            {{ __('reviews_sidebar_button') }}
-        </a>
-    </div>
+    @unless(auth()->user()?->hasReview())
+        <div class="px-6 pt-8">
+            <a href="{{ route('reviews.create') }}"
+                class="flex h-[35px] w-[259px] max-w-full items-center whitespace-nowrap rounded-lg border border-lime px-4
+                       text-[16px] font-medium leading-[19px] text-lime transition-colors hover:bg-lime hover:text-[#17162D]">
+                {{ __('reviews_sidebar_button') }}
+            </a>
+        </div>
+    @endunless
 
     @unless(request()->routeIs('news.index'))
         <livewire:news.index position="sidebar" limit="3" />

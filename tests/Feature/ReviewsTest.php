@@ -32,6 +32,33 @@ test('authenticated user can submit a review', function () {
         ->and($review->status)->toBe(ReviewStatusEnum::Pending);
 });
 
+test('create page redirects to reviews when user already left a review', function () {
+    $user = User::factory()->create();
+    Review::factory()->create(['user_id' => $user->id]);
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->assertRedirect(route('reviews'));
+});
+
+test('leave review button is hidden when user already left a review', function () {
+    $user = User::factory()->create();
+    Review::factory()->create(['user_id' => $user->id]);
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->assertDontSee(route('reviews.create'));
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\Account\Layout\Sidebar::class)
+        ->assertDontSee(route('reviews.create'));
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee(route('reviews.create'));
+});
+
 test('review body validation requires minimum 10 characters', function () {
     $user = User::factory()->create();
 
@@ -44,10 +71,8 @@ test('review body validation requires minimum 10 characters', function () {
 });
 
 test('only approved reviews are shown on reviews page', function () {
-    $user = User::factory()->create();
-
-    $approved = Review::factory()->create(['status' => ReviewStatusEnum::Approved, 'user_id' => $user->id]);
-    $pending = Review::factory()->create(['status' => ReviewStatusEnum::Pending, 'user_id' => $user->id]);
+    $approved = Review::factory()->create(['status' => ReviewStatusEnum::Approved]);
+    $pending = Review::factory()->create(['status' => ReviewStatusEnum::Pending]);
 
     Livewire::test(Index::class)
         ->assertSee($approved->body)
@@ -55,11 +80,8 @@ test('only approved reviews are shown on reviews page', function () {
 });
 
 test('reviews pagination uses branded dark styles', function () {
-    $user = User::factory()->create();
-
     Review::factory()->count(11)->create([
         'status' => ReviewStatusEnum::Approved,
-        'user_id' => $user->id,
     ]);
 
     Livewire::test(Index::class)
@@ -72,11 +94,8 @@ test('reviews pagination uses branded dark styles', function () {
 });
 
 test('reviews pagination collapses page numbers when there are many pages', function () {
-    $user = User::factory()->create();
-
     Review::factory()->count(115)->create([
         'status' => ReviewStatusEnum::Approved,
-        'user_id' => $user->id,
     ]);
 
     Livewire::test(Index::class)

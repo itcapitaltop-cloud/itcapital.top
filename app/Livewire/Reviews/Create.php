@@ -18,6 +18,13 @@ class Create extends Component
 
     public bool $submitted = false;
 
+    public function mount(): void
+    {
+        if ($this->userHasReview()) {
+            $this->redirectRoute('reviews', navigate: true);
+        }
+    }
+
     /**
      * @var array<string, string|array<string>>
      */
@@ -46,6 +53,10 @@ class Create extends Component
 
     public function submit(): void
     {
+        if ($this->userHasReview()) {
+            return;
+        }
+
         $this->validate();
 
         $user = Auth::user();
@@ -64,6 +75,17 @@ class Create extends Component
         $this->body = '';
         $this->rating = 0;
         $this->submitted = true;
+    }
+
+    private function userHasReview(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return Review::query()->where('user_id', $user->id)->exists();
     }
 
     public function render(): View

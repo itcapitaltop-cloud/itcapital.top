@@ -190,6 +190,16 @@ final class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Partner::class, 'partner_id', 'id');
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function hasReview(): bool
+    {
+        return $this->reviews()->exists();
+    }
+
     protected function investmentsSum(): Attribute
     {
         return Attribute::make(
