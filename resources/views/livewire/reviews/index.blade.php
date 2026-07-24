@@ -7,9 +7,9 @@
             {{-- Back to homepage --}}
             <a
                 href="{{ route('index') }}"
-                class="inline-flex items-center gap-2 text-white text-[16px] font-medium mb-6 md:mb-8 hover:text-[#B4FF59] transition-colors duration-200"
+                class="inline-flex items-center gap-2 text-lime text-[16px] font-medium mb-6 md:mb-8 underline underline-offset-[4px]"
             >
-                <img class="w-[16px]" src="{{ vite()->icon('/actions/arrow-to-main-left-white.svg') }}" alt="" />
+                <img class="w-[16px]" src="{{ vite()->icon('/actions/arrow-to-main-left.svg') }}" alt="" />
                 {{ __('home_page') }}
             </a>
 
