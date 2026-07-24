@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Notification;
 
 beforeEach(function (): void {
     Notification::fake();
+    config()->set('rank.maintenance.enabled', true);
     $this->service = app(UserRankServices::class);
 });
 
@@ -49,4 +50,24 @@ it('pays the rank bonus only once even after losing and re-achieving the rank', 
     expect((int) $user->rank)->toBe(2)
         ->and($user->rank_demoted_at)->toBeNull()
         ->and($bonusTransactions())->toBe(1);
+});
+
+it('ignores an old demotion baseline while rank maintenance is disabled', function (): void {
+    config()->set('rank.maintenance.enabled', false);
+    createPartnerRank(1); // always-met fallback
+    createPartnerRank(2, lineRequired: 1_000.0, bonus: 25.0);
+
+    $user = User::factory()->create([
+        'rank' => 1,
+        'max_rank_awarded' => 2,
+        'rank_demoted_at' => now()->subDay(),
+    ]);
+
+    // The turnover was generated before rank_demoted_at. With maintenance
+    // disabled, the old baseline should not block the normal rank calculation.
+    addPartnerLineTurnover($user, 1_500.0, now()->subDays(5));
+
+    expect($this->service->recalculateAndUpdateRank($user))->toBeTrue()
+        ->and((int) $user->refresh()->rank)->toBe(2)
+        ->and($user->rank_demoted_at)->toBeNull();
 });

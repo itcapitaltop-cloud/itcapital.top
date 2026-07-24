@@ -228,6 +228,16 @@ final class UserRankServices
     ): bool {
         $this->resetCaches();
 
+
+        if (! (bool) config('rank.maintenance.enabled', false)) {
+            Log::debug('[UserRankServices.applyMonthlyMaintenance] skipped: rank maintenance disabled', [
+                'user_id' => $user->id,
+                'rank' => (int) $user->rank,
+            ]);
+
+            return false;
+        }
+
         $currentRank = (int) $user->rank;
 
         if ((bool) $user->overridden_rank === true) {
@@ -538,7 +548,9 @@ final class UserRankServices
         if (! $this->useManualRankBaseline) {
             // После понижения для повышения засчитывается только оборот,
             // сгенерированный после базлайна понижения.
-            $demotedAt = $user->rank_demoted_at;
+            $demotedAt = (bool) config('rank.maintenance.enabled', false)
+                ? $user->rank_demoted_at
+                : null;
 
             $buyAmount = $this->calculateBuyAmount($lineIds, $demotedAt);
             $reinvestAmount = $this->calculateReinvestAmount($lineIds, $demotedAt);

@@ -44,7 +44,7 @@
                                     <div class="flex justify-between">
                                         <span>{{ $bar['label'] }}</span>
                                         <span>
-                                            {{ number_format($bar['current'], 0, ',', '') }}
+                                            {{ number_format(floor($bar['current']), 0, ',', '') }}
                                             /
                                             {{ number_format($bar['target'], 0, ',', '') }}
                                         </span>

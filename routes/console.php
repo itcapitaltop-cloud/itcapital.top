@@ -41,6 +41,7 @@ Schedule::command('partner:rank-maintenance')
     ->monthlyOn(1, '00:30')
     ->withoutOverlapping()
     ->onOneServer()
+    ->when(fn (): bool => (bool) config('rank.maintenance.enabled', false))
     ->sendOutputTo(storage_path('logs/scheduler.log'));
 
 Schedule::command('summary:reconcile')
