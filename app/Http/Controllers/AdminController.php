@@ -26,9 +26,12 @@ use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\MoonShine\Pages\User\UserDetailPage;
+use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Admin\ReferralTreeService;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
@@ -272,11 +275,13 @@ class AdminController extends Controller
 
         $telegram = trim((string) $user->telegram);
 
+        $referrals = app(ReferralTreeService::class)->flatten($user->id);
+
         $rows = [
             ['Фамилия Имя', trim("{$user->first_name} {$user->last_name}")],
             ['Никнейм', $user->username],
             ['Номер линии', $lineNumber],
-            ['Реферал', $user->referrer?->username ?? ''],
+            ['Кто пригласил', $user->referrer?->username ?? ''],
             ['Город', ''],
             ['Телефон', ''],
             ['Социальные сети', $telegram],
@@ -284,12 +289,36 @@ class AdminController extends Controller
             ['Токены', $tokens],
             ['Обучение', ''],
             ['Ранг', $user->rank],
+            ['', ''],
+            ['Рефералы', $referrals === [] ? 'Нет рефералов' : 'Всего: ' . count($referrals)],
         ];
+
+        /*
+         * Дерево рефералов: отступ в столбце A показывает линию, каждая строка —
+         * ссылка на карточку реферала в админке.
+         */
+        $treeFirstRow = count($rows) + 1;
+
+        foreach ($referrals as $referral) {
+            $rows[] = [
+                str_repeat('    ', $referral['line'] - 1) . $referral['name'],
+                'Линия ' . $referral['line'],
+            ];
+        }
+
+        $referralUrls = array_map(
+            static fn (array $referral): string => to_page(
+                page: new UserDetailPage(),
+                resource: new UserResource(),
+                params: ['resourceItem' => $referral['id']]
+            ),
+            $referrals
+        );
 
         $filename = sprintf('user-%d-card-%s.xlsx', $user->id, now()->format('Ymd-His'));
 
         return response()->streamDownload(
-            function () use ($rows, $telegram): void {
+            function () use ($rows, $telegram, $referralUrls, $treeFirstRow): void {
                 $spreadsheet = new Spreadsheet();
                 $sheet = $spreadsheet->getActiveSheet();
                 $sheet->setTitle('Карточка');
@@ -301,6 +330,15 @@ class AdminController extends Controller
                         ? $telegram
                         : 'https://t.me/' . ltrim($telegram, '@');
                     $sheet->getCell('B7')->getHyperlink()->setUrl($telegramUrl);
+                }
+
+                $sheet->getStyle('A' . ($treeFirstRow - 1))->getFont()->setBold(true);
+
+                foreach ($referralUrls as $index => $url) {
+                    $cell = 'A' . ($treeFirstRow + $index);
+
+                    $sheet->getCell($cell)->getHyperlink()->setUrl($url);
+                    $sheet->getStyle($cell)->getFont()->setUnderline(true)->getColor()->setARGB('FF0563C1');
                 }
 
                 foreach (['A', 'B'] as $column) {

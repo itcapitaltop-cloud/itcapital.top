@@ -60,11 +60,11 @@ it('exports the user card with template rows and dashboard package total', funct
     @unlink($path);
 
     expect($response->headers->get('content-type'))->toContain('spreadsheetml.sheet')
-        ->and(array_column($rows, 0))->toBe([
+        ->and(array_slice(array_column($rows, 0), 0, 11))->toBe([
             'Фамилия Имя',
             'Никнейм',
             'Номер линии',
-            'Реферал',
+            'Кто пригласил',
             'Город',
             'Телефон',
             'Социальные сети',
@@ -83,5 +83,69 @@ it('exports the user card with template rows and dashboard package total', funct
         ->and((float) $rows[7][1])->toBe(1150.0)
         ->and((float) $rows[8][1])->toBe(0.0)
         ->and($rows[9][1])->toBeNull()
-        ->and((int) $rows[10][1])->toBe(3);
+        ->and((int) $rows[10][1])->toBe(3)
+        ->and($rows[12][0])->toBe('Рефералы')
+        ->and($rows[12][1])->toBe('Нет рефералов');
+});
+
+it('exports the whole referral structure as an indented tree with admin profile links', function (): void {
+    $user = User::factory()->create(['username' => 'root-user']);
+
+    $first = User::factory()->create([
+        'username' => 'line1-user',
+        'first_name' => 'Пётр',
+        'last_name' => 'Сидоров',
+    ]);
+    $second = User::factory()->create([
+        'username' => 'line2-user',
+        'first_name' => 'Анна',
+        'last_name' => 'Иванова',
+    ]);
+    $third = User::factory()->create([
+        'username' => 'line3-user',
+        'first_name' => 'Олег',
+        'last_name' => 'Кузнецов',
+        'banned_at' => now(),
+    ]);
+
+    $chain = [$user, $first, $second, $third];
+
+    foreach ($chain as $depth => $descendant) {
+        if ($depth > 0) {
+            Partner::query()->create([
+                'user_id' => $descendant->id,
+                'partner_id' => $chain[$depth - 1]->id,
+            ]);
+        }
+
+        for ($ancestor = 0; $ancestor <= $depth; $ancestor++) {
+            PartnerClosure::query()->create([
+                'ancestor_id' => $chain[$ancestor]->id,
+                'descendant_id' => $descendant->id,
+                'depth' => $depth - $ancestor,
+            ]);
+        }
+    }
+
+    $response = (new AdminController())->exportUserCard($user->id);
+
+    ob_start();
+    $response->sendContent();
+    $xlsx = (string) ob_get_clean();
+
+    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
+    file_put_contents($path, $xlsx);
+
+    $sheet = IOFactory::load($path)->getActiveSheet();
+    $rows = $sheet->toArray();
+
+    @unlink($path);
+
+    expect($rows[12])->toBe(['Рефералы', 'Всего: 3'])
+        ->and($rows[13])->toBe(['Пётр Сидоров', 'Линия 1'])
+        ->and($rows[14])->toBe(['    Анна Иванова', 'Линия 2'])
+        ->and($rows[15])->toBe(['        Олег Кузнецов', 'Линия 3'])
+        ->and($sheet->getCell('A14')->getHyperlink()->getUrl())->toContain((string) $first->id)
+        ->and($sheet->getCell('A15')->getHyperlink()->getUrl())->toContain((string) $second->id)
+        ->and($sheet->getCell('A16')->getHyperlink()->getUrl())->toContain((string) $third->id);
 });
