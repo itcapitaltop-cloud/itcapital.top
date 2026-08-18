@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\Withdraw;
 
-use MoonShine\Pages\Crud\DetailPage;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Fields\Field;
+use MoonShine\Pages\Crud\DetailPage;
 use Throwable;
 
 class WithdrawDetailPage extends DetailPage
@@ -21,34 +21,37 @@ class WithdrawDetailPage extends DetailPage
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function topLayer(): array
     {
         return [
-            ...parent::topLayer()
+            ...parent::topLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function mainLayer(): array
     {
         return [
-            ...parent::mainLayer()
+            ...parent::mainLayer(),
         ];
     }
 
     /**
      * @return list<MoonShineComponent>
+     *
      * @throws Throwable
      */
     protected function bottomLayer(): array
     {
         return [
-            ...parent::bottomLayer()
+            ...parent::bottomLayer(),
         ];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages\Deposit;
 
+use App\Enums\Transactions\PaymentSourcesEnum;
 use App\Enums\Transactions\TransactionStatusEnum;
 use App\Models\Deposit;
 use App\Models\User;
@@ -12,9 +13,12 @@ use App\MoonShine\Resources\UserResource;
 use Illuminate\Support\Facades\Log;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\Dropdown;
+use MoonShine\Components\FormBuilder;
 use MoonShine\Components\MoonShineComponent;
 use MoonShine\Fields\Date;
 use MoonShine\Fields\Field;
+use MoonShine\Fields\Hidden;
+use MoonShine\Fields\Number;
 use MoonShine\Fields\Preview;
 use MoonShine\Fields\Td;
 use MoonShine\Fields\Text;
@@ -71,11 +75,10 @@ class DepositIndexPage extends IndexPage
 
                 return '<a href="https://tronscan.org/#/transaction/' . $item->transaction_hash . '" target="_blank" rel="noopener" title="Сканировать в Tronscan" style="display:inline-block;text-decoration:none;vertical-align:middle;"><svg xmlns="http://www.w3.org/2000/svg" style="width:1.5em;height:1.5em;vertical-align:middle;fill:currentColor;" viewBox="0 0 20 20"><path d="M10.186 2.003a8.013 8.013 0 1 0 7.812 6.288.75.75 0 0 0-1.469.292 6.51 6.51 0 1 1-1.396-2.446l-1.29.147a.75.75 0 0 0 .084 1.496l3.036-.346a.75.75 0 0 0 .662-.842l-.346-3.036a.75.75 0 1 0-1.496.084l.13 1.144A8.022 8.022 0 0 0 10.185 2ZM10 6.25a.75.75 0 0 1 .75.75v2.25h2.25a.75.75 0 0 1 0 1.5H10.75v2.25a.75.75 0 0 1-1.5 0V10.75H7a.75.75 0 0 1 0-1.5h2.25V7a.75.75 0 0 1 .75-.75Z"/></svg></a>';
             }),
-            Text::make('Крипто/Фиат', 'transaction_hash', formatted: fn (Deposit $item) =>
-                // если строка выглядит как 64-значный hex-хеш — считаем это криптовалютой
-            preg_match('/^[A-Fa-f0-9]{64}$/', $item->transaction_hash)
-                ? 'Крипто (USDT)'
-                : $item->transaction_hash)->showOnExport(),
+            Text::make('Крипто/ Фиат', 'transaction_hash', formatted: static fn (Deposit $item): string => $item->payment_source_id === PaymentSourcesEnum::Crypto->value
+                    ? 'Крипто (USDT)'
+                    : $item->transaction_hash
+            )->showOnExport(),
             Td::make('Статус')
                 ->fields(function (Td $field) {
                     $item = $field->getData();
@@ -104,6 +107,25 @@ class DepositIndexPage extends IndexPage
                             )
                             ->icon('heroicons.x-mark')
                             ->error();
+
+                        $buttons[] = ActionButton::make('')
+                            ->icon('heroicons.outline.pencil')
+                            ->inModal(
+                                title: 'Редактировать сумму заявки на ввод',
+                                content: fn () => FormBuilder::make()
+                                    ->action(route('deposit-update-amount', ['uuid' => $item->uuid]))
+                                    ->method('POST')
+                                    ->fields([
+                                        Hidden::make('uuid'),
+                                        Number::make('Сумма', 'amount')->min(0.01)->step(0.01),
+                                    ])
+                                    ->fill([
+                                        'uuid' => $item->uuid,
+                                        'amount' => (string) $item->transaction->amount,
+                                    ])
+                                    ->async()
+                                    ->submit('Сохранить')
+                            );
                     }
 
                     // Если статус "Отклонено" — dropdown с "Исполнено" и "На модерации"

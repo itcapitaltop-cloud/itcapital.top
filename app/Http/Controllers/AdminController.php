@@ -31,6 +31,7 @@ use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
+use App\Services\Admin\FinanceRequestService;
 use App\Services\Admin\ReferralTreeService;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
@@ -1201,35 +1202,78 @@ class AdminController extends Controller
         }
     }
 
-    public function withdrawUpdate(Request $request): MoonShineJsonResponse
+    public function withdrawUpdate(Request $request, FinanceRequestService $service): MoonShineJsonResponse
     {
         $data = $request->validate([
-            'amount' => 'required|numeric|min:0',
+            'amount' => 'required|numeric|gt:0',
             'status' => 'nullable|in:'
                 . TransactionStatusEnum::MODERATE->getName() . ','
                 . TransactionStatusEnum::ACCEPTED->getName() . ','
                 . TransactionStatusEnum::REJECTED->getName(),
         ]);
 
-        // обновили сумму и получили модель
-        $this->updateAmount($data['amount']);
+        $transaction = Transaction::query()->where('uuid', $request->string('uuid'))->firstOrFail();
+
+        if ($transaction->accepted_at === null && $transaction->rejected_at === null) {
+            $service->updateActiveAmount($transaction->uuid, (string) $data['amount'], TrxTypeEnum::WITHDRAW);
+        } else {
+            $this->updateAmount((float) $data['amount']);
+        }
 
         // переключаем статус
-        if ($data['status'] === TransactionStatusEnum::ACCEPTED->getName()) {
+        if (($data['status'] ?? null) === TransactionStatusEnum::ACCEPTED->getName()) {
             return $this->accept();
         }
 
-        if ($data['status'] === TransactionStatusEnum::REJECTED->getName()) {
+        if (($data['status'] ?? null) === TransactionStatusEnum::REJECTED->getName()) {
             return $this->reject();
         }
 
-        if ($data['status'] === TransactionStatusEnum::MODERATE->getName()) {
+        if (($data['status'] ?? null) === TransactionStatusEnum::MODERATE->getName()) {
             return $this->toModerate();
         }
 
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_withdraw_updated'), ToastType::SUCCESS)
             ->redirect($request->headers->get('referer'));
+    }
+
+    public function depositUpdateAmount(Request $request, FinanceRequestService $service): MoonShineJsonResponse
+    {
+        $data = $request->validate([
+            'uuid' => ['required', 'string'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        $service->updateActiveAmount($data['uuid'], (string) $data['amount'], TrxTypeEnum::DEPOSIT);
+
+        return MoonShineJsonResponse::make()->toast('Сумма заявки обновлена', ToastType::SUCCESS)->redirect(url()->previous());
+    }
+
+    public function withdrawCreate(Request $request, FinanceRequestService $service): MoonShineJsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'amount' => ['required', 'numeric', 'min:10'],
+            'source' => ['required', Rule::in(['crypto', 'fiat'])],
+            'wallet_address' => ['nullable', 'required_if:source,crypto', 'string', 'max:255'],
+            'sbp_phone' => ['nullable', 'required_if:source,fiat', 'regex:/^\+?7[\s\-]?\d{3}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}$/'],
+            'bank_name' => ['nullable', 'required_if:source,fiat', 'string', 'min:2', 'max:100'],
+            'recipient_name' => ['nullable', 'required_if:source,fiat', 'string', 'max:255'],
+        ]);
+
+        $user = User::withoutGlobalScope('notBanned')->findOrFail($data['user_id']);
+        $service->createWithdraw(
+            user: $user,
+            amount: (string) $data['amount'],
+            source: $data['source'],
+            walletAddress: $data['wallet_address'] ?? null,
+            sbpPhone: $data['sbp_phone'] ?? null,
+            bankName: $data['bank_name'] ?? null,
+            recipientName: $data['recipient_name'] ?? null,
+        );
+
+        return MoonShineJsonResponse::make()->toast('Заявка на вывод создана', ToastType::SUCCESS)->redirect(url()->previous());
     }
 
     public function recalculate(MoonShineRequest $request): RedirectResponse

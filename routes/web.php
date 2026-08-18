@@ -138,6 +138,8 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('users/amount', 'addAmountToBalance');
     Route::post('itc-packages/{uuid}', 'updateItcPackage');
     Route::post('withdraw/update', 'withdrawUpdate')->name('withdraw-update');
+    Route::post('deposit/update-amount', 'depositUpdateAmount')->name('deposit-update-amount');
+    Route::post('withdraw/create', 'withdrawCreate')->name('withdraw-create');
     Route::post('partners', 'addPartner')->name('add-partner');
     Route::post('partners/{partner_id}', 'updatePartner');
     Route::get('users/suggest', 'suggestUsers')->name('admin.users.suggest');

@@ -12,6 +12,8 @@ return [
     'update_investments_sum' => 'Изменение суммы инвестиций',
     'update_partner_balance' => 'Изменение партнёрского баланса',
     'update_withdraw_amount' => 'Изменение суммы вывода',
+    'update_deposit_amount' => 'Изменение суммы заявки на ввод',
+    'create_withdraw' => 'Создание заявки на вывод',
     'delete_package_reinvest_profit' => 'Удаление реинвеста профита пакета',
     'approve_transaction' => 'Одобрение транзакции',
     'reject_transaction' => 'Отклонение транзакции',

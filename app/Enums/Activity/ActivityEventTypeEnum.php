@@ -13,6 +13,9 @@ enum ActivityEventTypeEnum: string
     case WithdrawRequested = 'withdraw_requested';
     case WithdrawApproved = 'withdraw_approved';
     case WithdrawRejected = 'withdraw_rejected';
+    case DepositAmountChangedByAdmin = 'deposit_amount_changed_by_admin';
+    case WithdrawAmountIncreasedByAdmin = 'withdraw_amount_increased_by_admin';
+    case WithdrawAmountDecreasedByAdmin = 'withdraw_amount_decreased_by_admin';
 
     case PackagePurchased = 'package_purchased';
     case PackageClosed = 'package_closed';

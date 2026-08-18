@@ -82,6 +82,12 @@ final class ActivityManager
             ActivityEventTypeEnum::WithdrawRequested => __('activity/feed.business.withdraw_requested', ['details' => $financeDetails, 'amount' => $amount]),
             ActivityEventTypeEnum::WithdrawApproved => __('activity/feed.business.withdraw_approved', ['details' => $financeDetails, 'amount' => $amount]),
             ActivityEventTypeEnum::WithdrawRejected => __('activity/feed.business.withdraw_rejected', ['details' => $financeDetails, 'amount' => $amount]),
+            ActivityEventTypeEnum::DepositAmountChangedByAdmin => __('activity/feed.business.deposit_amount_changed_by_admin', [
+                'old_amount' => $this->formatAmount($activity->getExtraProperty('old_amount')),
+                'amount' => $amount,
+            ]),
+            ActivityEventTypeEnum::WithdrawAmountIncreasedByAdmin => __('activity/feed.business.withdraw_amount_increased_by_admin', ['amount' => $amount]),
+            ActivityEventTypeEnum::WithdrawAmountDecreasedByAdmin => __('activity/feed.business.withdraw_amount_decreased_by_admin', ['amount' => $amount]),
             ActivityEventTypeEnum::PackagePurchased => __('activity/feed.business.package_purchased', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageClosed => $activity->getExtraProperty('package_type') === 'staking'
                 ? __('activity/feed.business.staking_package_closed', ['uuid' => $packageUuid, 'amount' => $amount])

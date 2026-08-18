@@ -2,7 +2,7 @@
     use Illuminate\Support\Carbon;
     $depositAddress = config('wallet.deposit_address');
     use Illuminate\Support\Facades\Log;
-    $withdrawDisabled = !Carbon::now()->isSunday();
+    $withdrawDisabled = !auth()->user()->is_test && !Carbon::now()->isSunday();
 @endphp
 
 <x-ui.card-tabs :tabs="[

@@ -8,7 +8,7 @@
             </figure>
         </div>
     </x-bg.section-slim>
-    @if(Carbon::now()->isSunday())
+    @if(auth()->user()->is_test || Carbon::now()->isSunday())
         <x-bg.section-slim>
             <form wire:submit="createWithdraw" x-on:withdraw-created.window="isWithdrawModalActive = false">
                 <x-ui.input name="withdrawForm.amount" placeholder="Например: 100">

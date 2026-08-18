@@ -6,6 +6,7 @@ namespace App\MoonShine\Pages\Withdraw;
 
 use App\Enums\Transactions\TransactionStatusEnum;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Models\Withdraw;
 use App\MoonShine\Pages\User\UserDetailPage;
 use App\MoonShine\Resources\UserResource;
@@ -18,6 +19,7 @@ use MoonShine\Components\MoonShineComponent;
 use MoonShine\Exceptions\FieldException;
 use MoonShine\Fields\Date;
 use MoonShine\Fields\Field;
+use MoonShine\Fields\Hidden;
 use MoonShine\Fields\Number;
 use MoonShine\Fields\Select;
 use MoonShine\Fields\Td;
@@ -136,6 +138,24 @@ class WithdrawIndexPage extends IndexPage
                                 )
                                 ->icon('heroicons.x-mark')
                                 ->error(),
+                            ActionButton::make('')
+                                ->icon('heroicons.outline.pencil')
+                                ->inModal(
+                                    title: 'Редактировать сумму заявки на вывод',
+                                    content: fn () => FormBuilder::make()
+                                        ->action(route('withdraw-update', ['uuid' => $item->uuid]))
+                                        ->method('POST')
+                                        ->fields([
+                                            Hidden::make('uuid'),
+                                            Number::make('Сумма', 'amount')->min(0.01)->step(0.01),
+                                        ])
+                                        ->fill([
+                                            'uuid' => $item->uuid,
+                                            'amount' => (string) $item->transaction->amount,
+                                        ])
+                                        ->async()
+                                        ->submit('Сохранить')
+                                ),
                         ];
                     }
 
@@ -212,6 +232,32 @@ class WithdrawIndexPage extends IndexPage
     {
         return [
             ...parent::topLayer(),
+            ActionButton::make('Создать заявку на вывод')
+                ->icon('heroicons.plus')
+                ->inModal(
+                    title: 'Новая заявка на вывод',
+                    content: fn () => FormBuilder::make()
+                        ->action(route('withdraw-create'))
+                        ->method('POST')
+                        ->fields([
+                            Select::make('Аккаунт', 'user_id')
+                                ->options(User::withoutGlobalScope('notBanned')->orderBy('username')->get()->mapWithKeys(
+                                    fn (User $user) => [$user->id => $user->username . ($user->is_test ? ' (тестовый)' : '')]
+                                )->all())
+                                ->searchable(),
+                            Select::make('Способ вывода', 'source')->options([
+                                'crypto' => 'Криптовалюта',
+                                'fiat' => 'Фиат',
+                            ])->default('crypto'),
+                            Number::make('Сумма', 'amount')->min(10)->step(0.01),
+                            Text::make('Адрес кошелька', 'wallet_address')->showWhen('source', 'crypto'),
+                            Text::make('Телефон СБП', 'sbp_phone')->showWhen('source', 'fiat'),
+                            Text::make('Банк', 'bank_name')->showWhen('source', 'fiat'),
+                            Text::make('ФИО получателя', 'recipient_name')->showWhen('source', 'fiat'),
+                        ])
+                        ->async()
+                        ->submit('Создать')
+                ),
         ];
     }
 

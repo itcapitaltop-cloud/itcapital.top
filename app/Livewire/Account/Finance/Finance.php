@@ -52,7 +52,10 @@ class Finance extends Component
 
     public function createWithdraw()
     {
-        if (! Carbon::now()->isSunday()) {
+        /** @var User $user */
+        $user = Auth::user();
+
+        if (! $user->is_test && ! Carbon::now()->isSunday()) {
             $this->dispatch(
                 'new-system-notification',
                 type: 'warning',

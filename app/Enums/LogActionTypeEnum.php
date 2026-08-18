@@ -15,6 +15,8 @@ enum LogActionTypeEnum: string
     case UPDATE_INVESTMENTS_SUM = 'update_investments_sum';
     case UPDATE_PARTNER_BALANCE = 'update_partner_balance';
     case UPDATE_WITHDRAW_AMOUNT = 'update_withdraw_amount';
+    case UPDATE_DEPOSIT_AMOUNT = 'update_deposit_amount';
+    case CREATE_WITHDRAW = 'create_withdraw';
     case DELETE_PACKAGE_REINVEST_PROFIT = 'delete_package_reinvest_profit';
     case APPROVE_TRANSACTION = 'approve_transaction';
     case REJECT_TRANSACTION = 'reject_transaction';
@@ -39,6 +41,8 @@ enum LogActionTypeEnum: string
             self::UPDATE_INVESTMENTS_SUM => __('activity/log_action.update_investments_sum'),
             self::UPDATE_PARTNER_BALANCE => __('activity/log_action.update_partner_balance'),
             self::UPDATE_WITHDRAW_AMOUNT => __('activity/log_action.update_withdraw_amount'),
+            self::UPDATE_DEPOSIT_AMOUNT => __('activity/log_action.update_deposit_amount'),
+            self::CREATE_WITHDRAW => __('activity/log_action.create_withdraw'),
             self::DELETE_PACKAGE_REINVEST_PROFIT => __('activity/log_action.delete_package_reinvest_profit'),
             self::APPROVE_TRANSACTION => __('activity/log_action.approve_transaction'),
             self::REJECT_TRANSACTION => __('activity/log_action.reject_transaction'),
