@@ -25,4 +25,6 @@ return [
     'upsert_token_rate' => 'Создание/обновление курса токена',
     'create_token_rate' => 'Создание курса токена',
     'update_token_rate' => 'Обновление курса токена',
+    'update_beneficiary' => 'Изменение данных бенефициара',
+    'delete_beneficiary' => 'Удаление бенефициара',
 ];

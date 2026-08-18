@@ -340,6 +340,7 @@ class UserDetailPage extends DetailPage
         $packages = [];
         $unwithdrawnProfits = collect();
         $partners = collect();
+        $beneficiaries = collect();
         $userLogs = [];
         $adminLogs = [];
 
@@ -418,6 +419,23 @@ class UserDetailPage extends DetailPage
             $loadedSections['referrals'] = $partners->count();
         } else {
             $loadedSections['referrals'] = 'deferred';
+        }
+
+        if ($activeTab === 'beneficiaries') {
+            $beneficiaries = $item->beneficiaries()
+                ->latest()
+                ->get()
+                ->map(fn ($beneficiary): array => [
+                    'id' => $beneficiary->id,
+                    'user_id' => $beneficiary->user_id,
+                    'full_name' => $beneficiary->full_name,
+                    'phone' => $beneficiary->phone,
+                    'social_url' => $beneficiary->social_url,
+                    'created_at' => $beneficiary->created_at,
+                ]);
+            $loadedSections['beneficiaries'] = $beneficiaries->count();
+        } else {
+            $loadedSections['beneficiaries'] = 'deferred';
         }
 
         if ($activeTab === 'logs') {
@@ -771,6 +789,26 @@ class UserDetailPage extends DetailPage
             );
         };
 
+        $editBeneficiaryForm = static fn (array $beneficiary): FormBuilder => FormBuilder::make()
+            ->asyncMethod('updateBeneficiary')
+            ->fields([
+                Hidden::make('beneficiary_id')->fill($beneficiary['id']),
+                Hidden::make('user_id')->fill($beneficiary['user_id']),
+                Text::make('Полное ФИО', 'full_name')->fill($beneficiary['full_name'])->required(),
+                Text::make('Номер телефона', 'phone')->fill($beneficiary['phone'])->required(),
+                Text::make('Ссылка на социальные сети', 'social_url')->fill($beneficiary['social_url'])->required(),
+            ])
+            ->submit('Сохранить');
+
+        $deleteBeneficiaryForm = static fn (array $beneficiary): FormBuilder => FormBuilder::make()
+            ->asyncMethod('deleteBeneficiary')
+            ->fields([
+                Hidden::make('beneficiary_id')->fill($beneficiary['id']),
+                Hidden::make('user_id')->fill($beneficiary['user_id']),
+                Preview::make('Подтверждение', formatted: fn () => 'Удалить бенефициара «' . $beneficiary['full_name'] . '»? Действие нельзя отменить.'),
+            ])
+            ->submit('Удалить', attributes: ['class' => 'btn-error']);
+
         if ($activeTab === 'statistic_linear_partner') {
             $statisticComponents = [
                 Block::make([
@@ -1005,6 +1043,38 @@ class UserDetailPage extends DetailPage
                     ]
                 )->name('referrals')
                     ->active(fn () => $activeTab === 'referrals'),
+                Tab::make('Бенефициары', [
+                    ...($activeTab !== 'beneficiaries' ? [$deferredTab('beneficiaries', 'Загрузить бенефициаров')] : []),
+                    TableBuilder::make()
+                        ->withNotFound()
+                        ->fields([
+                            Text::make('Полное ФИО', 'full_name'),
+                            Text::make('Номер телефона', 'phone'),
+                            Url::make('Социальные сети', 'social_url'),
+                            Date::make('Дата добавления', 'created_at')->format('d.m.Y H:i:s'),
+                        ])
+                        ->buttons([
+                            ActionButton::make('')
+                                ->inModal(
+                                    title: static fn () => 'Редактирование бенефициара',
+                                    content: $editBeneficiaryForm,
+                                    name: 'beneficiary-edit-modal',
+                                )
+                                ->icon('heroicons.pencil')
+                                ->primary(),
+                            ActionButton::make('')
+                                ->inModal(
+                                    title: static fn () => 'Удаление бенефициара',
+                                    content: $deleteBeneficiaryForm,
+                                    name: 'beneficiary-delete-modal',
+                                )
+                                ->icon('heroicons.trash')
+                                ->error(),
+                        ])
+                        ->items($beneficiaries),
+                ])
+                    ->name('beneficiaries')
+                    ->active(fn () => $activeTab === 'beneficiaries'),
                 $referralDepositsTab,
                 Tab::make('Настройка рангов', [
                     ...($activeTab !== 'level_settings' ? [$deferredTab('level_settings', 'Загрузить настройку рангов')] : []),
@@ -1128,8 +1198,10 @@ class UserDetailPage extends DetailPage
                                         ->withNotFound()
                                         ->fields([
                                             Text::make('Событие', 'action'),
-                                            Text::make('Старые значения', 'old_values'),
-                                            Text::make('Новые значения', 'new_values'),
+                                            Text::make('Старые значения', 'old_values')
+                                                ->changePreview(static fn (mixed $value): string => nl2br(e((string) $value))),
+                                            Text::make('Новые значения', 'new_values')
+                                                ->changePreview(static fn (mixed $value): string => nl2br(e((string) $value))),
                                             Text::make('Сумма операции', 'operation_amount'),
                                             Text::make('Дата', 'date'),
                                         ])

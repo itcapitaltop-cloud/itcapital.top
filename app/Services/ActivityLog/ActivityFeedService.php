@@ -171,6 +171,13 @@ final class ActivityFeedService
                     return $this->closePackageAdminFeedRow($activity);
                 }
 
+                if (in_array($actionType, [
+                    LogActionTypeEnum::UPDATE_BENEFICIARY,
+                    LogActionTypeEnum::DELETE_BENEFICIARY,
+                ], true)) {
+                    return $this->beneficiaryAdminFeedRow($activity);
+                }
+
                 return [
                     'action' => $this->adminActionLabel($activity),
                     'old_values' => $oldValues->map(fn (mixed $value): string => $this->formatDisplayValue($value))->implode("\n"),
@@ -250,6 +257,48 @@ final class ActivityFeedService
             'operation_amount' => $this->formatAmount((string) ($oldValues->get('old_amount') ?? $newValues->get('new_amount') ?? '')),
             'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
         ];
+    }
+
+    /**
+     * @return array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}
+     */
+    private function beneficiaryAdminFeedRow(BusinessActivity $activity): array
+    {
+        $beneficiaryName = (string) ($activity->getExtraProperty('beneficiary_full_name')
+            ?? data_get($activity->subject, 'full_name', ''));
+        $action = $this->adminActionLabel($activity);
+
+        if ($beneficiaryName !== '') {
+            $action .= ': ' . $beneficiaryName;
+        }
+
+        return [
+            'action' => $action,
+            'old_values' => $this->formatBeneficiaryValues((array) $activity->getExtraProperty('old_values', [])),
+            'new_values' => $this->formatBeneficiaryValues((array) $activity->getExtraProperty('new_values', [])),
+            'operation_amount' => '',
+            'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function formatBeneficiaryValues(array $values): string
+    {
+        if ($values === []) {
+            return '—';
+        }
+
+        $labels = [
+            'full_name' => 'ФИО',
+            'phone' => 'Телефон',
+            'social_url' => 'Социальные сети',
+        ];
+
+        return collect($values)
+            ->map(fn (mixed $value, string $key): string => ($labels[$key] ?? $key) . ': ' . (string) $value)
+            ->implode("\n");
     }
 
     /**

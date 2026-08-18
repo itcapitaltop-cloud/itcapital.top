@@ -20,4 +20,6 @@ return [
     'extend_package_reinvest_profit' => 'Extend profit reinvest period',
     'close_itc_package' => 'Close package',
     'update_regular_bonus' => 'Regular bonus change',
+    'update_beneficiary' => 'Beneficiary details change',
+    'delete_beneficiary' => 'Beneficiary deletion',
 ];

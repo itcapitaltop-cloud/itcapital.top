@@ -20,4 +20,6 @@ return [
     'extend_package_reinvest_profit' => '延长收益复投期限',
     'close_itc_package' => '关闭套餐',
     'update_regular_bonus' => '常规奖金变更',
+    'update_beneficiary' => '受益人信息变更',
+    'delete_beneficiary' => '删除受益人',
 ];

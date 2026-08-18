@@ -11,8 +11,10 @@ use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\LogActionTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Models\Beneficiary;
 use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\PartnerLevel;
@@ -36,6 +38,7 @@ use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -852,5 +855,84 @@ class UserResource extends ModelResource
         return MoonShineJsonResponse::make()
             ->toast('Пользователь больше не тестовый', ToastType::SUCCESS)
             ->redirect($url);
+    }
+
+    public function updateBeneficiary(Request $request): MoonShineJsonResponse
+    {
+        $data = $request->validate([
+            'beneficiary_id' => ['required', 'integer', 'exists:beneficiaries,id'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'full_name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,32}$/', 'max:32'],
+            'social_url' => ['required', 'url:http,https', 'max:2048'],
+        ]);
+
+        $beneficiary = Beneficiary::query()
+            ->whereKey($data['beneficiary_id'])
+            ->where('user_id', $data['user_id'])
+            ->firstOrFail();
+
+        $oldValues = $beneficiary->only(['full_name', 'phone', 'social_url']);
+        $beneficiary->fill([
+            'full_name' => $data['full_name'],
+            'phone' => $data['phone'],
+            'social_url' => $data['social_url'],
+        ]);
+        $changedValues = $beneficiary->getDirty();
+
+        if ($changedValues !== []) {
+            $beneficiary->save();
+
+            app(LogRepositoryContract::class)->updated(
+                model: $beneficiary,
+                actionType: LogActionTypeEnum::UPDATE_BENEFICIARY->value,
+                oldValues: array_intersect_key($oldValues, $changedValues),
+                newValues: $changedValues,
+                targetUseId: $beneficiary->user_id,
+                extraProperties: ['beneficiary_full_name' => $beneficiary->full_name],
+            );
+        }
+
+        return MoonShineJsonResponse::make()
+            ->toast($changedValues === [] ? 'Изменений нет' : 'Данные бенефициара обновлены')
+            ->redirect($this->beneficiariesTabUrl($beneficiary->user_id));
+    }
+
+    public function deleteBeneficiary(Request $request): MoonShineJsonResponse
+    {
+        $data = $request->validate([
+            'beneficiary_id' => ['required', 'integer', 'exists:beneficiaries,id'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $beneficiary = Beneficiary::query()
+            ->whereKey($data['beneficiary_id'])
+            ->where('user_id', $data['user_id'])
+            ->firstOrFail();
+        $oldValues = $beneficiary->only(['full_name', 'phone', 'social_url']);
+
+        app(LogRepositoryContract::class)->updated(
+            model: $beneficiary,
+            actionType: LogActionTypeEnum::DELETE_BENEFICIARY->value,
+            oldValues: $oldValues,
+            newValues: [],
+            targetUseId: $beneficiary->user_id,
+            extraProperties: ['beneficiary_full_name' => $beneficiary->full_name],
+        );
+        $userId = $beneficiary->user_id;
+        $beneficiary->delete();
+
+        return MoonShineJsonResponse::make()
+            ->toast('Бенефициар удалён')
+            ->redirect($this->beneficiariesTabUrl($userId));
+    }
+
+    private function beneficiariesTabUrl(int $userId): string
+    {
+        return to_page(
+            page: new UserDetailPage(),
+            resource: new self(),
+            params: ['resourceItem' => $userId, 'tab' => 'beneficiaries'],
+        );
     }
 }

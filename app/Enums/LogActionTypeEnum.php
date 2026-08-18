@@ -26,6 +26,8 @@ enum LogActionTypeEnum: string
     case CLOSE_ITC_PACKAGE = 'close_itc_package';
     case UPDATE_REGULAR_BONUS = 'update_regular_bonus';
     case UPSERT_TOKEN_RATE = 'upsert_token_rate';
+    case UPDATE_BENEFICIARY = 'update_beneficiary';
+    case DELETE_BENEFICIARY = 'delete_beneficiary';
 
     public function label(): string
     {
@@ -52,6 +54,8 @@ enum LogActionTypeEnum: string
             self::CLOSE_ITC_PACKAGE => __('activity/log_action.close_itc_package'),
             self::UPDATE_REGULAR_BONUS => __('activity/log_action.update_regular_bonus'),
             self::UPSERT_TOKEN_RATE => __('activity/log_action.upsert_token_rate'),
+            self::UPDATE_BENEFICIARY => __('activity/log_action.update_beneficiary'),
+            self::DELETE_BENEFICIARY => __('activity/log_action.delete_beneficiary'),
         };
     }
 }

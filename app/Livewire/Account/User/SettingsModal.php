@@ -3,6 +3,7 @@
 namespace App\Livewire\Account\User;
 
 use App\Actions\User\InvalidateSessionUserAction;
+use App\Models\Beneficiary;
 use App\Notifications\PasswordChanged;
 use App\Notifications\VerifyNewEmail;
 use Illuminate\Support\Facades\Auth;
@@ -42,6 +43,21 @@ class SettingsModal extends Component
     #[Validate(['same:newPassword', 'required'])]
     public string $newPasswordConfirm = '';
 
+    #[Validate(['required', 'string', 'max:255'])]
+    public string $beneficiaryFullName = '';
+
+    #[Validate(['required', 'string', 'regex:/^[0-9+()\-\s]{7,32}$/', 'max:32'])]
+    public string $beneficiaryPhone = '';
+
+    #[Validate(['required', 'url:http,https', 'max:2048'])]
+    public string $beneficiarySocialUrl = '';
+
+    public ?int $editingBeneficiaryId = null;
+
+    public ?int $deletingBeneficiaryId = null;
+
+    public string $deletingBeneficiaryName = '';
+
     public function mount(): void
     {
         $u = Auth::user();
@@ -52,6 +68,7 @@ class SettingsModal extends Component
         $this->locale = $u->locale ?? session('locale') ?? (string) config('app.locale', 'ru');
         $this->email = $u->pending_email ?: $u->email;
         $this->originalEmail = $u->email;
+
     }
 
     /**
@@ -137,10 +154,120 @@ class SettingsModal extends Component
         }
     }
 
+    public function saveBeneficiary(): void
+    {
+        $validated = $this->validate(
+            [
+                'beneficiaryFullName' => ['required', 'string', 'max:255'],
+                'beneficiaryPhone' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,32}$/', 'max:32'],
+                'beneficiarySocialUrl' => ['required', 'url:http,https', 'max:2048'],
+            ],
+            [
+                'beneficiaryFullName.required' => __('livewire_user_settings_beneficiary_full_name_required'),
+                'beneficiaryFullName.string' => __('livewire_user_settings_beneficiary_full_name_invalid'),
+                'beneficiaryFullName.max' => __('livewire_user_settings_beneficiary_full_name_invalid'),
+                'beneficiaryPhone.required' => __('livewire_user_settings_beneficiary_phone_required'),
+                'beneficiaryPhone.string' => __('livewire_user_settings_beneficiary_phone_invalid'),
+                'beneficiaryPhone.regex' => __('livewire_user_settings_beneficiary_phone_invalid'),
+                'beneficiaryPhone.max' => __('livewire_user_settings_beneficiary_phone_invalid'),
+                'beneficiarySocialUrl.required' => __('livewire_user_settings_beneficiary_social_url_required'),
+                'beneficiarySocialUrl.url' => __('livewire_user_settings_beneficiary_social_url_invalid'),
+                'beneficiarySocialUrl.max' => __('livewire_user_settings_beneficiary_social_url_invalid'),
+            ],
+            attributes: [
+                'beneficiaryFullName' => __('livewire_user_settings_beneficiary_full_name'),
+                'beneficiaryPhone' => __('livewire_user_settings_beneficiary_phone'),
+                'beneficiarySocialUrl' => __('livewire_user_settings_beneficiary_social_url'),
+            ],
+        );
+
+        $data = [
+            'full_name' => $validated['beneficiaryFullName'],
+            'phone' => $validated['beneficiaryPhone'],
+            'social_url' => $validated['beneficiarySocialUrl'],
+        ];
+
+        if ($this->editingBeneficiaryId !== null) {
+            $beneficiary = Beneficiary::query()->findOrFail($this->editingBeneficiaryId);
+            abort_unless($beneficiary->user_id === Auth::id(), 403);
+            $beneficiary->update($data);
+            $message = __('livewire_user_settings_beneficiary_updated');
+        } else {
+            Beneficiary::query()->create(['user_id' => Auth::id(), ...$data]);
+            $message = __('livewire_user_settings_beneficiary_saved');
+        }
+
+        $this->resetBeneficiaryForm();
+        $this->dispatch('beneficiary-saved');
+        $this->dispatch(
+            'new-system-notification',
+            type: 'success',
+            message: $message,
+        );
+    }
+
+    public function startAddingBeneficiary(): void
+    {
+        $this->resetBeneficiaryForm();
+        $this->dispatch('beneficiary-form-opened');
+    }
+
+    public function startEditingBeneficiary(int $beneficiaryId): void
+    {
+        $beneficiary = Beneficiary::query()->findOrFail($beneficiaryId);
+        abort_unless($beneficiary->user_id === Auth::id(), 403);
+
+        $this->editingBeneficiaryId = $beneficiary->id;
+        $this->beneficiaryFullName = $beneficiary->full_name;
+        $this->beneficiaryPhone = $beneficiary->phone;
+        $this->beneficiarySocialUrl = $beneficiary->social_url;
+        $this->resetValidation();
+        $this->dispatch('beneficiary-form-opened');
+    }
+
+    public function startDeletingBeneficiary(int $beneficiaryId): void
+    {
+        $beneficiary = Beneficiary::query()->findOrFail($beneficiaryId);
+        abort_unless($beneficiary->user_id === Auth::id(), 403);
+
+        $this->deletingBeneficiaryId = $beneficiary->id;
+        $this->deletingBeneficiaryName = $beneficiary->full_name;
+        $this->dispatch('beneficiary-delete-confirmation-opened');
+    }
+
+    public function deleteBeneficiary(): void
+    {
+        abort_if($this->deletingBeneficiaryId === null, 404);
+
+        $beneficiary = Beneficiary::query()->findOrFail($this->deletingBeneficiaryId);
+        abort_unless($beneficiary->user_id === Auth::id(), 403);
+
+        $beneficiary->delete();
+        $this->reset('deletingBeneficiaryId', 'deletingBeneficiaryName');
+        $this->dispatch('beneficiary-deleted');
+        $this->dispatch(
+            'new-system-notification',
+            type: 'success',
+            message: __('livewire_user_settings_beneficiary_deleted'),
+        );
+    }
+
+    private function resetBeneficiaryForm(): void
+    {
+        $this->reset(
+            'editingBeneficiaryId',
+            'beneficiaryFullName',
+            'beneficiaryPhone',
+            'beneficiarySocialUrl',
+        );
+        $this->resetValidation();
+    }
+
     public function render()
     {
         return view('livewire.account.user.settings-modal', [
             'pendingEmail' => Auth::user()->pending_email,
+            'beneficiaries' => Auth::user()->beneficiaries()->latest()->get(),
         ]);
     }
 }
