@@ -11,4 +11,5 @@ return [
     'staking_accrual_type_start_bonus' => 'start bonus',
     'staking_accrual_type_partner_bonus' => 'regular premium',
     'staking_accrual_type_topup_bonus' => 'top-up bonus',
+    'staking_accrual_type_manual_tokens' => 'token grant',
 ];

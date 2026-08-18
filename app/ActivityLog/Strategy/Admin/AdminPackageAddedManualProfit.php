@@ -29,6 +29,7 @@ final class AdminPackageAddedManualProfit implements ActivityStrategyContract
             StakingTransactionAccrualEnum::StartBonus => __('activity/admin.staking_accrual_type_start_bonus'),
             StakingTransactionAccrualEnum::PartnerBonus => __('activity/admin.staking_accrual_type_partner_bonus'),
             StakingTransactionAccrualEnum::TopUpBonus => __('activity/admin.staking_accrual_type_topup_bonus'),
+            StakingTransactionAccrualEnum::ManualTokens => __('activity/admin.staking_accrual_type_manual_tokens'),
             StakingTransactionAccrualEnum::Profit, null => __('activity/admin.staking_accrual_type_profit'),
         };
     }

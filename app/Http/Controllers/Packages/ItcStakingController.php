@@ -209,7 +209,13 @@ final class ItcStakingController extends Controller
             'profit_percent' => ['required', 'numeric', 'min:0'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'manual_profit' => ['nullable', 'numeric', 'min:0'],
-            'manual_accrual_type' => ['nullable', Rule::enum(StakingTransactionAccrualEnum::class)],
+            // TopUpBonus is a bookkeeping shadow of a purchase and is excluded from
+            // every token sum, so accepting it here would silently accrue nothing.
+            'manual_accrual_type' => [
+                'nullable',
+                Rule::enum(StakingTransactionAccrualEnum::class)
+                    ->except(StakingTransactionAccrualEnum::TopUpBonus),
+            ],
         ]);
 
         $transaction = Transaction::query()

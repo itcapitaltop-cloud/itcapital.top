@@ -87,7 +87,7 @@ services:
       - ./:/var/www/html
     command: /usr/local/bin/entrypoint.sh
     healthcheck:
-      test: ["CMD-SHELL", "pgrep crond || exit 1"]
+      test: ["CMD-SHELL", "pgrep cron || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

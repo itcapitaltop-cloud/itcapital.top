@@ -127,6 +127,42 @@ it('includes accruals with their own historical rates in unrealized pnl', functi
         ->and((float) $package->stakingTransactionAccruals->firstWhere('type', StakingTransactionAccrualEnum::PartnerBonus)?->accrual_rate)->toBe(0.15);
 });
 
+it('counts manual token grants but not purchase shadow bonuses on a package with purchases', function () {
+    Carbon::setTestNow('2026-03-15 10:00:00');
+
+    $settings = app(GeneralSetting::class);
+    $settings->exchange_rate_itc = 0.10;
+    $settings->save();
+
+    TokenRate::query()->delete();
+    app(TokenRateResolver::class)->upsertRate('2026-03-01', 0.10);
+
+    $user = User::factory()->create();
+
+    $package = app(StakingPurchaseService::class)->createPackage($user->id, 100);
+
+    app(StakingAccrualService::class)->accrue(
+        $package->fresh(),
+        StakingTransactionAccrualEnum::ManualTokens,
+        100,
+        $user->id,
+    );
+
+    $package = ItcPackage::query()
+        ->whereKey($package->id)
+        ->with(['transaction', 'stakingPurchases', 'stakingTransactionAccruals'])
+        ->firstOrFail();
+
+    $performance = app(StakingPerformanceService::class)->forPackage($package);
+
+    // createPackage() also writes a TopUpBonus shadow of the purchase, which
+    // must stay out of both sums, while the manual grant lands in the yield.
+    expect($package->stakingTransactionAccruals->where('type', StakingTransactionAccrualEnum::TopUpBonus))->toHaveCount(1)
+        ->and($performance['purchased_tokens'])->toBe(1000.0)
+        ->and($performance['yield_tokens'])->toBe(100.0)
+        ->and($performance['total_tokens'])->toBe(1100.0);
+});
+
 afterEach(function () {
     Carbon::setTestNow();
 });

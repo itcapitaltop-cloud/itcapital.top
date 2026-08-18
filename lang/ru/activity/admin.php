@@ -11,4 +11,5 @@ return [
     'staking_accrual_type_start_bonus' => 'стартовый бонус',
     'staking_accrual_type_partner_bonus' => 'регулярная премия',
     'staking_accrual_type_topup_bonus' => 'начисление токенов',
+    'staking_accrual_type_manual_tokens' => 'начисление токенов',
 ];

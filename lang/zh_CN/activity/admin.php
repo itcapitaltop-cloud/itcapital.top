@@ -10,4 +10,5 @@ return [
     'staking_accrual_type_start_bonus' => '启动奖金',
     'staking_accrual_type_partner_bonus' => '定期奖励',
     'staking_accrual_type_topup_bonus' => '充值奖金',
+    'staking_accrual_type_manual_tokens' => '代币发放',
 ];

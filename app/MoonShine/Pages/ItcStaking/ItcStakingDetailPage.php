@@ -343,7 +343,7 @@ class ItcStakingDetailPage extends DetailPage
     {
         return [
             StakingTransactionAccrualEnum::Profit->value => 'Начисление доходности',
-            StakingTransactionAccrualEnum::TopUpBonus->value => 'Начисление токенов',
+            StakingTransactionAccrualEnum::ManualTokens->value => 'Начисление токенов',
             StakingTransactionAccrualEnum::StartBonus->value => 'Стартовый бонус',
             StakingTransactionAccrualEnum::PartnerBonus->value => 'Партнерский бонус',
         ];
