@@ -11,6 +11,7 @@ use App\MoonShine\Pages\News\NewsFormPage;
 use App\MoonShine\Pages\News\NewsIndexPage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
+use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Fields\Field;
 use MoonShine\Fields\Fields;
 use MoonShine\Pages\Page;
@@ -38,6 +39,16 @@ class NewsResource extends ModelResource
                     : __('moonshine::ui.add')
             ),
             NewsDetailPage::make(__('moonshine::ui.show')),
+        ];
+    }
+
+    /**
+     * @return list<ActionButton>
+     */
+    public function formButtons(): array
+    {
+        return [
+            $this->getCreateButton(),
         ];
     }
 
