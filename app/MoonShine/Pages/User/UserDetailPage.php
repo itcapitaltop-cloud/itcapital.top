@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoonShine\Pages\User;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Enums\Admin\UserCardExportField;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -185,13 +186,29 @@ class UserDetailPage extends DetailPage
             ])
         )->name('export-user-operations-modal');
 
-        $exportCardButton = ActionButton::make(
-            'Выгрузить карточку',
-            route('admin.users.card.export', ['userId' => $item->id])
-        )
+        $exportCardTrigger = ActionButton::make('Выгрузить карточку')
             ->icon('heroicons.arrow-down-tray')
-            ->blank()
+            ->toggleModal('export-user-card-modal')
             ->secondary();
+
+        $exportCardModal = Modal::make(
+            title: 'Выгрузить карточку',
+            content: fn () => null,
+            outer: $exportCardTrigger,
+            asyncUrl: null,
+            components: PageComponents::make([
+                FormBuilder::make()
+                    ->action(route('admin.users.card.export', ['userId' => $item->id]))
+                    ->method('GET')
+                    ->fields([
+                        Template::make('Поля для выгрузки')
+                            ->changeRender(fn () => view('admin.partials.user-card-export-fields', [
+                                'fields' => UserCardExportField::options(),
+                            ])->render()),
+                    ])
+                    ->submit('Скачать файл', ['formtarget' => '_blank']),
+            ])
+        )->name('export-user-card-modal');
 
         $formChangePassword = FormBuilder::make()
             ->asyncMethod('changePassword')
@@ -844,7 +861,7 @@ class UserDetailPage extends DetailPage
                          {$createPackageModal}
                          {$passwordModal}
                          {$exportOperationsModal}
-                         {$exportCardButton}
+                         {$exportCardModal}
                          {$testModeButton}
                      </div>
                  "

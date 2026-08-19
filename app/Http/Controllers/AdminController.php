@@ -10,6 +10,7 @@ use App\Contracts\Packages\PackageReinvestRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Transactions\CreateTransactionDto;
 use App\Enums\Activity\ActivityFeedTypeEnum;
+use App\Enums\Admin\UserCardExportField;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TransactionStatusEnum;
@@ -26,8 +27,6 @@ use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
-use App\MoonShine\Pages\User\UserDetailPage;
-use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
@@ -228,8 +227,21 @@ class AdminController extends Controller
         );
     }
 
-    public function exportUserCard(int $userId): StreamedResponse
+    public function exportUserCard(Request $request, int $userId): StreamedResponse
     {
+        $validated = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['required', 'distinct', Rule::enum(UserCardExportField::class)],
+        ], [
+            'fields.required' => 'Выберите хотя бы одно поле для выгрузки.',
+            'fields.min' => 'Выберите хотя бы одно поле для выгрузки.',
+        ]);
+
+        $selectedFields = array_values(array_filter(
+            UserCardExportField::cases(),
+            static fn (UserCardExportField $field): bool => in_array($field->value, $validated['fields'], true)
+        ));
+
         $user = User::withoutGlobalScope('notBanned')->with('referrer')->findOrFail($userId);
 
         $lineNumber = (int) PartnerClosure::query()
@@ -278,68 +290,64 @@ class AdminController extends Controller
 
         $referrals = app(ReferralTreeService::class)->flatten($user->id);
 
-        $rows = [
-            ['Фамилия Имя', trim("{$user->first_name} {$user->last_name}")],
-            ['Никнейм', $user->username],
-            ['Номер линии', $lineNumber],
-            ['Кто пригласил', $user->referrer?->username ?? ''],
-            ['Город', ''],
-            ['Телефон', ''],
-            ['Социальные сети', $telegram],
-            ['Пакеты Сумма', round($packagesTotal, 2)],
-            ['Токены', $tokens],
-            ['Обучение', ''],
-            ['Ранг', $user->rank],
-            ['', ''],
-            ['Рефералы', $referrals === [] ? 'Нет рефералов' : 'Всего: ' . count($referrals)],
+        $values = [
+            UserCardExportField::FULL_NAME->value => trim("{$user->first_name} {$user->last_name}"),
+            UserCardExportField::USERNAME->value => $user->username,
+            UserCardExportField::LINE_NUMBER->value => $lineNumber,
+            UserCardExportField::REFERRER->value => $user->referrer?->username ?? '',
+            UserCardExportField::CITY->value => '',
+            UserCardExportField::PHONE->value => '',
+            UserCardExportField::SOCIAL_NETWORKS->value => $telegram,
+            UserCardExportField::PACKAGES_TOTAL->value => round($packagesTotal, 2),
+            UserCardExportField::TOKENS->value => $tokens,
+            UserCardExportField::EDUCATION->value => '',
+            UserCardExportField::RANK->value => $user->rank,
+            UserCardExportField::REFERRALS->value => $referrals === [] ? 'Нет рефералов' : 'Всего: ' . count($referrals),
         ];
+
+        $rows = [];
+        $referralsRow = false;
+
+        foreach ($selectedFields as $field) {
+            if ($field === UserCardExportField::REFERRALS && $rows !== []) {
+                $rows[] = ['', ''];
+            }
+
+            $row = count($rows);
+            $rows[] = [$field->label(), $values[$field->value]];
+
+            if ($field === UserCardExportField::REFERRALS) {
+                $referralsRow = $row;
+            }
+        }
 
         /*
          * Дерево рефералов: отступ в столбце A показывает линию, каждая строка —
          * ссылка на карточку реферала в админке.
          */
-        $treeFirstRow = count($rows) + 1;
+        $treeFirstRow = $referralsRow === false ? null : $referralsRow + 2;
 
-        foreach ($referrals as $referral) {
-            $rows[] = [
-                str_repeat('    ', $referral['line'] - 1) . $referral['name'],
-                'Линия ' . $referral['line'],
-            ];
+        if ($treeFirstRow !== null) {
+            foreach ($referrals as $referral) {
+                $rows[] = [
+                    str_repeat('    ', $referral['line'] - 1) . $referral['name'],
+                    'Линия ' . $referral['line'],
+                ];
+            }
         }
-
-        $referralUrls = array_map(
-            static fn (array $referral): string => to_page(
-                page: new UserDetailPage(),
-                resource: new UserResource(),
-                params: ['resourceItem' => $referral['id']]
-            ),
-            $referrals
-        );
 
         $filename = sprintf('user-%d-card-%s.xlsx', $user->id, now()->format('Ymd-His'));
 
         return response()->streamDownload(
-            function () use ($rows, $telegram, $referralUrls, $treeFirstRow): void {
+            function () use ($rows, $treeFirstRow): void {
                 $spreadsheet = new Spreadsheet();
                 $sheet = $spreadsheet->getActiveSheet();
                 $sheet->setTitle('Карточка');
 
                 $sheet->fromArray($rows, null, 'A1');
 
-                if ($telegram !== '') {
-                    $telegramUrl = str_starts_with($telegram, 'http')
-                        ? $telegram
-                        : 'https://t.me/' . ltrim($telegram, '@');
-                    $sheet->getCell('B7')->getHyperlink()->setUrl($telegramUrl);
-                }
-
-                $sheet->getStyle('A' . ($treeFirstRow - 1))->getFont()->setBold(true);
-
-                foreach ($referralUrls as $index => $url) {
-                    $cell = 'A' . ($treeFirstRow + $index);
-
-                    $sheet->getCell($cell)->getHyperlink()->setUrl($url);
-                    $sheet->getStyle($cell)->getFont()->setUnderline(true)->getColor()->setARGB('FF0563C1');
+                if ($treeFirstRow !== null) {
+                    $sheet->getStyle('A' . ($treeFirstRow - 1))->getFont()->setBold(true);
                 }
 
                 foreach (['A', 'B'] as $column) {

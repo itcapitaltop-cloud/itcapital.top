@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Admin\UserCardExportField;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
@@ -10,6 +11,7 @@ use App\Models\Partner;
 use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 it('exports the user card with template rows and dashboard package total', function (): void {
@@ -46,7 +48,10 @@ it('exports the user card with template rows and dashboard package total', funct
         'matured_at' => now()->addDays(180),
     ]);
 
-    $response = (new AdminController())->exportUserCard($user->id);
+    $request = Request::create('/admin/users/card/export', 'GET', [
+        'fields' => array_column(UserCardExportField::cases(), 'value'),
+    ]);
+    $response = (new AdminController())->exportUserCard($request, $user->id);
 
     ob_start();
     $response->sendContent();
@@ -88,7 +93,7 @@ it('exports the user card with template rows and dashboard package total', funct
         ->and($rows[12][1])->toBe('Нет рефералов');
 });
 
-it('exports the whole referral structure as an indented tree with admin profile links', function (): void {
+it('exports the whole referral structure as an indented text tree', function (): void {
     $user = User::factory()->create(['username' => 'root-user']);
 
     $first = User::factory()->create([
@@ -127,7 +132,10 @@ it('exports the whole referral structure as an indented tree with admin profile 
         }
     }
 
-    $response = (new AdminController())->exportUserCard($user->id);
+    $request = Request::create('/admin/users/card/export', 'GET', [
+        'fields' => array_column(UserCardExportField::cases(), 'value'),
+    ]);
+    $response = (new AdminController())->exportUserCard($request, $user->id);
 
     ob_start();
     $response->sendContent();
@@ -145,7 +153,42 @@ it('exports the whole referral structure as an indented tree with admin profile 
         ->and($rows[13])->toBe(['Пётр Сидоров', 'Линия 1'])
         ->and($rows[14])->toBe(['    Анна Иванова', 'Линия 2'])
         ->and($rows[15])->toBe(['        Олег Кузнецов', 'Линия 3'])
-        ->and($sheet->getCell('A14')->getHyperlink()->getUrl())->toContain((string) $first->id)
-        ->and($sheet->getCell('A15')->getHyperlink()->getUrl())->toContain((string) $second->id)
-        ->and($sheet->getCell('A16')->getHyperlink()->getUrl())->toContain((string) $third->id);
+        ->and($sheet->getCell('A14')->getHyperlink()->getUrl())->toBe('')
+        ->and($sheet->getCell('A15')->getHyperlink()->getUrl())->toBe('')
+        ->and($sheet->getCell('A16')->getHyperlink()->getUrl())->toBe('');
+});
+
+it('exports only the fields selected for CRM', function (): void {
+    $user = User::factory()->create([
+        'first_name' => 'Иван',
+        'last_name' => 'Петров',
+        'username' => 'ivan-petrov',
+        'telegram' => '@ivan_tg',
+    ]);
+
+    $request = Request::create('/admin/users/card/export', 'GET', [
+        'fields' => [
+            UserCardExportField::FULL_NAME->value,
+            UserCardExportField::SOCIAL_NETWORKS->value,
+        ],
+    ]);
+
+    $response = (new AdminController())->exportUserCard($request, $user->id);
+
+    ob_start();
+    $response->sendContent();
+    $xlsx = (string) ob_get_clean();
+
+    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
+    file_put_contents($path, $xlsx);
+
+    $sheet = IOFactory::load($path)->getActiveSheet();
+    $rows = $sheet->toArray();
+
+    @unlink($path);
+
+    expect($rows)->toBe([
+        ['Фамилия Имя', 'Иван Петров'],
+        ['Социальные сети', '@ivan_tg'],
+    ])->and($sheet->getCell('B2')->getHyperlink()->getUrl())->toBe('');
 });
