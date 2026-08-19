@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Packages;
 
+use App\Dto\Activity\WriteBusinessActivityData;
+use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Itc\StakingTransactionAccrualEnum;
@@ -13,10 +15,12 @@ use App\Models\ItcPackage;
 use App\Models\TokenRate;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\Package\Staking\StakingAccrualService;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Services\Package\Staking\StakingPurchaseService;
 use App\Services\Token\TokenRateResolver;
+use App\Settings\GeneralSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -60,21 +64,20 @@ final class ItcStakingController extends Controller
     public function changeStartBonusPercentage(MoonShineRequest $request, GeneralSetting $generalSetting): RedirectResponse
     {
         if ($request->has('user_id')) {
-            $package = ItcPackage::query()->findOrFail($request->input('package_id'));
+            $package = ItcPackage::query()->with('transaction')->findOrFail($request->input('package_id'));
+            $user = User::query()->findOrFail($request->input('user_id'));
+            $oldPercent = $user->setting('start_bonus_staking_percent', $generalSetting->start_bonus_staking_percent);
 
-            User::query()->findOrFail($request->input('user_id'))->setSettings([
+            $user->setSettings([
                 'start_bonus_staking_percent' => $request->input('percent'),
             ]);
 
-            activity('packages')
-                ->performedOn($package)
-                ->causedBy(auth()->user())
-                ->withProperties([
-                    'percent' => $request->input('percent'),
-                    'package_uuid' => $package->uuid,
-                    'package_type' => PackageTypeEnum::STAKING,
-                ])
-                ->log('admin_package_changed_staking_start_bonus_percent');
+            $this->logStakingPercentChange(
+                ActivityEventTypeEnum::StakingStartBonusPercentChanged,
+                $package,
+                (string) $oldPercent,
+                (string) $request->input('percent'),
+            );
 
             return back();
         }
@@ -207,6 +210,7 @@ final class ItcStakingController extends Controller
     {
         $request->validate([
             'profit_percent' => ['required', 'numeric', 'min:0'],
+            'start_bonus_staking_percent' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'manual_profit' => ['nullable', 'numeric', 'min:0'],
             // TopUpBonus is a bookkeeping shadow of a purchase and is excluded from
@@ -229,6 +233,11 @@ final class ItcStakingController extends Controller
 
         $oldAmount = $transaction->amount;
         $oldPercent = $package->month_profit_percent;
+        $owner = $package->transaction->user;
+        $oldStartBonusPercent = $owner?->setting(
+            'start_bonus_staking_percent',
+            app(GeneralSetting::class)->start_bonus_staking_percent
+        );
         $manualProfit = round((float) $request->input('manual_profit', 0), 2);
         $topUpTokens = round((float) $request->input('amount', 0), 2);
         $oldTotalTokens = app(StakingPerformanceService::class)->forPackage($package)['total_tokens'];
@@ -275,18 +284,15 @@ final class ItcStakingController extends Controller
         }
 
         if ($package->wasChanged('month_profit_percent')) {
-            activity('admin')
-                ->performedOn($package)
-                ->causedBy(auth()->user())
-                ->withProperties([
-                    'package_uuid' => $transaction->uuid,
-                    'package_type' => PackageTypeEnum::STAKING,
-                    'amount' => $topUpTokens,
-                    'percent' => $oldPercent,
-                    'old_percent' => $package->month_profit_percent,
-                ])
-                ->log('admin_package_changed_percentage');
+            $this->logStakingPercentChange(
+                ActivityEventTypeEnum::StakingProfitPercentChanged,
+                $package,
+                (string) $oldPercent,
+                (string) $package->month_profit_percent,
+            );
         }
+
+        $this->applyStartBonusPercent($request, $package, $owner, $oldStartBonusPercent);
 
         if ($manualProfit > 0) {
             activity('admin')
@@ -310,5 +316,69 @@ final class ItcStakingController extends Controller
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_package_updated'), ToastType::SUCCESS)
             ->redirect($referer);
+    }
+
+    /**
+     * «Процент стартовой премии» живёт в настройках пользователя, а не в пакете,
+     * поэтому форма редактирования пакета сохраняет его отдельно и только при
+     * фактическом изменении — иначе журнал заполнялся бы пустыми записями.
+     */
+    private function applyStartBonusPercent(
+        MoonShineRequest $request,
+        ItcPackage $package,
+        ?User $owner,
+        mixed $oldStartBonusPercent,
+    ): void {
+        $newStartBonusPercent = $request->input('start_bonus_staking_percent');
+
+        if ($owner === null || $newStartBonusPercent === null || $newStartBonusPercent === '') {
+            return;
+        }
+
+        if ((float) $oldStartBonusPercent === (float) $newStartBonusPercent) {
+            return;
+        }
+
+        $owner->setSettings([
+            'start_bonus_staking_percent' => $newStartBonusPercent,
+        ]);
+
+        $this->logStakingPercentChange(
+            ActivityEventTypeEnum::StakingStartBonusPercentChanged,
+            $package,
+            (string) $oldStartBonusPercent,
+            (string) $newStartBonusPercent,
+        );
+    }
+
+    private function logStakingPercentChange(
+        ActivityEventTypeEnum $type,
+        ItcPackage $package,
+        string $oldPercent,
+        string $newPercent,
+    ): void {
+        $userId = $package->transaction?->user_id;
+
+        if ($userId === null) {
+            return;
+        }
+
+        app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
+            type: $type,
+            userId: (int) $userId,
+            subject: $package,
+            feeds: [ActivityFeedTypeEnum::Staking, ActivityFeedTypeEnum::UserDetailAdmin],
+            properties: [
+                'package_uuid' => $package->uuid,
+                'package_type' => PackageTypeEnum::STAKING->value,
+                'old_percent' => $oldPercent,
+                'percent' => $newPercent,
+                'old_values' => ['percent' => $oldPercent],
+                'new_values' => ['percent' => $newPercent],
+            ],
+            causer: auth()->user(),
+            logName: 'admin',
+            context: 'admin',
+        ));
     }
 }

@@ -72,5 +72,7 @@ return [
         'staking_package_topped_up' => 'В пакет стейкинга :uuid добавлено :amount коинов:rate',
         'promo_code_applied' => 'Применён промокод :promo_code, порог снижен с :original_threshold ITC до :effective_threshold ITC',
         'staking_profit_accrued' => 'Получена доходность :profit коинов на пакет стейкинга :uuid:rate',
+        'staking_profit_percent_changed' => 'Процент прибыли пакета стейкинга :uuid изменён администратором с :old_percent% на :percent%',
+        'staking_start_bonus_percent_changed' => 'Процент стартовой премии по стейкингу изменён администратором с :old_percent% на :percent% (пакет :uuid)',
     ],
 ];

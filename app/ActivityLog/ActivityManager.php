@@ -74,6 +74,8 @@ final class ActivityManager
         $stakingExchangeRate = $this->formatRate($activity->getExtraProperty('exchange_rate'));
         $oldRank = (string) ($activity->getExtraProperty('old_rank') ?? '');
         $newRank = (string) ($activity->getExtraProperty('new_rank') ?? '');
+        $percent = $this->formatPercent($activity->getExtraProperty('percent'));
+        $oldPercent = $this->formatPercent($activity->getExtraProperty('old_percent'));
 
         return match ($type) {
             ActivityEventTypeEnum::DepositRequested => __('activity/feed.business.deposit_requested', ['details' => $financeDetails, 'amount' => $amount]),
@@ -114,6 +116,8 @@ final class ActivityManager
             ActivityEventTypeEnum::StakingPackagePurchased => __('activity/feed.business.staking_package_purchased', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingPackageToppedUp => __('activity/feed.business.staking_package_topped_up', ['uuid' => $packageUuid, 'amount' => $stakingTokenAmount, 'rate' => $stakingPurchaseRate]),
             ActivityEventTypeEnum::StakingProfitAccrued => __('activity/feed.business.staking_profit_accrued', ['uuid' => $packageUuid, 'profit' => $profit, 'rate' => $stakingExchangeRate]),
+            ActivityEventTypeEnum::StakingProfitPercentChanged => __('activity/feed.business.staking_profit_percent_changed', ['uuid' => $packageUuid, 'old_percent' => $oldPercent, 'percent' => $percent]),
+            ActivityEventTypeEnum::StakingStartBonusPercentChanged => __('activity/feed.business.staking_start_bonus_percent_changed', ['uuid' => $packageUuid, 'old_percent' => $oldPercent, 'percent' => $percent]),
             ActivityEventTypeEnum::PromoCodeApplied => __('activity/feed.business.promo_code_applied', [
                 'promo_code' => (string) ($activity->getExtraProperty('promo_code') ?? ''),
                 'original_threshold' => $this->formatAmount($activity->getExtraProperty('original_threshold', '0')),
@@ -125,6 +129,19 @@ final class ActivityManager
     private function formatAmount(mixed $amount): string
     {
         return number_format((float) $amount, 2, '.', '');
+    }
+
+    /**
+     * Проценты хранятся как строки/числа с произвольной точностью, поэтому хвостовые
+     * нули отбрасываются: «2» вместо «2.00», но «2.5» остаётся «2.5».
+     */
+    private function formatPercent(mixed $percent): string
+    {
+        if (! is_numeric($percent)) {
+            return '';
+        }
+
+        return rtrim(rtrim(number_format((float) $percent, 2, '.', ''), '0'), '.');
     }
 
     private function formatRate(mixed $rate): string

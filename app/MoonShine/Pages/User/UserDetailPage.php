@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\MoonShine\Pages\User;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
+use App\Dto\Activity\JournalFilterData;
+use App\Enums\Activity\ActivityJournalCategoryEnum;
 use App\Enums\Admin\UserCardExportField;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
@@ -455,17 +457,91 @@ class UserDetailPage extends DetailPage
             $loadedSections['beneficiaries'] = 'deferred';
         }
 
+        $journalFilter = JournalFilterData::fromRequest();
+
         if ($activeTab === 'logs') {
             $activityFeedService = app(ActivityFeedService::class);
 
-            $userLogs = $activityFeedService->userDetailUserFeed($item->id);
-            $adminLogs = $activityFeedService->userDetailAdminFeed($item->id);
+            $userLogs = $activityFeedService->userDetailUserFeed($item->id, filter: $journalFilter);
+            // Админские записи помечены только фидом user_detail_admin, категорий финансов
+            // и партнёров у них нет — на этой вкладке фильтруем лишь по периоду.
+            $adminLogs = $activityFeedService->userDetailAdminFeed($item->id, filter: $journalFilter->withoutCategory());
             $loadedSections['user_logs'] = $userLogs->count();
             $loadedSections['admin_logs'] = $adminLogs->count();
         } else {
             $loadedSections['user_logs'] = 'deferred';
             $loadedSections['admin_logs'] = 'deferred';
         }
+
+        $journalTabUrl = fn (string $journalTab): string => url()->current() . '?' . http_build_query([
+            'resourceItem' => $item->id,
+            'tab' => 'logs',
+            'journal_tab' => $journalTab,
+        ]);
+
+        $journalFilterPanel = function (string $journalTab, bool $withCategory) use ($item, $journalFilter, $journalTabUrl): FlexibleRender {
+            return FlexibleRender::make(
+                fn (): string => view('admin.partials.user-journal-filter', [
+                    'action' => url()->current(),
+                    'resourceItem' => $item->id,
+                    'journalTab' => $journalTab,
+                    'categories' => $withCategory ? ActivityJournalCategoryEnum::options() : [],
+                    'category' => $journalFilter->category?->value ?? '',
+                    'dateFrom' => $journalFilter->dateInputValue($journalFilter->dateFrom),
+                    'dateTo' => $journalFilter->dateInputValue($journalFilter->dateTo),
+                    'isFiltered' => ! $journalFilter->isEmpty(),
+                    'resetUrl' => $journalTabUrl($journalTab),
+                ])->render()
+            );
+        };
+
+        /**
+         * Подвкладки журнала переключаются на клиенте, поэтому без синхронизации адрес
+         * оставался прежним: после F5 на «Администраторе» страница возвращалась на
+         * «Пользователя». Обработчик пишет выбранную подвкладку в URL, а когда есть что
+         * сбрасывать (фильтр или страница пагинации) — уходит на чистый адрес.
+         */
+        $journalTabSync = function () use ($journalTabUrl, $journalFilter): FlexibleRender {
+            // Порядок совпадает с порядком вкладок «Администратор»/«Пользователь» ниже.
+            $urls = e(json_encode([$journalTabUrl('admin'), $journalTabUrl('user')], JSON_UNESCAPED_SLASHES));
+            $needsReload = ! $journalFilter->isEmpty() || request()->hasAny(['user_logs_page', 'admin_logs_page'])
+                ? '1'
+                : '0';
+
+            return FlexibleRender::make(
+                fn (): string => <<<HTML
+                    <div id="journal-tab-sync" class="hidden" data-urls='{$urls}' data-reload="{$needsReload}"></div>
+                    <script>
+                        (() => {
+                            const marker = document.getElementById('journal-tab-sync');
+                            if (!marker || marker.dataset.bound === '1') return;
+                            marker.dataset.bound = '1';
+
+                            const tabs = marker.closest('.tabs-body')?.querySelector('.tabs');
+                            if (!tabs) return;
+
+                            const urls = JSON.parse(marker.dataset.urls);
+                            const reload = marker.dataset.reload === '1';
+                            const buttons = tabs.querySelectorAll(':scope > .tabs-list > .tabs-item > .tabs-button');
+
+                            buttons.forEach((button, index) => {
+                                const url = urls[index];
+                                if (!url) return;
+
+                                button.addEventListener('click', () => {
+                                    if (reload) {
+                                        window.location.href = url;
+                                        return;
+                                    }
+
+                                    window.history.replaceState({}, '', url);
+                                });
+                            });
+                        })();
+                    </script>
+                HTML
+            );
+        };
 
         $referrerLink = $item->referrer ?
             Url::make(
@@ -1211,6 +1287,7 @@ class UserDetailPage extends DetailPage
                             Tab::make(
                                 'Администратор',
                                 [
+                                    $journalFilterPanel('admin', false),
                                     TableBuilder::make()
                                         ->withNotFound()
                                         ->fields([
@@ -1226,6 +1303,7 @@ class UserDetailPage extends DetailPage
                                 ]
                             )->active(fn (): bool => $this->activeJournalTab() === 'admin'),
                             Tab::make('Пользователь', [
+                                $journalFilterPanel('user', true),
                                 TableBuilder::make()
                                     ->withNotFound()
                                     ->fields([
@@ -1250,6 +1328,7 @@ class UserDetailPage extends DetailPage
                                     }),
                             ])->active(fn (): bool => $this->activeJournalTab() === 'user'),
                         ]),
+                        $journalTabSync(),
                     ]
                 )
                     ->name('logs')

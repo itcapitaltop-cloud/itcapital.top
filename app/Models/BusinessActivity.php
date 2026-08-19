@@ -106,6 +106,8 @@ final class BusinessActivity extends Activity
                         'admin_package_changed_amount',
                         'admin_package_changed_percentage',
                         'admin_package_added_manual_profit',
+                        'staking_profit_percent_changed',
+                        'staking_start_bonus_percent_changed',
                     ])
                     ->whereJsonContains(
                         'properties->package_type',

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Services\ActivityLog;
 
 use App\ActivityLog\ActivityManager;
+use App\Dto\Activity\JournalFilterData;
 use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\Activity\ActivityFeedTypeEnum;
-use App\Enums\Itc\PackageTypeEnum;
+use App\Enums\Activity\ActivityJournalCategoryEnum;
 use App\Enums\LogActionTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Models\BusinessActivity;
@@ -83,19 +84,17 @@ final class ActivityFeedService
      *
      * @return LengthAwarePaginator<int, array{action:string,type:string,operation_amount:string,from_user:string,date:string}>
      */
-    public function userDetailUserFeed(int $userId, int $perPage = 50): LengthAwarePaginator
+    public function userDetailUserFeed(int $userId, int $perPage = 50, ?JournalFilterData $filter = null): LengthAwarePaginator
     {
-        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser)
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailUser, $filter)
             ->paginate($perPage, pageName: 'user_logs_page')
             ->withQueryString()
             ->appends(['journal_tab' => 'user'])
             ->through(function (BusinessActivity $activity): array {
-                $amount = $activity->getExtraProperty('amount');
-
                 return [
                     'action' => $this->userDetailAction($activity),
                     'type' => $this->activityManager->resolve($activity),
-                    'operation_amount' => $amount === null ? '' : $this->formatAmount((string) $amount),
+                    'operation_amount' => $this->operationAmount($activity),
                     'from_user' => (string) ($activity->getExtraProperty('from_username')
                     ?? $activity->getExtraProperty('username')
                     ?? $activity->getExtraProperty('to_username')
@@ -125,11 +124,9 @@ final class ActivityFeedService
         return $query
             ->get()
             ->map(function (BusinessActivity $activity): array {
-                $amount = $activity->getExtraProperty('amount');
-
                 return [
                     'type' => $this->activityManager->resolve($activity),
-                    'operation_amount' => $amount === null ? '' : $this->formatAmount((string) $amount),
+                    'operation_amount' => $this->operationAmount($activity),
                     'from_user' => (string) ($activity->getExtraProperty('from_username')
                     ?? $activity->getExtraProperty('username')
                     ?? $activity->getExtraProperty('to_username')
@@ -146,9 +143,9 @@ final class ActivityFeedService
      *
      * @return LengthAwarePaginator<int, array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}>
      */
-    public function userDetailAdminFeed(int $userId, int $perPage = 50): LengthAwarePaginator
+    public function userDetailAdminFeed(int $userId, int $perPage = 50, ?JournalFilterData $filter = null): LengthAwarePaginator
     {
-        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin)
+        return $this->userDetailBaseQuery($userId, ActivityFeedTypeEnum::UserDetailAdmin, $filter)
             ->where('description', '!=', LogActionTypeEnum::UPDATE_ITC_PACKAGE_AMOUNT->value)
             ->where('description', '!=', LogActionTypeEnum::WITHDRAW_PACKAGE_REINVEST_PROFIT->value)
             ->paginate($perPage, pageName: 'admin_logs_page')
@@ -176,6 +173,10 @@ final class ActivityFeedService
                     LogActionTypeEnum::DELETE_BENEFICIARY,
                 ], true)) {
                     return $this->beneficiaryAdminFeedRow($activity);
+                }
+
+                if ($oldValues->isEmpty() && $newValues->isEmpty()) {
+                    return $this->stakingAdminFeedRow($activity);
                 }
 
                 return [
@@ -238,6 +239,27 @@ final class ActivityFeedService
             'admin_login' => $this->activityAdminLogin($activity),
             'old_values' => $this->formatActivityValues((array) $activity->getExtraProperty('old_values', [])),
             'new_values' => $this->formatActivityValues((array) $activity->getExtraProperty('new_values', [])),
+            'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
+        ];
+    }
+
+    /**
+     * Начисления и правки по стейкингу пишутся историческими вызовами activity(): вместо
+     * old_values/new_values у них плоские amount/old_amount, поэтому обе колонки значений
+     * остались бы пустыми.
+     *
+     * @return array{action:string,old_values:string,new_values:string,operation_amount:string,date:string}
+     */
+    private function stakingAdminFeedRow(BusinessActivity $activity): array
+    {
+        $oldAmount = $activity->getExtraProperty('old_amount');
+        $newAmount = $activity->getExtraProperty('amount');
+
+        return [
+            'action' => $this->adminActionLabel($activity),
+            'old_values' => $oldAmount === null ? '' : $this->formatAmount((string) $oldAmount),
+            'new_values' => $oldAmount === null || $newAmount === null ? '' : $this->formatAmount((string) $newAmount),
+            'operation_amount' => $newAmount === null ? '' : $this->formatAmount((string) $newAmount),
             'date' => $activity->created_at?->format('d.m.Y H:i') ?? '',
         ];
     }
@@ -342,36 +364,130 @@ final class ActivityFeedService
             ->orderByDesc('id');
     }
 
-    private function userDetailBaseQuery(int $userId, ActivityFeedTypeEnum $feed): Builder
-    {
-        return $this->baseFeedQuery($userId, $feed)
-            ->where(function (Builder $query): void {
-                $query
-                    ->where('properties->package_type', '!=', PackageTypeEnum::STAKING->value)
-                    ->orWhereNull('properties->package_type');
+    /**
+     * Журнал карточки собирается из двух источников.
+     *
+     * Основной — записи с проставленными user_id и feeds. Но события по стейкингу
+     * пишутся историческими вызовами activity() без user_id и без feeds, поэтому по
+     * первому пути они недостижимы: владелец у них определяется только через
+     * subject → transaction → user_id. Второй источник повторяет ровно ту выборку,
+     * которой пользуется журнал страницы «Стейкинг», чтобы обе страницы показывали
+     * одинаковый набор токеновых событий.
+     */
+    private function userDetailBaseQuery(
+        int $userId,
+        ActivityFeedTypeEnum $feed,
+        ?JournalFilterData $filter = null,
+    ): Builder {
+        $filter ??= new JournalFilterData();
+        $category = $filter->category;
+
+        $query = BusinessActivity::query()
+            ->with('subject')
+            ->where(function (Builder $query) use ($userId, $feed, $category): void {
+                if ($category !== ActivityJournalCategoryEnum::Staking) {
+                    $query->where(fn (Builder $feedQuery) => $this->feedSourceQuery($feedQuery, $userId, $feed, $category));
+                }
+
+                if ($category === null || $category === ActivityJournalCategoryEnum::Staking) {
+                    $query->orWhere(fn (Builder $stakingQuery) => $this->stakingSourceQuery($stakingQuery, $userId, $feed));
+                }
             })
-            ->whereNotIn('description', [
-                ActivityEventTypeEnum::StakingPackagePurchased->value,
-                ActivityEventTypeEnum::StakingPackageToppedUp->value,
-                ActivityEventTypeEnum::StakingProfitAccrued->value,
-                ActivityEventTypeEnum::StakingRegularBonusReceived->value,
-                ActivityEventTypeEnum::StakingStartBonusReceived->value,
-            ])
-            ->where(function (Builder $query): void {
-                $query
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if ($filter->dateFrom !== null) {
+            $query->where('created_at', '>=', $filter->dateFrom);
+        }
+
+        if ($filter->dateTo !== null) {
+            $query->where('created_at', '<=', $filter->dateTo);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Записи с проставленными user_id и feeds — основной источник журнала.
+     */
+    private function feedSourceQuery(
+        Builder $query,
+        int $userId,
+        ActivityFeedTypeEnum $feed,
+        ?ActivityJournalCategoryEnum $category,
+    ): void {
+        $query
+            ->forUser($userId)
+            ->forFeed($feed)
+            ->where(function (Builder $legacyQuery): void {
+                $legacyQuery
                     ->where('subject_type', '!=', ItcPackage::class)
-                    ->orWhereNotIn('description', [
-                        'top_up_package',
-                        'profit_accrued',
-                        'start_bonus_package',
-                        'regular_premium_package',
-                        'admin_package_purchased',
-                        'admin_package_changed_amount',
-                        'admin_package_changed_percentage',
-                        'admin_package_added_manual_profit',
-                        'admin_package_staking_changed_percentage',
-                    ]);
+                    ->orWhereNotIn('description', $this->legacyPackageEvents());
             });
+
+        if ($category !== null) {
+            $query->forFeed($category->value);
+        }
+    }
+
+    /**
+     * Токеновые события. Исторические вызовы activity() по стейкингу не проставляют
+     * ни user_id, ни feeds, поэтому владелец у них ищется через subject → transaction;
+     * вторая ветка добирает business-события стейкинга, которые лежат в чужих фидах
+     * (например, партнёрские премии по стейкингу помечены фидом «partners»).
+     */
+    private function stakingSourceQuery(Builder $query, int $userId, ActivityFeedTypeEnum $feed): void
+    {
+        $query
+            ->where(function (Builder $ownedQuery) use ($userId, $feed): void {
+                $feed === ActivityFeedTypeEnum::UserDetailAdmin
+                    ? $ownedQuery->packagesStakingWithAdmin($userId)
+                    : $ownedQuery->packagesStaking($userId);
+            })
+            ->orWhere(function (Builder $businessQuery) use ($userId, $feed): void {
+                $businessQuery
+                    ->forUser($userId)
+                    ->forFeed($feed)
+                    ->whereIn('description', $this->stakingBusinessEvents());
+            });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function stakingBusinessEvents(): array
+    {
+        return [
+            ActivityEventTypeEnum::StakingPackagePurchased->value,
+            ActivityEventTypeEnum::StakingPackageToppedUp->value,
+            ActivityEventTypeEnum::StakingProfitAccrued->value,
+            ActivityEventTypeEnum::StakingRegularBonusReceived->value,
+            ActivityEventTypeEnum::StakingStartBonusReceived->value,
+            ActivityEventTypeEnum::StakingProfitPercentChanged->value,
+            ActivityEventTypeEnum::StakingStartBonusPercentChanged->value,
+        ];
+    }
+
+    /**
+     * Исторические события по пакетам, продублированные новыми business-событиями:
+     * в основной выборке они лишние, но через staking-ветку приходят как единственный
+     * источник по токенам.
+     *
+     * @return array<int, string>
+     */
+    private function legacyPackageEvents(): array
+    {
+        return [
+            'top_up_package',
+            'profit_accrued',
+            'start_bonus_package',
+            'regular_premium_package',
+            'admin_package_purchased',
+            'admin_package_changed_amount',
+            'admin_package_changed_percentage',
+            'admin_package_added_manual_profit',
+            'admin_package_staking_changed_percentage',
+        ];
     }
 
     private function financeArrow(BusinessActivity $activity): string
@@ -447,6 +563,7 @@ final class ActivityFeedService
             'start_bonus_package',
             'regular_premium_package',
             'profit_accrued',
+            'admin_package_added_manual_profit',
         ];
     }
 
@@ -459,7 +576,25 @@ final class ActivityFeedService
             ActivityEventTypeEnum::ReferralAddedToLine->value,
             ActivityEventTypeEnum::BecameReferralOfUser->value,
             ActivityEventTypeEnum::PackageReinvested->value,
+            'admin_package_purchased',
+            'admin_package_changed_amount',
+            'admin_package_changed_percentage',
+            ActivityEventTypeEnum::StakingProfitPercentChanged->value,
+            ActivityEventTypeEnum::StakingStartBonusPercentChanged->value,
         ];
+    }
+
+    /**
+     * Историческое staking-событие profit_accrued держит в `amount` весь баланс пакета,
+     * а сумму операции — в `profit`; иначе в колонке «Сумма операции» оказался бы баланс.
+     */
+    private function operationAmount(BusinessActivity $activity): string
+    {
+        $amount = $activity->description === 'profit_accrued'
+            ? $activity->getExtraProperty('profit', $activity->getExtraProperty('amount'))
+            : $activity->getExtraProperty('amount');
+
+        return $amount === null ? '' : $this->formatAmount((string) $amount);
     }
 
     private function adminActionLabel(BusinessActivity $activity): string

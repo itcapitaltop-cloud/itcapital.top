@@ -69,5 +69,7 @@ return [
         'staking_package_topped_up' => '已向质押套餐 :uuid 添加 :amount ITC:rate',
         'promo_code_applied' => '已应用促销码 :promo_code，门槛从 :original_threshold ITC 降至 :effective_threshold ITC',
         'staking_profit_accrued' => '质押套餐 :uuid 已获得收益 :profit ITC:rate',
+        'staking_profit_percent_changed' => '管理员已将质押套餐 :uuid 的收益百分比从 :old_percent% 修改为 :percent%',
+        'staking_start_bonus_percent_changed' => '管理员已将质押启动奖金百分比从 :old_percent% 修改为 :percent%（套餐 :uuid）',
     ],
 ];
