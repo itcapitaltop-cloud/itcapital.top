@@ -3,6 +3,7 @@
 return [
     'update_itc_package_amount' => '套餐金额变更',
     'update_itc_package_type' => '套餐类型变更',
+    'update_itc_package_definition' => '套餐资费变更',
     'update_itc_package_profit_percent' => '套餐收益率变更',
     'update_itc_package_created_at' => '套餐开启日期变更',
     'update_referrer' => '推荐人变更',

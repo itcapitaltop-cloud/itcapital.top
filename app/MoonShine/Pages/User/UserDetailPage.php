@@ -22,6 +22,7 @@ use App\Models\UserLevelPercentOverride;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Components\StatisticLinearPartner;
+use App\MoonShine\Forms\ItcPackageTariffField;
 use App\MoonShine\Resources\UserResource;
 use App\Services\ActivityLog\ActivityFeedService;
 use Carbon\Carbon;
@@ -681,9 +682,7 @@ class UserDetailPage extends DetailPage
                         ->fill($package->month_profit_percent),
                     Text::make('Депозит', 'amount')
                         ->fill(round((float) $item['amount'], 2)),
-                    Enum::make('Тип пакета', 'type')
-                        ->attach(PackageTypeEnum::class)
-                        ->fill($package->type),
+                    ItcPackageTariffField::make($package),
                 ])
                 ->async()
                 ->submit('Подтвердить');

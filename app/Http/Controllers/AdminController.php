@@ -27,11 +27,13 @@ use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\MoonShine\Forms\ItcPackageTariffField;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Admin\FinanceRequestService;
 use App\Services\Admin\ReferralTreeService;
+use App\Services\Package\PackageDefinitionResolver;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
@@ -587,12 +589,28 @@ class AdminController extends Controller
         $oldPercent = $package->month_profit_percent;
         $targetUserId = $package->transaction->user_id;
         $oldCreatedAt = $package->created_at->toDateString();
+        $oldDefinitionId = $package->package_definition_id;
+        $oldDefinitionName = $package->packageDefinition?->name;
 
         $package->transaction->amount = $request->input('amount');
         $newCreatedAt = Carbon::parse($request->input('created_at'))->toDateString();
 
         $package->created_at = $newCreatedAt;
-        $package->type = $request->input('type');
+
+        try {
+            $this->applyPackageTariffChange($package, $request);
+        } catch (RuntimeException $exception) {
+            Log::warning('[FIX:package-tariff-change] Tariff could not be applied', [
+                'package_uuid' => $package->uuid,
+                'submitted_package_definition_id' => $request->input('package_definition_id'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось изменить тариф: ' . $exception->getMessage(), ToastType::ERROR);
+        }
+
         $package->month_profit_percent = $request->input('profit_percent');
 
         // A manual per-package edit pins the rate so a later package-definition
@@ -660,6 +678,21 @@ class AdminController extends Controller
             );
         }
 
+        if ($oldDefinitionId !== $package->package_definition_id) {
+            // Only the tariff name goes into old_values/new_values: the admin journal
+            // renders those columns as bare values and money-formats every numeric
+            // one, so a raw definition id would show up as "1.00" and would even
+            // produce a meaningless amount diff between the two ids.
+            $logRepo->updated(
+                $package,
+                'update_itc_package_definition',
+                ['package_definition' => $oldDefinitionName ?? '—'],
+                ['package_definition' => $package->packageDefinition?->name ?? '—'],
+                $targetUserId,
+                ['package_uuid' => $package->uuid],
+            );
+        }
+
         if ((float) $oldPercent !== (float) $package->month_profit_percent) {
             $logRepo->updated(
                 $package,
@@ -689,6 +722,81 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_package_updated'), ToastType::SUCCESS)
             ->redirect($referer);
+    }
+
+    /**
+     * Apply the tariff submitted by the admin package edit form.
+     *
+     * Legacy packages hold their tariff in `type`; definition-based packages hold
+     * it in `package_definition_id` while `type` is only the system category.
+     * Writing `type` for a definition-based package leaves the label and card
+     * image pointing at the previous tariff, so each package model gets its own
+     * branch — mirroring the field rendered by {@see ItcPackageTariffField}.
+     *
+     * @throws RuntimeException when the submitted definition does not exist
+     */
+    private function applyPackageTariffChange(ItcPackage $package, MoonShineRequest $request): void
+    {
+        $submittedDefinitionId = $request->input('package_definition_id');
+        $submittedType = $request->input('type');
+
+        if ($package->type === PackageTypeEnum::STAKING) {
+            return;
+        }
+
+        if ($package->package_definition_id !== null) {
+            if (blank($submittedDefinitionId)) {
+                return;
+            }
+
+            if ($submittedDefinitionId === ItcPackageTariffField::ARCHIVE_VALUE) {
+                $package->type = PackageTypeEnum::ARCHIVE;
+
+                Log::info('[FIX:package-tariff-change] Archived the package without returning its body', [
+                    'package_uuid' => $package->uuid,
+                    'package_definition_id' => $package->package_definition_id,
+                ]);
+
+                return;
+            }
+
+            $definition = app(PackageDefinitionResolver::class)->resolveById((int) $submittedDefinitionId);
+
+            $package->package_definition_id = $definition->id;
+            $package->type = $definition->type;
+            $package->setRelation('packageDefinition', $definition);
+
+            return;
+        }
+
+        if (blank($submittedType)) {
+            Log::warning('[FIX:package-tariff-change] Legacy package submitted without a type', [
+                'package_uuid' => $package->uuid,
+                'submitted_package_definition_id' => $submittedDefinitionId,
+            ]);
+
+            return;
+        }
+
+        $newType = $submittedType instanceof PackageTypeEnum
+            ? $submittedType
+            : PackageTypeEnum::tryFrom((string) $submittedType);
+
+        if ($newType === null) {
+            Log::warning('[FIX:package-tariff-change] Unknown package type submitted', [
+                'package_uuid' => $package->uuid,
+                'submitted_type' => $submittedType,
+            ]);
+
+            return;
+        }
+
+        $package->type = $newType;
+
+        Log::info('[FIX:package-tariff-change] Applied legacy type', [
+            'package_uuid' => $package->uuid,
+            'new_type' => $newType->value,
+        ]);
     }
 
     public function reinvest(string $uuid)
