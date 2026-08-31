@@ -14,9 +14,11 @@ use App\Models\BusinessActivity;
 use App\Models\ItcPackage;
 use App\Services\Package\Staking\StakingPerformanceService;
 use App\Services\Package\Staking\StakingPurchaseService;
+use App\Services\User\SpendableBalanceResolver;
 use App\Services\User\StakingStartBonusAccrualService;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -39,7 +41,7 @@ final class Index extends Component
     {
         $this->validate();
 
-        $package = app(StakingPurchaseService::class)->createPackage(auth()->id(), (float) $this->amount);
+        $package = app(StakingPurchaseService::class)->createPackage(auth()->id(), (float) $this->spendableAmount());
 
         $purchase = $package->stakingPurchases()->latest('id')->firstOrFail();
 
@@ -66,11 +68,36 @@ final class Index extends Component
             })
             ->firstOrFail();
 
-        $purchase = app(StakingPurchaseService::class)->addPurchase($package, (float) $this->amount, auth()->id());
+        $purchase = app(StakingPurchaseService::class)->addPurchase($package, (float) $this->spendableAmount(), auth()->id());
 
         new StakingStartBonusAccrualService()->accrue(auth()->id(), (float) $purchase->token_amount);
 
         $this->js('window.location.reload()');
+    }
+
+    /**
+     * The amount that may actually be debited from the main balance.
+     *
+     * The balance is rendered at 2 decimals while it is stored at 8, so the figure
+     * on screen can exceed the real balance by up to 0.005. Validation accepts the
+     * displayed figure; this caps the debit at what the user truly has.
+     */
+    private function spendableAmount(): string
+    {
+        $resolver = app(SpendableBalanceResolver::class);
+        $spendable = $resolver->clampToBalance($this->mainBalance, $this->amount);
+
+        if ($resolver->wasClamped($this->mainBalance, $this->amount)) {
+            Log::info('[FIX] staking purchase clamped to real balance', [
+                'user_id' => auth()->id(),
+                'requested_amount' => $this->amount,
+                'displayed_balance' => $resolver->toDisplayScale($this->mainBalance),
+                'real_balance' => $this->mainBalance,
+                'debited_amount' => $spendable,
+            ]);
+        }
+
+        return $spendable;
     }
 
     protected function rules(): array
@@ -80,8 +107,8 @@ final class Index extends Component
                 'required',
                 'numeric',
                 'min:1',
-                function ($attribute, $value, $fail) {
-                    if ($value > $this->mainBalance) {
+                function ($attribute, $value, $fail): void {
+                    if (! app(SpendableBalanceResolver::class)->coversRequestedAmount($this->mainBalance, (string) $value)) {
                         $fail('Недостаточно средств на балансе.');
                     }
                 },

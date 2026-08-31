@@ -29,6 +29,7 @@ use App\MoonShine\Pages\User\UserIndexPage;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Package\PackageDefinitionResolver;
 use App\Services\Package\Staking\StakingAccrualService;
+use App\Services\User\SpendableBalanceResolver;
 use App\Services\User\UserRankServices;
 use Carbon\Carbon;
 use Closure;
@@ -547,6 +548,35 @@ class UserResource extends ModelResource
     }
 
     /**
+     * The amount that may actually be debited from a user's main balance.
+     *
+     * The admin UI renders the balance at 2 decimals while it is stored at 8, so the
+     * figure on screen can exceed the real balance by up to 0.005. This caps the debit
+     * at what the user truly has instead of rejecting the whole operation.
+     */
+    private function spendableAmountForUser(int $userId, string $requestedAmount): string
+    {
+        $resolver = app(SpendableBalanceResolver::class);
+        $balance = app(TransactionRepositoryContract::class)
+            ->getBalanceAmountByUserIdAndType($userId, BalanceTypeEnum::MAIN);
+
+        $spendable = $resolver->clampToBalance($balance, $requestedAmount);
+
+        if ($resolver->wasClamped($balance, $requestedAmount)) {
+            Log::info('[FIX] admin package amount clamped to real balance', [
+                'admin_id' => auth()->id(),
+                'target_user_id' => $userId,
+                'requested_amount' => $requestedAmount,
+                'displayed_balance' => $resolver->toDisplayScale($balance),
+                'real_balance' => $balance,
+                'debited_amount' => $spendable,
+            ]);
+        }
+
+        return $spendable;
+    }
+
+    /**
      * @throws \LeMaX10\SimpleActions\Exceptions\ActionHandlerMethodNotFoundException
      * @throws \Throwable
      */
@@ -600,12 +630,23 @@ class UserResource extends ModelResource
                 'selected_duration_months' => $durationMonths,
             ]);
 
+            /**
+             * A present is granted, not paid for, so it must keep the exact amount
+             * the admin typed. A paid package is debited from the user's main balance,
+             * which the admin sees rounded to 2 decimals while it is stored at 8 —
+             * typing the displayed figure would otherwise trip the balance guard.
+             */
+            $requestedAmount = (string) $request->input('amount');
+            $packageAmount = $isPresent
+                ? $requestedAmount
+                : $this->spendableAmountForUser($userId, $requestedAmount);
+
             /* DTO транзакции */
             $dto = new CreateTransactionDto(
                 userId: $userId,
                 trxType: $isPresent ? TrxTypeEnum::PRESENT_PACKAGE : TrxTypeEnum::BUY_PACKAGE,
                 balanceType: BalanceTypeEnum::MAIN,
-                amount: $request->input('amount'),
+                amount: $packageAmount,
                 acceptedAt: Carbon::now(),
                 prefix: 'ITC-',
             );
