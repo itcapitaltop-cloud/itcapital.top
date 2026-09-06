@@ -282,7 +282,7 @@ Both are derived in a fixed order so the producer here and the branch-based cons
 Pick the first matching case:
 
 1. **`HANDOFF_BRANCH_PREPARED = 1`** → `plan_file_stem = HANDOFF_BRANCH_NAME` with every `/` replaced by `-`. Skip slug generation entirely. No `branch_name` is created here (Handoff already owns the branch).
-2. **`git.enabled = true` AND `git.create_branches = true`** → generate a description slug, then `branch_name = <git.branch_prefix><slug>` (default prefix: `feature/`). Set `plan_file_stem = branch_name` with every `/` replaced by `-` (for example `feature-user-authentication`).
+2. **`git.enabled = true` AND `git.create_branches = true`** → generate a description slug and build the suggestion `<git.branch_prefix><slug>` (default prefix: `feature/`), then **ALWAYS ask the user for the branch name** (see 1.2.a-bis) and use the confirmed answer as `branch_name`. Set `plan_file_stem = branch_name` with every `/` replaced by `-` (for example `feature-user-authentication`).
 3. **Otherwise** (`git.enabled = false` OR `git.create_branches = false`) → `plan_file_stem = <description slug>`. No `branch_name` is created.
 
 Slug rules (cases 2 and 3):
@@ -297,6 +297,23 @@ Branch examples (case 2):
 - `fix/cart-total-calculation`
 - `refactor/api-error-handling`
 - `chore/upgrade-dependencies`
+
+#### 1.2.a-bis — Branch name confirmation (MANDATORY)
+
+Never create a branch under a name the user has not seen and approved. Whenever case 2 applies, ask before continuing — there is no auto-accept path, no "obvious name" shortcut, and no skipping because the generated slug looks right:
+
+```
+AskUserQuestion: Branch name for this plan?
+
+Options:
+1. <git.branch_prefix><slug>   (generated suggestion)
+2. Enter another name
+```
+
+- **Generated suggestion** → use it as `branch_name`.
+- **Enter another name** → ask the user for the exact branch name via `AskUserQuestion` and use it verbatim; do not re-slugify or re-prefix it.
+- Validate the final name with `git check-ref-format --branch <branch_name>`. If it is invalid, show the error and ask again.
+- Only after the user has confirmed a name may Step 1.4 run `git branch` / `git checkout -b` / `git worktree add`.
 
 **Invariant:** branch-based consumer skills compute their lookup stem as `current-branch-with-slashes-replaced`. Cases 1 and 2 above already match that. Case 3 never has a branch, so consumers fall back to the lone full-mode plan in `<configured plans dir>/` (see `aif-implement` Step 0.2). Producing a `plan_file_stem` outside these rules breaks discovery.
 
@@ -431,6 +448,8 @@ Docs policy semantics:
 
 #### Worktree Creation
 
+`<branch-name>` is the name the user confirmed in Step 1.2.a-bis. Never invent it here.
+
 ```bash
 DIRNAME=$(basename "$(pwd)")
 git branch <branch-name> <configured-base-branch>
@@ -478,6 +497,8 @@ To manage worktrees later:
 Continue to Step 2.
 
 **If no `--parallel` → create branch normally:**
+
+`<branch-name>` is the name the user confirmed in Step 1.2.a-bis. If for any reason this step is reached without a user-confirmed name, ask for it now before running any git command.
 
 ```bash
 git checkout <configured-base-branch>

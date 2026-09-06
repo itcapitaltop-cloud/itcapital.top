@@ -50,6 +50,7 @@ If any rule is violated — fix the output before presenting it to the user.
    - Run `git status` to see staged files
    - Run `git diff --cached` to see staged changes
    - If nothing staged, show warning and suggest staging
+   - Run `git branch --show-current` and apply the **Branch Gate** below before any commit is made
 
 2. **Resolve Active Plan Context (Read-Only, Optional)**
    - Resolve active plan using this read-only priority:
@@ -130,6 +131,29 @@ If any rule is violated — fix the output before presenting it to the user.
    - Don't capitalize first letter after type
    - No period at end of subject
 
+## Branch Gate (MANDATORY)
+
+Applies before the first `git commit` of the run, and to every branch this skill would create.
+
+- If the current branch is a working branch (not `git.base_branch`, default `main`), commit there. Do not create a branch and do not ask.
+- If the current branch is `git.base_branch`, or the user asked to commit on a new branch, a branch must be created first — and **the branch name is ALWAYS asked, never derived silently**. There is no auto-accept path: not when the commit type and scope make an "obvious" name, not when a plan or `git.branch_prefix` suggests one, not when the same name was used earlier in the session.
+
+  ```
+  AskUserQuestion: Committing on <current-branch>. Branch name for the new branch?
+
+  Options:
+  1. <suggested-name>   (generated from the staged changes / active plan)
+  2. Enter another name
+  3. Commit on <current-branch> anyway
+  ```
+
+  - **Suggested name** → use it verbatim.
+  - **Enter another name** → ask for the exact name via `AskUserQuestion` and use it as typed; do not re-slugify or re-prefix it.
+  - **Commit on `<current-branch>` anyway** → skip branch creation entirely.
+  - Validate the chosen name with `git check-ref-format --branch <name>`. On failure, show the error and ask again.
+  - If the branch already exists, ask whether to switch to it or pick a different name.
+  - Create it with `git checkout -b <name>` only after the user has confirmed the name, then continue the commit flow.
+
 ## Format
 
 ```
@@ -192,7 +216,7 @@ When invoked:
    - **Edit message** → ask the user for the corrected message via `AskUserQuestion`, then return to step 7 with the new message
    - **Cancel** → stop, do NOT commit. End the workflow
 
-9. Execute `git commit` with the confirmed message
+9. Apply the **Branch Gate** (ask for the branch name whenever a branch must be created), then execute `git commit` with the confirmed message
 10. Post-commit push handling:
    - If `git.skip_push_after_commit = true` in resolved config:
      - Skip push prompt entirely
@@ -221,6 +245,7 @@ If argument provided (e.g., `/aif-commit auth`):
 
 ## Important
 
+- NEVER create a git branch with a name the user has not explicitly confirmed — see **Branch Gate**
 - Never commit secrets or credentials
 - Review large diffs carefully before committing
 - `/aif-commit` has no implicit strict mode — context gates are warning-first unless user explicitly requests blocking behavior

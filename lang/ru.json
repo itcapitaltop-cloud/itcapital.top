@@ -601,6 +601,7 @@
     "livewire_finance_deposit_source_crypto": "Криптовалюта",
     "livewire_finance_deposit_source_fiat": "Фиат",
     "livewire_finance_deposit_amount_label": "Сумма пополнения в ITC",
+    "livewire_finance_itc_rate_notice": "1 ITC = 1 USDT BEP20",
     "livewire_finance_deposit_amount_placeholder": "Введите сумму для зачисления",
     "livewire_finance_deposit_wallet_address_label": "Адрес кошелька",
     "livewire_finance_deposit_network_label": "Сеть:",

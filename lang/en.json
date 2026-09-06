@@ -601,6 +601,7 @@
     "livewire_finance_deposit_source_crypto": "Cryptocurrency",
     "livewire_finance_deposit_source_fiat": "Fiat",
     "livewire_finance_deposit_amount_label": "Top-Up Amount to ITC",
+    "livewire_finance_itc_rate_notice": "1 ITC = 1 USDT BEP20",
     "livewire_finance_deposit_amount_placeholder": "Enter amount to deposit",
     "livewire_finance_deposit_wallet_address_label": "Wallet Address",
     "livewire_finance_deposit_network_label": "Network:",
