@@ -140,6 +140,9 @@ Route::controller(AdminController::class)->middleware(Authenticate::class)->pref
     Route::post('withdraw/update', 'withdrawUpdate')->name('withdraw-update');
     Route::post('deposit/update-amount', 'depositUpdateAmount')->name('deposit-update-amount');
     Route::post('withdraw/create', 'withdrawCreate')->name('withdraw-create');
+    Route::post('finance/accept', 'financeAccept')->name('admin.finance.accept');
+    Route::post('finance/reject', 'financeReject')->name('admin.finance.reject');
+    Route::post('finance/moderate', 'financeModerate')->name('admin.finance.moderate');
     Route::post('partners', 'addPartner')->name('add-partner');
     Route::post('partners/{partner_id}', 'updatePartner');
     Route::get('users/suggest', 'suggestUsers')->name('admin.users.suggest');

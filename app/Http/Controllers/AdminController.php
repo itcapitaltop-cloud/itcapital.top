@@ -1284,6 +1284,46 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()->toast('Заявка на вывод создана', ToastType::SUCCESS)->redirect(url()->previous());
     }
 
+    /**
+     * Одобрение заявки из карточки клиента.
+     *
+     * Общие разделы «Ввод»/«Вывод» дёргают accept() как метод MoonShine-ресурса, но
+     * внутри карточки текущий ресурс — UserResource, у которого этого метода нет.
+     * Поэтому те же действия выставлены отдельными роутами: uuid приходит в строке
+     * запроса, откуда его и читает getItemID().
+     */
+    public function financeAccept(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->accept();
+    }
+
+    public function financeReject(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->reject();
+    }
+
+    public function financeModerate(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->toModerate();
+    }
+
+    /**
+     * Методы трейта ищут транзакцию через firstWhere() и не проверяют результат на null,
+     * поэтому несуществующий uuid без этой проверки уронил бы запрос фаталом.
+     */
+    private function validateFinanceRequestUuid(Request $request): void
+    {
+        $request->validate([
+            'uuid' => ['required', 'string', 'exists:transactions,uuid'],
+        ]);
+    }
+
     public function recalculate(MoonShineRequest $request): RedirectResponse
     {
         $uuids = (array) $request->input('uuid');
