@@ -15,6 +15,7 @@ use App\Enums\Transactions\BalanceTypeEnum;
 use App\Enums\Transactions\TrxTypeEnum;
 use App\Exceptions\Domain\InvalidAmountException;
 use App\Models\ItcPackage;
+use App\Models\PackageBodyUnlock;
 use App\Models\PackagePartnerTransfer;
 use App\Models\PackageProfit;
 use App\Models\PackageProfitReinvest;
@@ -29,6 +30,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ItcPackageRepository implements ItcPackageRepositoryContract
 {
@@ -181,6 +183,30 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
                 PackageProfitWithdraw::query()->create([
                     'uuid' => $trx->uuid,
                     'package_uuid' => $uuid,
+                ]);
+            }
+
+            // Тело пакета уже выплачено транзакцией WITHDRAW_PACKAGE выше, поэтому
+            // ожидающие разблокировки нужно снять с очереди, иначе планировщик
+            // выплатит те же деньги второй раз. Своей транзакции здесь нет и не нужно.
+            $pendingUnlocks = PackageBodyUnlock::query()
+                ->where('package_uuid', $package->uuid)
+                ->pending()
+                ->lockForUpdate()
+                ->get();
+
+            if ($pendingUnlocks->isNotEmpty()) {
+                PackageBodyUnlock::query()
+                    ->whereIn('uuid', $pendingUnlocks->pluck('uuid'))
+                    ->update(['cancelled_at' => Carbon::now()]);
+
+                Log::info('[ItcPackageRepository.closePackage] pending body unlocks cancelled', [
+                    'package_uuid' => $package->uuid,
+                    'unlock_uuids' => $pendingUnlocks->pluck('uuid')->all(),
+                    'amount' => (string) $pendingUnlocks->reduce(
+                        static fn (BigDecimal $carry, PackageBodyUnlock $unlock): BigDecimal => $carry->plus($unlock->amount),
+                        BigDecimal::zero()
+                    ),
                 ]);
             }
 

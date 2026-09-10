@@ -51,6 +51,11 @@ return [
         'package_profit_withdrawn' => '套餐 :uuid 的收益 :amount ITC 已提取到余额',
         'package_reinvested' => '收益 :amount ITC 已复投到套餐 :uuid',
         'package_amount_withdrawn_to_balance' => '已从套餐 :uuid 提取 :amount ITC 到主余额',
+<<<<<<< Updated upstream
+=======
+        'package_reinvest_unlocked' => '套餐 :uuid 中 :amount ITC 的复投已解锁，将于 :date 支付',
+        'package_body_unlocked' => '套餐 :uuid 本金中的 :amount ITC 已解锁，将于 :date 支付',
+>>>>>>> Stashed changes
         'package_reinvest_withdrawn_to_balance' => '套餐 :uuid 的复投 :amount ITC 已提取到主余额',
         'present_package_zeroed' => '赠送套餐 :uuid 已清零，金额 :amount ITC',
         'referral_added_to_line' => '推荐人 @:username 已添加到第 :line 线',

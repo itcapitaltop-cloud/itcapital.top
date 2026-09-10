@@ -54,6 +54,11 @@ return [
         'package_profit_withdrawn' => 'С пакета :uuid выведена доходность :amount ITC на баланс',
         'package_reinvested' => 'Доходность :amount ITC реинвестирована в пакет :uuid',
         'package_amount_withdrawn_to_balance' => 'С пакета :uuid выведена сумма :amount ITC на основной баланс',
+<<<<<<< Updated upstream
+=======
+        'package_reinvest_unlocked' => 'Реинвесты на :amount ITC разлокированы в пакете :uuid, выплата :date',
+        'package_body_unlocked' => 'С пакета :uuid разблокирована сумма :amount ITC, выплата :date',
+>>>>>>> Stashed changes
         'package_reinvest_withdrawn_to_balance' => 'Реинвест :amount ITC выведен с пакета :uuid на основной баланс',
         'present_package_zeroed' => 'Подарочный пакет :uuid обнулен на сумму :amount ITC',
         'referral_added_to_line' => 'В линию :line добавлен реферал @:username',

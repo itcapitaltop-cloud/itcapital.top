@@ -576,6 +576,11 @@ final class ActivityFeedService
             ActivityEventTypeEnum::ReferralAddedToLine->value,
             ActivityEventTypeEnum::BecameReferralOfUser->value,
             ActivityEventTypeEnum::PackageReinvested->value,
+<<<<<<< Updated upstream
+=======
+            ActivityEventTypeEnum::PackageReinvestUnlocked->value,
+            ActivityEventTypeEnum::PackageBodyUnlocked->value,
+>>>>>>> Stashed changes
             'admin_package_purchased',
             'admin_package_changed_amount',
             'admin_package_changed_percentage',

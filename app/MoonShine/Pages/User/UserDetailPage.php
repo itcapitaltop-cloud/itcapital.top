@@ -391,6 +391,17 @@ class UserDetailPage extends DetailPage
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')
                 ->withSum([
+<<<<<<< Updated upstream
+=======
+                    'unlockedReinvestProfits as reinvest_unlocked_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum([
+                    'pendingBodyUnlocks as body_unlocked_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum([
+>>>>>>> Stashed changes
                     'profits as profits_sum_amount' => fn ($q) => $q
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')
@@ -414,6 +425,11 @@ class UserDetailPage extends DetailPage
                     'type' => $pkg->type,
                     'month_profit_percent' => $pkg->month_profit_percent,
                     'reinvest_total_all' => (float) ($pkg->reinvest_profits_sum_amount ?? 0),
+<<<<<<< Updated upstream
+=======
+                    'reinvest_unlocked_total' => (float) ($pkg->reinvest_unlocked_sum_amount ?? 0),
+                    'body_unlocked_total' => (float) ($pkg->body_unlocked_sum_amount ?? 0),
+>>>>>>> Stashed changes
                     'profits_total_all' => (float) ($pkg->profits_total_all ?? 0),
                     'itc_created_at' => $pkg->created_at,
                     'reinvest_profits' => $pkg->reinvestProfits
@@ -1339,6 +1355,11 @@ class UserDetailPage extends DetailPage
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                 Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
                                 Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
+<<<<<<< Updated upstream
+=======
+                                Number::make('Реинвесты в ожидании выплаты', 'reinvest_unlocked_total', formatted: fn ($item) => round((float) ($item['reinvest_unlocked_total'] ?? 0), 2))->showOnExport(),
+                                Number::make('Разблокировано с тела (ожидает выплаты)', 'body_unlocked_total', formatted: fn ($item) => round((float) ($item['body_unlocked_total'] ?? 0), 2))->showOnExport(),
+>>>>>>> Stashed changes
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)
                                 ),

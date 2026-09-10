@@ -99,6 +99,11 @@ final class ActivityManager
             ActivityEventTypeEnum::PackageProfitWithdrawn => __('activity/feed.business.package_profit_withdrawn', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageReinvested => __('activity/feed.business.package_reinvested', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageAmountWithdrawnToBalance => __('activity/feed.business.package_amount_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
+<<<<<<< Updated upstream
+=======
+            ActivityEventTypeEnum::PackageReinvestUnlocked => __('activity/feed.business.package_reinvest_unlocked', ['uuid' => $packageUuid, 'amount' => $amount, 'date' => $payoutAt]),
+            ActivityEventTypeEnum::PackageBodyUnlocked => __('activity/feed.business.package_body_unlocked', ['uuid' => $packageUuid, 'amount' => $amount, 'date' => $payoutAt]),
+>>>>>>> Stashed changes
             ActivityEventTypeEnum::PackageReinvestWithdrawnToBalance => __('activity/feed.business.package_reinvest_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PresentPackageZeroed => __('activity/feed.business.present_package_zeroed', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::ReferralAddedToLine => __('activity/feed.business.referral_added_to_line', ['line' => $line, 'username' => $username]),
