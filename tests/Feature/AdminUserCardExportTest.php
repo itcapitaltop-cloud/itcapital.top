@@ -12,9 +12,65 @@ use App\Models\PartnerClosure;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
-it('exports the user card with template rows and dashboard package total', function (): void {
+/**
+ * Выгружает карточку и возвращает разобранную книгу вместе с ответом.
+ *
+ * @param list<string>|null $fields
+ * @return array{response: StreamedResponse, spreadsheet: Spreadsheet}
+ */
+function exportUserCard(User $user, ?array $fields = null): array
+{
+    $request = Request::create('/admin/users/card/export', 'GET', [
+        'fields' => $fields ?? array_column(UserCardExportField::cases(), 'value'),
+    ]);
+
+    $response = (new AdminController())->exportUserCard($request, $user->id);
+
+    ob_start();
+    $response->sendContent();
+    $xlsx = (string) ob_get_clean();
+
+    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
+    file_put_contents($path, $xlsx);
+
+    $spreadsheet = IOFactory::load($path);
+
+    @unlink($path);
+
+    return ['response' => $response, 'spreadsheet' => $spreadsheet];
+}
+
+/**
+ * Цепочка рефералов: каждый следующий приглашён предыдущим.
+ *
+ * @param list<User> $chain
+ */
+function linkReferralChain(array $chain): void
+{
+    foreach ($chain as $depth => $descendant) {
+        if ($depth > 0) {
+            Partner::query()->create([
+                'user_id' => $descendant->id,
+                'partner_id' => $chain[$depth - 1]->id,
+            ]);
+        }
+
+        for ($ancestor = 0; $ancestor <= $depth; $ancestor++) {
+            PartnerClosure::query()->create([
+                'ancestor_id' => $chain[$ancestor]->id,
+                'descendant_id' => $descendant->id,
+                'depth' => $depth - $ancestor,
+            ]);
+        }
+    }
+}
+
+it('exports the card as a transposed sheet with the owner in column C', function (): void {
     $referrer = User::factory()->create(['username' => 'sponsor-user']);
     $user = User::factory()->create([
         'first_name' => 'Иван',
@@ -24,9 +80,7 @@ it('exports the user card with template rows and dashboard package total', funct
         'telegram' => '@ivan_tg',
     ]);
 
-    Partner::query()->create(['user_id' => $user->id, 'partner_id' => $referrer->id]);
-    PartnerClosure::query()->create(['ancestor_id' => $user->id, 'descendant_id' => $user->id, 'depth' => 0]);
-    PartnerClosure::query()->create(['ancestor_id' => $referrer->id, 'descendant_id' => $user->id, 'depth' => 1]);
+    linkReferralChain([$referrer, $user]);
 
     $transaction = Transaction::factory()->create([
         'user_id' => $user->id,
@@ -48,53 +102,43 @@ it('exports the user card with template rows and dashboard package total', funct
         'matured_at' => now()->addDays(180),
     ]);
 
-    $request = Request::create('/admin/users/card/export', 'GET', [
-        'fields' => array_column(UserCardExportField::cases(), 'value'),
-    ]);
-    $response = (new AdminController())->exportUserCard($request, $user->id);
+    ['response' => $response, 'spreadsheet' => $spreadsheet] = exportUserCard($user);
 
-    ob_start();
-    $response->sendContent();
-    $xlsx = (string) ob_get_clean();
-
-    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
-    file_put_contents($path, $xlsx);
-
-    $rows = IOFactory::load($path)->getActiveSheet()->toArray();
-
-    @unlink($path);
+    $sheet = $spreadsheet->getSheetByName('Главная');
 
     expect($response->headers->get('content-type'))->toContain('spreadsheetml.sheet')
-        ->and(array_slice(array_column($rows, 0), 0, 11))->toBe([
+        ->and($spreadsheet->getActiveSheetIndex())->toBe(0)
+        ->and(array_map(
+            static fn (int $row): mixed => $sheet->getCell([1, $row])->getValue(),
+            range(3, 13)
+        ))->toBe([
             'Фамилия Имя',
             'Никнейм',
             'Номер линии',
-            'Кто пригласил',
+            'Реферал',
             'Город',
             'Телефон',
             'Социальные сети',
             'Пакеты Сумма',
             'Токены',
-            'Обучение',
+            'Обучение онлайн',
             'Ранг',
         ])
-        ->and($rows[0][1])->toBe('Иван Петров')
-        ->and($rows[1][1])->toBe('ivan-petrov')
-        ->and((int) $rows[2][1])->toBe(1)
-        ->and($rows[3][1])->toBe('sponsor-user')
-        ->and($rows[4][1])->toBeNull()
-        ->and($rows[5][1])->toBeNull()
-        ->and($rows[6][1])->toBe('@ivan_tg')
-        ->and((float) $rows[7][1])->toBe(1150.0)
-        ->and((float) $rows[8][1])->toBe(0.0)
-        ->and($rows[9][1])->toBeNull()
-        ->and((int) $rows[10][1])->toBe(3)
-        ->and($rows[12][0])->toBe('Рефералы')
-        ->and($rows[12][1])->toBe('Нет рефералов');
+        ->and($sheet->getCell('C3')->getValue())->toBe('Иван Петров')
+        ->and($sheet->getCell('C4')->getValue())->toBe('ivan-petrov')
+        ->and((int) $sheet->getCell('C5')->getValue())->toBe(1)
+        ->and($sheet->getCell('C9')->getValue())->toBe('@ivan_tg')
+        ->and((float) $sheet->getCell('C10')->getValue())->toBe(1150.0)
+        ->and((float) $sheet->getCell('C11')->getValue())->toBe(0.0)
+        ->and((int) $sheet->getCell('C13')->getValue())->toBe(3);
 });
 
-it('exports the whole referral structure as an indented text tree', function (): void {
-    $user = User::factory()->create(['username' => 'root-user']);
+it('places every referral in its own column with the tree line number', function (): void {
+    $user = User::factory()->create([
+        'first_name' => 'Мария',
+        'last_name' => 'Соколова',
+        'username' => 'root-user',
+    ]);
 
     $first = User::factory()->create([
         'username' => 'line1-user',
@@ -113,52 +157,60 @@ it('exports the whole referral structure as an indented text tree', function ():
         'banned_at' => now(),
     ]);
 
-    $chain = [$user, $first, $second, $third];
+    linkReferralChain([$user, $first, $second, $third]);
 
-    foreach ($chain as $depth => $descendant) {
-        if ($depth > 0) {
-            Partner::query()->create([
-                'user_id' => $descendant->id,
-                'partner_id' => $chain[$depth - 1]->id,
-            ]);
-        }
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('Главная');
 
-        for ($ancestor = 0; $ancestor <= $depth; $ancestor++) {
-            PartnerClosure::query()->create([
-                'ancestor_id' => $chain[$ancestor]->id,
-                'descendant_id' => $descendant->id,
-                'depth' => $depth - $ancestor,
-            ]);
-        }
-    }
-
-    $request = Request::create('/admin/users/card/export', 'GET', [
-        'fields' => array_column(UserCardExportField::cases(), 'value'),
-    ]);
-    $response = (new AdminController())->exportUserCard($request, $user->id);
-
-    ob_start();
-    $response->sendContent();
-    $xlsx = (string) ob_get_clean();
-
-    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
-    file_put_contents($path, $xlsx);
-
-    $sheet = IOFactory::load($path)->getActiveSheet();
-    $rows = $sheet->toArray();
-
-    @unlink($path);
-
-    expect($rows[12])->toBe(['Рефералы', 'Всего: 3'])
-        ->and($rows[13])->toBe(['Пётр Сидоров', 'Линия 1'])
-        ->and($rows[14])->toBe(['    Анна Иванова', 'Линия 2'])
-        ->and($rows[15])->toBe(['        Олег Кузнецов', 'Линия 3'])
-        ->and($sheet->getCell('A14')->getHyperlink()->getUrl())->toBe('')
-        ->and($sheet->getCell('A15')->getHyperlink()->getUrl())->toBe('')
-        ->and($sheet->getCell('A16')->getHyperlink()->getUrl())->toBe('');
+    expect(array_map(
+        static fn (string $column): mixed => $sheet->getCell($column . '3')->getValue(),
+        ['C', 'D', 'E', 'F']
+    ))->toBe(['Мария Соколова', 'Пётр Сидоров', 'Анна Иванова', 'Олег Кузнецов'])
+        ->and($sheet->getCell('C4')->getValue())->toBe('root-user')
+        ->and($sheet->getCell('D4')->getValue())->toBe('line1-user')
+        ->and(array_map(
+            static fn (string $column): int => (int) $sheet->getCell($column . '5')->getValue(),
+            ['C', 'D', 'E', 'F']
+        ))->toBe([0, 1, 2, 3]);
 });
 
-it('exports only the fields selected for CRM', function (): void {
+it('sums packages and tokens across the whole tree in column B', function (): void {
+    $user = User::factory()->create(['username' => 'root-user']);
+    $referral = User::factory()->create(['username' => 'line1-user']);
+
+    linkReferralChain([$user, $referral]);
+
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('Главная');
+
+    expect($sheet->getCell('B10')->getValue())->toBe('=SUM(C10:D10)')
+        ->and($sheet->getCell('B11')->getValue())->toBe('=SUM(C11:D11)')
+        // Служебная колонка свёрнута, как в эталоне: формулы есть, на глаза не лезут.
+        ->and($sheet->getColumnDimension('B')->getVisible())->toBeFalse()
+        ->and($sheet->getColumnDimension('B')->getOutlineLevel())->toBe(1);
+});
+
+it('fills fields that are not stored in the system with the reference placeholders', function (): void {
+    $user = User::factory()->create(['username' => 'root-user', 'telegram' => null]);
+
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('Главная');
+
+    expect($sheet->getCell('C6')->getValue())->toBe('?')
+        ->and($sheet->getCell('C7')->getValue())->toBe('?')
+        ->and($sheet->getCell('C8')->getValue())->toBe('?')
+        ->and($sheet->getCell('C9')->getValue())->toBe('?')
+        ->and($sheet->getCell('C12')->getValue())->toBe('Проходил / не проходил');
+});
+
+it('keeps numeric rows at zero instead of a placeholder', function (): void {
+    $user = User::factory()->create(['username' => 'root-user', 'rank' => 0]);
+
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('Главная');
+
+    expect($sheet->getCell('C10')->getValue())->toBe(0.0)
+        ->and($sheet->getCell('C11')->getValue())->toBe(0.0)
+        ->and($sheet->getCell('C13')->getValue())->toBe(0);
+});
+
+it('keeps every field on its reference row when only some fields are selected', function (): void {
     $user = User::factory()->create([
         'first_name' => 'Иван',
         'last_name' => 'Петров',
@@ -166,29 +218,107 @@ it('exports only the fields selected for CRM', function (): void {
         'telegram' => '@ivan_tg',
     ]);
 
-    $request = Request::create('/admin/users/card/export', 'GET', [
-        'fields' => [
-            UserCardExportField::FULL_NAME->value,
-            UserCardExportField::SOCIAL_NETWORKS->value,
-        ],
+    $sheet = exportUserCard($user, [
+        UserCardExportField::FULL_NAME->value,
+        UserCardExportField::SOCIAL_NETWORKS->value,
+    ])['spreadsheet']->getSheetByName('Главная');
+
+    expect($sheet->getCell('A3')->getValue())->toBe('Фамилия Имя')
+        ->and($sheet->getCell('C3')->getValue())->toBe('Иван Петров')
+        ->and($sheet->getCell('A9')->getValue())->toBe('Социальные сети')
+        ->and($sheet->getCell('C9')->getValue())->toBe('@ivan_tg')
+        ->and($sheet->getCell('A4')->getValue())->toBeNull()
+        ->and($sheet->getCell('A10')->getValue())->toBeNull()
+        ->and($sheet->getCell('B10')->getValue())->toBeNull();
+});
+
+it('adds the tasks sheet with headers and dropdown validation', function (): void {
+    $user = User::factory()->create(['username' => 'root-user']);
+
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('задачи');
+
+    expect($sheet)->not->toBeNull()
+        ->and(array_map(
+            static fn (int $column): mixed => $sheet->getCell([$column, 1])->getValue(),
+            range(1, 8)
+        ))->toBe([
+            'Дата встречи',
+            'Приоритет',
+            'Статус',
+            'Встреча',
+            'Коментарии и отчет о событии',
+            'Дата следующего события',
+            'Галочку ставить проверяющий',
+            'Примечания',
+        ])
+        ->and($sheet->getCell('D2')->getDataValidation()->getFormula1())
+        ->toBe('"Назначено,Выполняется,Перенесено,Выполнено"')
+        ->and($sheet->getCell('B2')->getDataValidation()->getFormula1())
+        ->toBe('"1 встреча,2 встреча,3 встреча"')
+        ->and($sheet->getCell('C2')->getDataValidation()->getFormula1())
+        ->toBe('"Встреча онлайн,Встреча офлайн,Созвон"')
+        ->and($sheet->getFreezePane())->toBe('A2');
+});
+
+it('styles the main sheet like the reference workbook', function (): void {
+    $user = User::factory()->create(['username' => 'root-user']);
+
+    $sheet = exportUserCard($user)['spreadsheet']->getSheetByName('Главная');
+
+    expect($sheet->getStyle('A3')->getFill()->getStartColor()->getARGB())->toBe('FF00FFFF')
+        ->and($sheet->getStyle('C3')->getFill()->getStartColor()->getARGB())->toBe('FFFF00FF')
+        ->and($sheet->getStyle('A4')->getFill()->getStartColor()->getARGB())->toBe('FFFF00FF')
+        ->and($sheet->getStyle('A13')->getFill()->getStartColor()->getARGB())->toBe('FFFBBC04')
+        ->and($sheet->getStyle('C12')->getFont()->getSize())->toBe(8.0)
+        ->and($sheet->getStyle('A3')->getFont()->getName())->toBe('Arial')
+        ->and($sheet->getFreezePane())->toBe('B1')
+        ->and($sheet->getRowDimension(1)->getRowHeight())->toBe(61.5)
+        ->and($sheet->getRowDimension(2)->getRowHeight())->toBe(79.5)
+        ->and($sheet->getRowDimension(3)->getRowHeight())->toBe(20.25)
+        ->and($sheet->getColumnDimension('A')->getWidth())->toBe(45.75);
+});
+
+it('names the downloaded file after the user full name', function (): void {
+    $user = User::factory()->create([
+        'first_name' => 'Светлана',
+        'last_name' => 'Волкова',
+        'username' => 'svetlana',
     ]);
 
-    $response = (new AdminController())->exportUserCard($request, $user->id);
+    $disposition = exportUserCard($user)['response']->headers->get('content-disposition');
 
-    ob_start();
-    $response->sendContent();
-    $xlsx = (string) ob_get_clean();
+    expect($disposition)->toContain("filename*=utf-8''")
+        ->and(rawurldecode((string) $disposition))->toContain('Светлана Волкова.xlsx')
+        ->and($disposition)->not->toContain('user-' . $user->id);
+});
 
-    $path = tempnam(sys_get_temp_dir(), 'user-card-export-');
-    file_put_contents($path, $xlsx);
+it('falls back to the username when the full name is empty', function (): void {
+    $user = User::factory()->create([
+        'first_name' => '',
+        'last_name' => '',
+        'username' => 'lonely-user',
+    ]);
 
-    $sheet = IOFactory::load($path)->getActiveSheet();
-    $rows = $sheet->toArray();
+    $disposition = (string) exportUserCard($user)['response']->headers->get('content-disposition');
 
-    @unlink($path);
+    expect($disposition)->toContain('lonely-user.xlsx');
+});
 
-    expect($rows)->toBe([
-        ['Фамилия Имя', 'Иван Петров'],
-        ['Социальные сети', '@ivan_tg'],
-    ])->and($sheet->getCell('B2')->getHyperlink()->getUrl())->toBe('');
+it('collects the whole tree without running a query per referral', function (): void {
+    $chain = [User::factory()->create(['username' => 'root-user'])];
+
+    for ($index = 0; $index < 20; $index++) {
+        $chain[] = User::factory()->create(['username' => 'referral-' . $index]);
+    }
+
+    linkReferralChain($chain);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    exportUserCard($chain[0]);
+
+    expect($queries)->toBeLessThan(15);
 });

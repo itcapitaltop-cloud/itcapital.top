@@ -23,6 +23,24 @@ final class ReferralTreeService
      */
     public function flatten(int $userId): array
     {
+        return array_map(
+            static fn (array $row): array => [
+                'id' => $row['id'],
+                'line' => $row['line'],
+                'name' => $row['name'],
+            ],
+            $this->flattenWithUsers($userId)
+        );
+    }
+
+    /**
+     * То же дерево, но с полями профиля, нужными выгрузке карточки.
+     * Отдельный метод, чтобы построитель `.xlsx` не делал N+1 запросов к `users`.
+     *
+     * @return list<array{id: int, line: int, name: string, username: string, telegram: string, rank: int}>
+     */
+    public function flattenWithUsers(int $userId): array
+    {
         $depths = PartnerClosure::query()
             ->where('ancestor_id', $userId)
             ->where('depth', '>', 0)
@@ -38,7 +56,7 @@ final class ReferralTreeService
         $users = User::query()
             ->withoutGlobalScope('notBanned')
             ->whereIn('id', $ids)
-            ->get(['id', 'username', 'first_name', 'last_name'])
+            ->get(['id', 'username', 'first_name', 'last_name', 'telegram', 'rank'])
             ->keyBy('id');
 
         $parents = Partner::query()
@@ -112,7 +130,7 @@ final class ReferralTreeService
      * @param Collection<int, User> $users
      * @param Collection<int, int> $depths
      * @param array<int, true> $visited
-     * @param list<array{id: int, line: int, username: string, full_name: string}> $rows
+     * @param list<array{id: int, line: int, name: string, username: string, telegram: string, rank: int}> $rows
      */
     private function walk(
         int $parentId,
@@ -137,14 +155,19 @@ final class ReferralTreeService
 
     /**
      * @param Collection<int, User> $users
-     * @return array{id: int, line: int, name: string}
+     * @return array{id: int, line: int, name: string, username: string, telegram: string, rank: int}
      */
     private function row(int $id, int $line, Collection $users): array
     {
+        $user = $users[$id];
+
         return [
             'id' => $id,
             'line' => $line,
-            'name' => $this->name($users[$id]),
+            'name' => $this->name($user),
+            'username' => (string) $user->username,
+            'telegram' => trim((string) $user->telegram),
+            'rank' => (int) $user->rank,
         ];
     }
 

@@ -32,9 +32,9 @@ use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Admin\FinanceRequestService;
-use App\Services\Admin\ReferralTreeService;
+use App\Services\Admin\UserCardExportService;
+use App\Services\Admin\UserCardSpreadsheetBuilder;
 use App\Services\Package\PackageDefinitionResolver;
-use App\Services\Package\Staking\StakingPerformanceService;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -246,121 +246,47 @@ class AdminController extends Controller
 
         $user = User::withoutGlobalScope('notBanned')->with('referrer')->findOrFail($userId);
 
-        $lineNumber = (int) PartnerClosure::query()
-            ->where('descendant_id', $user->id)
-            ->max('depth');
+        $cardData = app(UserCardExportService::class)->collect($user);
+        $spreadsheet = app(UserCardSpreadsheetBuilder::class)->build($cardData, $selectedFields);
 
-        /*
-         * «Пакеты Сумма» повторяет «Сумму пакетов» дашборда /account
-         * (App\Livewire\Account\Dashboard\Index): тело пакета
-         * (amount + partnerTransfers + reinvestToBody − balanceWithdraws,
-         * 0 для обнулённых PRESENT) плюс активные реинвесты.
-         */
-        $packagesTotal = ItcPackage::query()
-            ->select('itc_packages.*')
-            ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
-            ->where('transactions.user_id', $user->id)
-            ->notActive()
-            ->with(['transaction', 'zeroing'])
-            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->get()
-            ->sum(function (ItcPackage $package): float {
-                $body = $package->type === PackageTypeEnum::PRESENT && $package->zeroing
-                    ? 0.0
-                    : (float) $package->transaction->amount
-                        + (float) $package->partner_transfers_sum_amount
-                        + (float) $package->reinvest_to_body_sum_amount
-                        - (float) $package->balance_withdraws_sum_amount;
+        $filename = $this->userCardFilename($user);
 
-                return $body + (float) $package->reinvest_profits_sum_amount;
-            });
-
-        $stakingPackages = ItcPackage::query()
-            ->active(PackageTypeEnum::STAKING)
-            ->whereHas('transaction', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases', 'packageDefinition'])
-            ->get();
-
-        $tokens = $stakingPackages->isEmpty()
-            ? 0.0
-            : app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
-
-        $telegram = trim((string) $user->telegram);
-
-        $referrals = app(ReferralTreeService::class)->flatten($user->id);
-
-        $values = [
-            UserCardExportField::FULL_NAME->value => trim("{$user->first_name} {$user->last_name}"),
-            UserCardExportField::USERNAME->value => $user->username,
-            UserCardExportField::LINE_NUMBER->value => $lineNumber,
-            UserCardExportField::REFERRER->value => $user->referrer?->username ?? '',
-            UserCardExportField::CITY->value => '',
-            UserCardExportField::PHONE->value => '',
-            UserCardExportField::SOCIAL_NETWORKS->value => $telegram,
-            UserCardExportField::PACKAGES_TOTAL->value => round($packagesTotal, 2),
-            UserCardExportField::TOKENS->value => $tokens,
-            UserCardExportField::EDUCATION->value => '',
-            UserCardExportField::RANK->value => $user->rank,
-            UserCardExportField::REFERRALS->value => $referrals === [] ? 'Нет рефералов' : 'Всего: ' . count($referrals),
-        ];
-
-        $rows = [];
-        $referralsRow = false;
-
-        foreach ($selectedFields as $field) {
-            if ($field === UserCardExportField::REFERRALS && $rows !== []) {
-                $rows[] = ['', ''];
-            }
-
-            $row = count($rows);
-            $rows[] = [$field->label(), $values[$field->value]];
-
-            if ($field === UserCardExportField::REFERRALS) {
-                $referralsRow = $row;
-            }
-        }
-
-        /*
-         * Дерево рефералов: отступ в столбце A показывает линию, каждая строка —
-         * ссылка на карточку реферала в админке.
-         */
-        $treeFirstRow = $referralsRow === false ? null : $referralsRow + 2;
-
-        if ($treeFirstRow !== null) {
-            foreach ($referrals as $referral) {
-                $rows[] = [
-                    str_repeat('    ', $referral['line'] - 1) . $referral['name'],
-                    'Линия ' . $referral['line'],
-                ];
-            }
-        }
-
-        $filename = sprintf('user-%d-card-%s.xlsx', $user->id, now()->format('Ymd-His'));
+        Log::info('[AdminController.exportUserCard] export requested', [
+            'user_id' => $user->id,
+            'fields' => array_column($selectedFields, 'value'),
+            'filename' => $filename,
+        ]);
 
         return response()->streamDownload(
-            function () use ($rows, $treeFirstRow): void {
-                $spreadsheet = new Spreadsheet();
-                $sheet = $spreadsheet->getActiveSheet();
-                $sheet->setTitle('Карточка');
-
-                $sheet->fromArray($rows, null, 'A1');
-
-                if ($treeFirstRow !== null) {
-                    $sheet->getStyle('A' . ($treeFirstRow - 1))->getFont()->setBold(true);
-                }
-
-                foreach (['A', 'B'] as $column) {
-                    $sheet->getColumnDimension($column)->setAutoSize(true);
-                }
-
+            function () use ($spreadsheet): void {
                 (new Xlsx($spreadsheet))->save('php://output');
             },
             $filename,
             ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
         );
+    }
+
+    /**
+     * Имя файла карточки — ФИО пользователя, как в эталоне «Светлана Волкова.xlsx».
+     * Кириллицу кодирует сам Symfony (`filename*=UTF-8''…`), здесь достаточно
+     * убрать символы, недопустимые в именах файлов.
+     */
+    private function userCardFilename(User $user): string
+    {
+        $candidates = [
+            trim("{$user->first_name} {$user->last_name}"),
+            (string) $user->username,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $name = trim(preg_replace('/\s+/u', ' ', preg_replace('#[/\\\\:*?"<>|]+#u', '', $candidate) ?? '') ?? '');
+
+            if ($name !== '') {
+                return $name . '.xlsx';
+            }
+        }
+
+        return sprintf('user-%d.xlsx', $user->id);
     }
 
     public function generatePromoCode(MoonShineRequest $request): MoonShineJsonResponse

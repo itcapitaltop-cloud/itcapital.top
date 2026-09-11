@@ -9,6 +9,11 @@
     })"
     x-on:change="hasSelectionError = false"
 >
+    <div class="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+        Выбранные поля — это строки листа «Главная». Владелец карточки и вся его структура
+        рефералов выгружаются отдельными столбцами, поэтому отдельного поля «Рефералы» больше нет.
+    </div>
+
     <div class="flex justify-end gap-2">
         <button
             class="btn"
