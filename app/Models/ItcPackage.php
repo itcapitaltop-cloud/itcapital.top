@@ -50,6 +50,22 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $profits_count
  * @property-read Collection<int, PackageProfitReinvest> $reinvestProfits
  * @property-read int|null $reinvest_profits_count
+ * @property-read Collection<int, PackageProfitReinvest> $activeReinvestProfits
+ * @property-read int|null $active_reinvest_profits_count
+ * @property-read string|null $active_reinvest_profits_sum_amount
+ * @property-read Collection<int, PackageProfitReinvest> $unlockedReinvestProfits
+ * @property-read int|null $unlocked_reinvest_profits_count
+ * @property-read string|null $unlocked_reinvest_profits_sum_amount
+ * @property-read string|null $unlocked_reinvest_profits_min_payout_at
+ * @property-read Collection<int, PackageProfitReinvest> $unlockableReinvestProfits
+ * @property-read int|null $unlockable_reinvest_profits_count
+ * @property-read string|null $unlockable_reinvest_profits_sum_amount
+ * @property-read Collection<int, PackageBodyUnlock> $bodyUnlocks
+ * @property-read int|null $body_unlocks_count
+ * @property-read Collection<int, PackageBodyUnlock> $pendingBodyUnlocks
+ * @property-read int|null $pending_body_unlocks_count
+ * @property-read string|null $pending_body_unlocks_sum_amount
+ * @property-read string|null $pending_body_unlocks_min_payout_at
  * @property-read Collection<int, Transaction> $withdrawProfitsTransactions
  * @property-read int|null $withdraw_profits_transactions_count
  *
@@ -114,6 +130,62 @@ class ItcPackage extends Model
         return $this
             ->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid')
             ->whereDoesntHave('withdraw');
+    }
+
+    /**
+     * Reinvests that still take part in dividend generation:
+     * not paid out and not unlocked by the user.
+     */
+    public function activeReinvestProfits(): HasMany
+    {
+        return $this
+            ->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid')
+            ->whereDoesntHave('withdraw')
+            ->whereNull('unlocked_at');
+    }
+
+    /**
+     * Reinvests the user unlocked, waiting for their delayed payout to the MAIN balance.
+     */
+    public function unlockedReinvestProfits(): HasMany
+    {
+        return $this
+            ->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid')
+            ->whereDoesntHave('withdraw')
+            ->whereNotNull('unlocked_at');
+    }
+
+    /**
+     * Reinvests the user may unlock right now — drives the cabinet button state.
+     *
+     * Uses the same `COALESCE(matured_at, created_at)` rule as
+     * `PackageProfitReinvest::unlockable()` so legacy reinvests with a NULL unfreeze
+     * date stay reachable.
+     */
+    public function unlockableReinvestProfits(): HasMany
+    {
+        return $this
+            ->hasMany(PackageProfitReinvest::class, 'package_uuid', 'uuid')
+            ->unlockable();
+    }
+
+    /**
+     * Все разблокировки тела пакета: ожидающие, выплаченные и снятые закрытием пакета.
+     */
+    public function bodyUnlocks(): HasMany
+    {
+        return $this->hasMany(PackageBodyUnlock::class, 'package_uuid', 'uuid');
+    }
+
+    /**
+     * Разблокировки тела, которые уже вышли из базы начисления дивидендов,
+     * но ещё не дошли до основного баланса.
+     */
+    public function pendingBodyUnlocks(): HasMany
+    {
+        return $this
+            ->hasMany(PackageBodyUnlock::class, 'package_uuid', 'uuid')
+            ->pending();
     }
 
     public function reinvestProfitWithdraws(): HasManyThrough
@@ -267,7 +339,9 @@ class ItcPackage extends Model
             ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestProfitWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount');
+            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['pendingBodyUnlocks' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withMin('pendingBodyUnlocks', 'payout_at');
     }
 
     #[Scope]

@@ -6,11 +6,15 @@ namespace App\MoonShine\Pages\User;
 
 use App\Contracts\Transactions\TransactionRepositoryContract;
 use App\Dto\Activity\JournalFilterData;
+use App\Dto\Finance\FinanceRequestFilterData;
 use App\Enums\Activity\ActivityJournalCategoryEnum;
 use App\Enums\Admin\UserCardExportField;
 use App\Enums\Itc\PackageTypeEnum;
 use App\Enums\Transactions\BalanceTypeEnum;
+use App\Enums\Transactions\PaymentSourcesEnum;
+use App\Enums\Transactions\TransactionStatusEnum;
 use App\Enums\Transactions\TrxTypeEnum;
+use App\Models\Deposit;
 use App\Models\ItcPackage;
 use App\Models\Package\PackageDefinition;
 use App\Models\Partner;
@@ -19,17 +23,23 @@ use App\Models\PartnerLevelPercent;
 use App\Models\Transaction;
 use App\Models\UserAuthLog;
 use App\Models\UserLevelPercentOverride;
+use App\Models\Withdraw;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedRegularPercentComponent;
 use App\MoonShine\Components\ItcPackages\Staking\ChangedStartBonusPercentComponent;
 use App\MoonShine\Components\StatisticLinearPartner;
 use App\MoonShine\Forms\ItcPackageTariffField;
 use App\MoonShine\Resources\UserResource;
+use App\Repositories\UserFinanceRequestRepository;
 use App\Services\ActivityLog\ActivityFeedService;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\ComponentAttributeBag;
 use MoonShine\ActionButtons\ActionButton;
 use MoonShine\Components\Alert;
+use MoonShine\Components\Dropdown;
 use MoonShine\Components\FlexibleRender;
 use MoonShine\Components\FormBuilder;
 use MoonShine\Components\Modal;
@@ -52,6 +62,7 @@ use MoonShine\Fields\Password;
 use MoonShine\Fields\Preview;
 use MoonShine\Fields\Select;
 use MoonShine\Fields\Switcher;
+use MoonShine\Fields\Td;
 use MoonShine\Fields\Template;
 use MoonShine\Fields\Text;
 use MoonShine\Fields\Url;
@@ -381,6 +392,14 @@ class UserDetailPage extends DetailPage
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')
                 ->withSum([
+                    'unlockedReinvestProfits as reinvest_unlocked_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum([
+                    'pendingBodyUnlocks as body_unlocked_sum_amount' => fn ($q) => $q
+                        ->select(DB::raw('COALESCE(SUM(amount),0)')),
+                ], 'amount')
+                ->withSum([
                     'profits as profits_sum_amount' => fn ($q) => $q
                         ->select(DB::raw('COALESCE(SUM(amount),0)')),
                 ], 'amount')
@@ -404,6 +423,8 @@ class UserDetailPage extends DetailPage
                     'type' => $pkg->type,
                     'month_profit_percent' => $pkg->month_profit_percent,
                     'reinvest_total_all' => (float) ($pkg->reinvest_profits_sum_amount ?? 0),
+                    'reinvest_unlocked_total' => (float) ($pkg->reinvest_unlocked_sum_amount ?? 0),
+                    'body_unlocked_total' => (float) ($pkg->body_unlocked_sum_amount ?? 0),
                     'profits_total_all' => (float) ($pkg->profits_total_all ?? 0),
                     'itc_created_at' => $pkg->created_at,
                     'reinvest_profits' => $pkg->reinvestProfits
@@ -456,6 +477,26 @@ class UserDetailPage extends DetailPage
             $loadedSections['beneficiaries'] = $beneficiaries->count();
         } else {
             $loadedSections['beneficiaries'] = 'deferred';
+        }
+
+        $depositsFilter = FinanceRequestFilterData::fromRequest('deposits');
+        $withdrawsFilter = FinanceRequestFilterData::fromRequest('withdraws');
+        $financeRequests = app(UserFinanceRequestRepository::class);
+        $deposits = null;
+        $withdraws = null;
+
+        if ($activeTab === 'deposits') {
+            $deposits = $financeRequests->paginateDeposits($item->id, $depositsFilter);
+            $loadedSections['deposits'] = $deposits->count();
+        } else {
+            $loadedSections['deposits'] = 'deferred';
+        }
+
+        if ($activeTab === 'withdraws') {
+            $withdraws = $financeRequests->paginateWithdraws($item->id, $withdrawsFilter);
+            $loadedSections['withdraws'] = $withdraws->count();
+        } else {
+            $loadedSections['withdraws'] = 'deferred';
         }
 
         $journalFilter = JournalFilterData::fromRequest();
@@ -901,6 +942,332 @@ class UserDetailPage extends DetailPage
             ])
             ->submit('Удалить', attributes: ['class' => 'btn-error']);
 
+        $financeStatusOptions = collect(TransactionStatusEnum::cases())
+            ->mapWithKeys(static fn (TransactionStatusEnum $case): array => [$case->value => $case->getName()])
+            ->all();
+
+        $financeFilterPanel = function (string $tab, FinanceRequestFilterData $filter) use ($item, $financeStatusOptions): FlexibleRender {
+            return FlexibleRender::make(
+                fn (): string => view('admin.partials.user-finance-filter', [
+                    'action' => url()->current(),
+                    'resourceItem' => $item->id,
+                    'tab' => $tab,
+                    'statuses' => $financeStatusOptions,
+                    'status' => $filter->status?->value ?? '',
+                    'dateFrom' => $filter->dateInputValue($filter->dateFrom),
+                    'dateTo' => $filter->dateInputValue($filter->dateTo),
+                    'isFiltered' => ! $filter->isEmpty(),
+                    'resetUrl' => url()->current() . '?' . http_build_query([
+                        'resourceItem' => $item->id,
+                        'tab' => $tab,
+                    ]),
+                ])->render()
+            );
+        };
+
+        /**
+         * Пагинация рисуется вручную через общий админский вид: в TableBuilder уходит
+         * массив строк, а не пагинатор, иначе MoonShine добавит собственный блок
+         * пагинации поверх нашего (см. PackageDefinitionDetailPage::journalPagination()).
+         *
+         * @return list<MoonShineComponent>
+         */
+        $financePagination = static function (?LengthAwarePaginator $paginator): array {
+            if ($paginator === null) {
+                return [];
+            }
+
+            return [
+                FlexibleRender::make(
+                    fn (): string => $paginator->links('moonshine::ui.pagination', ['async' => false])->toHtml()
+                ),
+            ];
+        };
+
+        /**
+         * Кнопки статуса ведут на роуты admin.finance.*, а не на ->method() ресурса:
+         * внутри карточки текущий ресурс — UserResource, у которого accept/reject/
+         * toModerate нет, поэтому кнопки из общих разделов здесь не резолвятся.
+         */
+        $financeStatusButtons = static fn (string $uuid): array => [
+            ActionButton::make('', route('admin.finance.accept', ['uuid' => $uuid]))
+                ->icon('heroicons.check')
+                ->success()
+                ->async(method: 'POST'),
+            ActionButton::make('', route('admin.finance.reject', ['uuid' => $uuid]))
+                ->icon('heroicons.x-mark')
+                ->error()
+                ->async(method: 'POST'),
+        ];
+
+        $depositsTab = Tab::make(
+            'Ввод',
+            [
+                ...($activeTab !== 'deposits' ? [$deferredTab('deposits', 'Загрузить заявки на ввод')] : []),
+                $financeFilterPanel('deposits', $depositsFilter),
+                $this->financeTable([
+                    Date::make('Дата создания депозита', 'created_at')->format('d.m.Y H:i:s'),
+                    Text::make(
+                        'Сумма транзакции',
+                        formatted: static fn (Deposit $deposit): float => round((float) $deposit->transaction?->amount, 2)
+                    ),
+                    Text::make('Хеш транзакции', 'transaction_hash'),
+                    Preview::make('', formatted: static function (Deposit $deposit): string {
+                        if (! preg_match('/^[A-Fa-f0-9]{64}$/', $deposit->transaction_hash ?? '')) {
+                            return '';
+                        }
+
+                        return '<a href="https://tronscan.org/#/transaction/' . $deposit->transaction_hash . '" target="_blank" rel="noopener" title="Сканировать в Tronscan" style="display:inline-block;text-decoration:none;vertical-align:middle;"><svg xmlns="http://www.w3.org/2000/svg" style="width:1.5em;height:1.5em;vertical-align:middle;fill:currentColor;" viewBox="0 0 20 20"><path d="M10.186 2.003a8.013 8.013 0 1 0 7.812 6.288.75.75 0 0 0-1.469.292 6.51 6.51 0 1 1-1.396-2.446l-1.29.147a.75.75 0 0 0 .084 1.496l3.036-.346a.75.75 0 0 0 .662-.842l-.346-3.036a.75.75 0 1 0-1.496.084l.13 1.144A8.022 8.022 0 0 0 10.185 2ZM10 6.25a.75.75 0 0 1 .75.75v2.25h2.25a.75.75 0 0 1 0 1.5H10.75v2.25a.75.75 0 0 1-1.5 0V10.75H7a.75.75 0 0 1 0-1.5h2.25V7a.75.75 0 0 1 .75-.75Z"/></svg></a>';
+                    }),
+                    Text::make(
+                        'Крипто/ Фиат',
+                        'transaction_hash',
+                        formatted: static fn (Deposit $deposit): string => $deposit->payment_source_id === PaymentSourcesEnum::Crypto->value
+                            ? 'Крипто (USDT)'
+                            : (string) $deposit->transaction_hash
+                    ),
+                    Td::make('Статус')
+                        ->fields(static function (Td $field) use ($financeStatusButtons): array {
+                            /** @var Deposit|null $deposit */
+                            $deposit = $field->getData();
+
+                            if ($deposit?->transaction === null) {
+                                return [];
+                            }
+
+                            $status = TransactionStatusEnum::fromDates(
+                                $deposit->transaction->accepted_at,
+                                $deposit->transaction->rejected_at
+                            );
+
+                            if ($status === TransactionStatusEnum::MODERATE) {
+                                return [
+                                    ...$financeStatusButtons($deposit->uuid),
+                                    ActionButton::make('')
+                                        ->icon('heroicons.outline.pencil')
+                                        ->inModal(
+                                            title: 'Редактировать сумму заявки на ввод',
+                                            content: static fn (): FormBuilder => FormBuilder::make()
+                                                ->action(route('deposit-update-amount'))
+                                                ->method('POST')
+                                                ->fields([
+                                                    Hidden::make('uuid'),
+                                                    Number::make('Сумма', 'amount')->min(0.01)->step(0.01),
+                                                ])
+                                                ->fill([
+                                                    'uuid' => $deposit->uuid,
+                                                    'amount' => (string) $deposit->transaction->amount,
+                                                ])
+                                                ->async()
+                                                ->submit('Сохранить')
+                                        ),
+                                ];
+                            }
+
+                            if ($status === TransactionStatusEnum::REJECTED) {
+                                return [
+                                    Text::make('', formatted: static fn (): string => $status->getName()),
+                                    Dropdown::make()
+                                        ->toggler(static fn () => ActionButton::make('')->icon('heroicons.outline.pencil'))
+                                        ->items([
+                                            ActionButton::make('На модерации', route('admin.finance.moderate', ['uuid' => $deposit->uuid]))
+                                                ->icon('heroicons.clock')
+                                                ->async(method: 'POST'),
+                                            ActionButton::make('Исполнено', route('admin.finance.accept', ['uuid' => $deposit->uuid]))
+                                                ->icon('heroicons.check')
+                                                ->success()
+                                                ->async(method: 'POST'),
+                                        ]),
+                                ];
+                            }
+
+                            return [
+                                Text::make('', formatted: static fn (): string => $status->getName()),
+                            ];
+                        }),
+                ], $deposits?->items() ?? [], Deposit::class),
+                ...$financePagination($deposits),
+            ]
+        )->name('deposits')
+            ->active(fn () => $activeTab === 'deposits');
+
+        $withdrawsTab = Tab::make(
+            'Вывод',
+            [
+                ...($activeTab !== 'withdraws' ? [$deferredTab('withdraws', 'Загрузить заявки на вывод')] : []),
+                ActionButton::make('Создать заявку на вывод')
+                    ->icon('heroicons.plus')
+                    ->primary()
+                    ->inModal(
+                        title: 'Новая заявка на вывод',
+                        content: static fn (): FormBuilder => FormBuilder::make()
+                            ->action(route('withdraw-create'))
+                            ->method('POST')
+                            ->fields([
+                                // Аккаунт не выбирается: заявка всегда создаётся владельцу карточки.
+                                Hidden::make('user_id')->fill($item->id),
+                                Select::make('Способ вывода', 'source')->options([
+                                    'crypto' => 'Криптовалюта',
+                                    'fiat' => 'Фиат',
+                                ])->default('crypto'),
+                                Number::make('Сумма', 'amount')->min(10)->step(0.01),
+                                Text::make('Адрес кошелька', 'wallet_address')->showWhen('source', 'crypto'),
+                                Text::make('Телефон СБП', 'sbp_phone')->showWhen('source', 'fiat'),
+                                Text::make('Банк', 'bank_name')->showWhen('source', 'fiat'),
+                                Text::make('ФИО получателя', 'recipient_name')->showWhen('source', 'fiat'),
+                            ])
+                            ->async()
+                            ->submit('Создать'),
+                        name: 'user-card-withdraw-create'
+                    ),
+                $financeFilterPanel('withdraws', $withdrawsFilter),
+                $this->financeTable([
+                    Date::make('Дата заявки на вывод', 'created_at')->format('d.m.Y H:i:s'),
+                    Text::make(
+                        'Сумма',
+                        formatted: static fn (Withdraw $withdraw): float => round((float) $withdraw->transaction?->amount, 2)
+                    ),
+                    Text::make(
+                        'Комиссия',
+                        'commission',
+                        formatted: static fn (Withdraw $withdraw): float => round((float) $withdraw->commission, 2)
+                    ),
+                    Text::make('К выводу', formatted: static function (Withdraw $withdraw): string {
+                        // Денежная арифметика идёт через BigDecimal — float здесь запрещён.
+                        return (string) BigDecimal::of($withdraw->transaction?->amount ?? '0')
+                            ->minus($withdraw->commission)
+                            ->toScale(0, RoundingMode::DOWN)
+                            ->stripTrailingZeros();
+                    }),
+                    Text::make('Адрес', formatted: static function (Withdraw $withdraw): string {
+                        if ($withdraw->payment_source_id === 2 && $withdraw->fiatDetail) {
+                            return $withdraw->fiatDetail->sbp_phone ?? '';
+                        }
+
+                        return $withdraw->wallet_address ?? '';
+                    }),
+                    Text::make('Карта', formatted: static function (Withdraw $withdraw): string {
+                        if ($withdraw->payment_source_id === 2 && $withdraw->fiatDetail) {
+                            return $withdraw->fiatDetail->bank_name ?? '';
+                        }
+
+                        return '';
+                    }),
+                    Text::make('Счёт', formatted: static function (Withdraw $withdraw): string {
+                        if ($withdraw->payment_source_id === 2 && $withdraw->fiatDetail) {
+                            return $withdraw->fiatDetail->recipient_name ?? '';
+                        }
+
+                        return '';
+                    }),
+                    Text::make('Крипто/Фиат', 'wallet_address', formatted: static function (Withdraw $withdraw): string {
+                        $address = $withdraw->wallet_address;
+
+                        if (! is_string($address) || $address === '') {
+                            return 'Фиат';
+                        }
+
+                        if (preg_match('/^0x[0-9A-Fa-f]{40}$/', $address)) {
+                            return 'Крипто (ETH)';
+                        }
+
+                        if (preg_match('/^T[a-zA-Z0-9]{33}$/', $address)) {
+                            return 'Крипто (USDT)';
+                        }
+
+                        if (preg_match(
+                            '/^(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{39})$/i',
+                            $address
+                        )) {
+                            return 'Крипто (BTC)';
+                        }
+
+                        return 'Фиат';
+                    }),
+                    Td::make('Статус')
+                        ->fields(static function (Td $field) use ($financeStatusButtons): array {
+                            /** @var Withdraw|null $withdraw */
+                            $withdraw = $field->getData();
+
+                            if ($withdraw?->transaction === null) {
+                                return [];
+                            }
+
+                            $transaction = $withdraw->transaction;
+                            $status = TransactionStatusEnum::fromDates(
+                                $transaction->accepted_at,
+                                $transaction->rejected_at
+                            );
+
+                            if ($status === TransactionStatusEnum::MODERATE) {
+                                return [
+                                    ...$financeStatusButtons($withdraw->uuid),
+                                    ActionButton::make('')
+                                        ->icon('heroicons.outline.pencil')
+                                        ->inModal(
+                                            title: 'Редактировать сумму заявки на вывод',
+                                            content: static fn (): FormBuilder => FormBuilder::make()
+                                                ->action(route('withdraw-update', ['uuid' => $withdraw->uuid]))
+                                                ->method('POST')
+                                                ->fields([
+                                                    Hidden::make('uuid'),
+                                                    Number::make('Сумма', 'amount')->min(0.01)->step(0.01),
+                                                ])
+                                                ->fill([
+                                                    'uuid' => $withdraw->uuid,
+                                                    'amount' => (string) $transaction->amount,
+                                                ])
+                                                ->async()
+                                                ->submit('Сохранить')
+                                        ),
+                                ];
+                            }
+
+                            $statusLabel = $status->getName()
+                                . ($status === TransactionStatusEnum::ACCEPTED && $transaction->accepted_at
+                                    ? ' (' . $transaction->accepted_at->format('d.m.Y H:i') . ')'
+                                    : '');
+
+                            return [
+                                Text::make('Статус', formatted: static fn (): string => $statusLabel),
+                                ActionButton::make('')
+                                    ->icon('heroicons.outline.pencil')
+                                    ->inModal(
+                                        title: 'Редактировать заявку на вывод',
+                                        content: static function () use ($withdraw, $transaction, $status): FormBuilder {
+                                            // Текущий статус из списка убран: выбирать его повторно нечего.
+                                            $statusOptions = $status === TransactionStatusEnum::ACCEPTED
+                                                ? [
+                                                    TransactionStatusEnum::REJECTED->getName() => TransactionStatusEnum::REJECTED->getName(),
+                                                    TransactionStatusEnum::MODERATE->getName() => TransactionStatusEnum::MODERATE->getName(),
+                                                ]
+                                                : [
+                                                    TransactionStatusEnum::ACCEPTED->getName() => TransactionStatusEnum::ACCEPTED->getName(),
+                                                    TransactionStatusEnum::MODERATE->getName() => TransactionStatusEnum::MODERATE->getName(),
+                                                ];
+
+                                            return FormBuilder::make()
+                                                ->action(route('withdraw-update', ['uuid' => $withdraw->uuid]))
+                                                ->method('POST')
+                                                ->fillCast($transaction, ModelCast::make(Transaction::class))
+                                                ->fields([
+                                                    Number::make('Сумма', 'amount'),
+                                                    Select::make('Статус заявки', 'status')
+                                                        ->nullable()
+                                                        ->options($statusOptions),
+                                                ])
+                                                ->async()
+                                                ->submit('Сохранить');
+                                        }
+                                    ),
+                            ];
+                        }),
+                ], $withdraws?->items() ?? [], Withdraw::class),
+                ...$financePagination($withdraws),
+            ]
+        )->name('withdraws')
+            ->active(fn () => $activeTab === 'withdraws');
+
         if ($activeTab === 'statistic_linear_partner') {
             $statisticComponents = [
                 Block::make([
@@ -981,6 +1348,8 @@ class UserDetailPage extends DetailPage
                                 Date::make('Дата открытия', 'itc_created_at')->format('d.m.Y H:i:s')->showOnExport(),
                                 Text::make('Сумма', 'amount', formatted: fn ($item) => round((float) $item['amount'], 2)),
                                 Number::make('Сумма реинвеста', 'reinvest_total_all', formatted: fn ($item) => round((float) $item['reinvest_total_all'], 2)),
+                                Number::make('Реинвесты в ожидании выплаты', 'reinvest_unlocked_total', formatted: fn ($item) => round((float) ($item['reinvest_unlocked_total'] ?? 0), 2))->showOnExport(),
+                                Number::make('Разблокировано с тела (ожидает выплаты)', 'body_unlocked_total', formatted: fn ($item) => round((float) ($item['body_unlocked_total'] ?? 0), 2))->showOnExport(),
                                 Number::make('Процент прибыли', 'month_profit_percent', formatted: fn ($item) => $item['month_profit_percent'] . '%'),
                                 Number::make('Дивидендов начислено', 'profits_total_all', formatted: fn ($item) => round((float) $item['profits_total_all'], 2)
                                 ),
@@ -1068,6 +1437,8 @@ class UserDetailPage extends DetailPage
                     ]
                 )->name('packages')
                     ->active(fn () => $activeTab === 'packages'),
+                $depositsTab,
+                $withdrawsTab,
                 Tab::make(
                     'Рефералы',
                     [
@@ -1361,6 +1732,52 @@ class UserDetailPage extends DetailPage
      *
      * @throws Throwable
      */
+    /**
+     * Таблица заявок вкладок «Ввод» и «Вывод».
+     *
+     * Ячейка «Статус» содержит несколько кнопок подряд; без flex они встают друг под
+     * друга. Общие разделы решают это тем же классом в tdAttributes() своих ресурсов
+     * (DepositResource, WithdrawResource), только там номер колонки прописан числом.
+     * Здесь он вычисляется по позиции поля Td, чтобы добавление колонки не ломало
+     * вёрстку молча.
+     *
+     * @param list<Field|MoonShineComponent> $fields
+     * @param list<mixed> $items
+     * @param class-string $model
+     */
+    private function financeTable(array $fields, array $items, string $model): TableBuilder
+    {
+        $statusCell = null;
+
+        foreach ($fields as $index => $field) {
+            if ($field instanceof Td) {
+                $statusCell = $index;
+
+                break;
+            }
+        }
+
+        return TableBuilder::make()
+            ->withNotFound()
+            ->fields($fields)
+            ->cast(ModelCast::make($model))
+            ->tdAttributes(static function (
+                mixed $data,
+                int $row,
+                int $cell,
+                ComponentAttributeBag $attr
+            ) use ($statusCell): ComponentAttributeBag {
+                if ($cell === $statusCell) {
+                    $attr->setAttributes([
+                        'class' => trim($attr->get('class', '') . ' flex items-center gap-2'),
+                    ]);
+                }
+
+                return $attr;
+            })
+            ->items($items);
+    }
+
     protected function topLayer(): array
     {
         return [

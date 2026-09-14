@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Account\Itc;
 
+use App\Actions\Packages\UnlockMaturedReinvestsAction;
+use App\Actions\Packages\UnlockPackageBodyAmountAction;
 use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
@@ -28,6 +30,7 @@ use App\Models\ReinvestToPackageBody;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ActivityLog\BusinessActivityLogger;
+use App\Services\Package\PackageBodyBalanceResolver;
 use App\Services\Package\PackageDefinitionResolver;
 use App\Services\PromoCodes\PackagePromoCodeService;
 use App\Services\User\SpendableBalanceResolver;
@@ -113,31 +116,68 @@ class Packages extends Component
 
     public string $withdrawPackageAmount = '';
 
+    public string $unlockBodyAmount = '';
+
     public function boot(TransactionRepositoryContract $transactionRepositoryContract): void
     {
+        // Оба правила спрашивают у PackageBodyBalanceResolver одну и ту же цифру:
+        // тело пакета минус уже разблокированные, но ещё не выплаченные суммы. Иначе
+        // пользователь смог бы разблокировать сумму и вывести её же мгновенно.
         Validator::extend('max_package_sum', function ($attribute, $value, $params) {
-            $uuid = $params[0] ?? null;
+            $available = $this->availableBodyForRule($params[0] ?? null);
 
-            if (! $uuid) {
+            if ($available === null) {
                 return false;
             }
 
-            $package = ItcPackage::where('uuid', $uuid)->first();
+            return ! $this->parsedAmount($value)->isGreaterThan($available);
+        });
 
-            if (! $package) {
+        Validator::extend('max_body_unlock', function ($attribute, $value, $params) {
+            $available = $this->availableBodyForRule($params[0] ?? null);
+
+            if ($available === null) {
                 return false;
             }
 
-            $val = (float) str_replace([' ', ','], ['', '.'], $value);
-
-            $withdrawn = $package->balanceWithdraws()->sum('amount');
-
-            $maxAvailable = $package->transaction->amount - $withdrawn;
-
-            return $val <= $maxAvailable;
+            return ! $this->parsedAmount($value)->isGreaterThan($available);
         });
 
         $this->mainBalance = $transactionRepositoryContract->getBalanceAmountByUserIdAndType(auth()->user()->id, BalanceTypeEnum::MAIN);
+    }
+
+    /**
+     * Тело пакета, доступное к выводу или разблокировке, для валидаторов из boot().
+     *
+     * Возвращает null, когда uuid не передан или пакет не найден — правило в этом
+     * случае обязано провалиться, а не пропустить произвольную сумму.
+     */
+    private function availableBodyForRule(?string $uuid): ?BigDecimal
+    {
+        if (! $uuid) {
+            return null;
+        }
+
+        $package = ItcPackage::query()->where('uuid', $uuid)->first();
+
+        if (! $package) {
+            return null;
+        }
+
+        return app(PackageBodyBalanceResolver::class)->availableToUnlock($package);
+    }
+
+    /**
+     * Разбор введённой суммы: пробелы-разделители и запятая как десятичный знак.
+     * Сравнение идёт через BigDecimal, а не float — это деньги.
+     */
+    private function parsedAmount(mixed $value): BigDecimal
+    {
+        try {
+            return BigDecimal::of(str_replace([' ', ','], ['', '.'], (string) $value));
+        } catch (\Throwable) {
+            return BigDecimal::zero();
+        }
     }
 
     /**
@@ -183,6 +223,23 @@ class Packages extends Component
         string $uuid,
         TransactionRepositoryContract $transactionRepo
     ): void {
+        $package = ItcPackage::query()
+            ->where('uuid', $uuid)
+            ->with('transaction')
+            ->firstOrFail();
+
+        // Метод зачисляет деньги на баланс вызывающего, поэтому владение пакетом
+        // обязано проверяться на сервере: блейд лишь прячет кнопку.
+        if ($package->transaction?->user_id !== Auth::id()) {
+            Log::warning('[Packages.withdrawPackageBalance] forbidden', [
+                'package_uuid' => $uuid,
+                'user_id' => Auth::id(),
+                'owner_id' => $package->transaction?->user_id,
+            ]);
+
+            abort(403);
+        }
+
         $this->validateOnly('withdrawPackageAmount', [
             'withdrawPackageAmount' => 'required|numeric|min:1|max_package_sum:' . $uuid,
         ]);
@@ -975,6 +1032,98 @@ class Packages extends Component
         Artisan::call('user:use-rank');
 
         $this->markReinvestNotificationsAsRead($uuid);
+    }
+
+    /**
+     * Снимает все созревшие реинвесты пакета: они сразу выходят из базы начисления
+     * дивидендов, а деньги поступят на основной баланс ровно через календарный месяц.
+     */
+    public function unlockMaturedReinvests(string $uuid, UnlockMaturedReinvestsAction $action): void
+    {
+        Log::debug('[Packages.unlockMaturedReinvests] request', [
+            'package_uuid' => $uuid,
+            'user_id' => Auth::id(),
+        ]);
+
+        $package = ItcPackage::query()
+            ->where('uuid', $uuid)
+            ->with('transaction')
+            ->firstOrFail();
+
+        if ($package->transaction?->user_id !== Auth::id()) {
+            Log::warning('[Packages.unlockMaturedReinvests] forbidden', [
+                'package_uuid' => $uuid,
+                'user_id' => Auth::id(),
+                'owner_id' => $package->transaction?->user_id,
+            ]);
+
+            abort(403);
+        }
+
+        $result = $action->execute($package, Auth::user());
+
+        $this->dispatch(
+            'new-system-notification',
+            type   : 'success',
+            message: __('livewire_itc_packages_reinvests_unlocked', [
+                'amount' => (string) $result->amount->toScale(2, RoundingMode::HALF_EVEN),
+                'date' => $result->payoutAt->format('d.m.Y'),
+            ])
+        );
+    }
+
+    /**
+     * Разблокирует указанную пользователем сумму из тела пакета: она сразу выходит
+     * из базы начисления дивидендов, а деньги поступят на основной баланс ровно
+     * через календарный месяц. Отменить действие пользователь не может.
+     *
+     * @throws ValidationException
+     */
+    public function unlockPackageBodyAmount(string $uuid, UnlockPackageBodyAmountAction $action): void
+    {
+        Log::debug('[Packages.unlockPackageBodyAmount] request', [
+            'package_uuid' => $uuid,
+            'user_id' => Auth::id(),
+            'amount' => $this->unlockBodyAmount,
+        ]);
+
+        $package = ItcPackage::query()
+            ->where('uuid', $uuid)
+            ->with('transaction')
+            ->firstOrFail();
+
+        if ($package->transaction?->user_id !== Auth::id()) {
+            Log::warning('[Packages.unlockPackageBodyAmount] forbidden', [
+                'package_uuid' => $uuid,
+                'user_id' => Auth::id(),
+                'owner_id' => $package->transaction?->user_id,
+            ]);
+
+            abort(403);
+        }
+
+        $this->validateOnly('unlockBodyAmount', [
+            'unlockBodyAmount' => [
+                'required',
+                'numeric',
+                'min:1',
+                "max_body_unlock:$uuid",
+            ],
+        ]);
+
+        $result = $action->execute($package, $this->unlockBodyAmount, Auth::user());
+
+        $this->reset('unlockBodyAmount');
+        $this->dispatch('balance-edited');
+
+        $this->dispatch(
+            'new-system-notification',
+            type   : 'success',
+            message: __('livewire_itc_packages_body_unlock_success', [
+                'amount' => (string) $result->amount->toScale(2, RoundingMode::HALF_EVEN),
+                'date' => $result->payoutAt->format('d.m.Y'),
+            ])
+        );
     }
 
     private function markReinvestNotificationsAsRead(string $packageUuid): void

@@ -51,6 +51,8 @@ return [
         'package_profit_withdrawn' => 'Yield of :amount ITC withdrawn from package :uuid to balance',
         'package_reinvested' => 'Yield of :amount ITC reinvested into package :uuid',
         'package_amount_withdrawn_to_balance' => ':amount ITC withdrawn from package :uuid to main balance',
+        'package_reinvest_unlocked' => 'Reinvests of :amount ITC unlocked in package :uuid, payout on :date',
+        'package_body_unlocked' => ':amount ITC unlocked from the body of package :uuid, payout on :date',
         'package_reinvest_withdrawn_to_balance' => 'Reinvest of :amount ITC withdrawn from package :uuid to main balance',
         'present_package_zeroed' => 'Gift package :uuid zeroed by :amount ITC',
         'referral_added_to_line' => 'Referral @:username added to line :line',

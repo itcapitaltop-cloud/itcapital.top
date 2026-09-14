@@ -24,6 +24,8 @@ enum ActivityEventTypeEnum: string
     case PackageProfitWithdrawn = 'package_profit_withdrawn';
     case PackageReinvested = 'package_reinvested';
     case PackageAmountWithdrawnToBalance = 'package_amount_withdrawn_to_balance';
+    case PackageReinvestUnlocked = 'package_reinvest_unlocked';
+    case PackageBodyUnlocked = 'package_body_unlocked';
     case PackageReinvestWithdrawnToBalance = 'package_reinvest_withdrawn_to_balance';
     case PresentPackageZeroed = 'present_package_zeroed';
 

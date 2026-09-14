@@ -30,8 +30,15 @@ class Index extends Component
             ->count();
 
         // "Сумма пакетов" must mirror each ITC card: package body
-        // (transaction.amount + partnerTransfers + reinvestToBody − balanceWithdraws,
-        // forced to 0 for zeroed PRESENT) plus the active "+Реинвестировано" amount.
+        // (transaction.amount + partnerTransfers + reinvestToBody − balanceWithdraws
+        // − pending body unlocks, forced to 0 for zeroed PRESENT) plus the active
+        // "+Реинвестировано" amount.
+        //
+        // Pending body unlocks are subtracted here only because the card subtracts them
+        // too (they are shown as their own line with a payout date). This is a display
+        // split on purpose: partner turnover (Partners.php), rank qualification
+        // (ProgressBarAction) and user_summary (SummaryMetricsService) keep counting the
+        // amount until it actually lands on the balance — do not "fix" them to match.
         $depositTotalAmount = ItcPackage::query()
             ->select('itc_packages.*')
             ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
@@ -42,6 +49,7 @@ class Index extends Component
             ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['pendingBodyUnlocks' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->get()
             ->sum(function (ItcPackage $package): float {
                 $body = $package->type === PackageTypeEnum::PRESENT && $package->zeroing
@@ -49,7 +57,8 @@ class Index extends Component
                     : (float) $package->transaction->amount
                         + (float) $package->partner_transfers_sum_amount
                         + (float) $package->reinvest_to_body_sum_amount
-                        - (float) $package->balance_withdraws_sum_amount;
+                        - (float) $package->balance_withdraws_sum_amount
+                        - (float) $package->pending_body_unlocks_sum_amount;
 
                 return $body + (float) $package->reinvest_profits_sum_amount;
             });

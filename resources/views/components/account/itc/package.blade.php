@@ -5,6 +5,7 @@
 
 @php
     use App\Enums\Itc\PackageTypeEnum;
+    use App\Services\Package\PackageBodyBalanceResolver;
     use Illuminate\Support\Facades\Log;
     use Illuminate\Support\Facades\Storage;
 
@@ -19,6 +20,25 @@
             'package_definition_id' => $package->package_definition_id,
         ]);
     }
+
+    // Считаем из уже загруженных агрегатов, а не через PackageBodyBalanceResolver:
+    // вызов резолвера на карточку дал бы отдельный запрос на каждый пакет в списке.
+    // Формула совпадает с PackageBodyBalanceResolver::availableToUnlock().
+    $pendingBodyUnlocks = (float) ($package->pending_body_unlocks_sum_amount ?? 0);
+
+    $packageBody =
+        (float) $package->transaction->amount +
+        (float) ($package->partner_transfers_sum_amount ?? 0) +
+        (float) ($package->reinvest_to_body_sum_amount ?? 0) -
+        (float) ($package->balance_withdraws_sum_amount ?? 0);
+
+    $availableBodyToUnlock = max($packageBody - $pendingBodyUnlocks, 0);
+
+    // Список типов берём из резолвера, а не дублируем здесь: иначе новый разрешённый
+    // тип пакета появился бы на сервере, но кнопка на карточке молча не отрисовалась бы.
+    $canUnlockBody =
+        in_array($package->type, PackageBodyBalanceResolver::UNLOCKABLE_TYPES, true) &&
+        $availableBodyToUnlock > 0;
 @endphp
 
 <x-bg.main class="relative border-none bg-none rounded-none">
@@ -30,7 +50,9 @@
         showConfirmReinvest: false,
         showConfirmWithdraw: false,
         showConfirmContinue: false,
-        showConfirmEditBalance: false
+        showConfirmEditBalance: false,
+        showConfirmUnlockReinvests: false,
+        isModalUnlockBodyActive: false
     }" class="flex flex-col md:flex-row gap-[40px] md:items-center items-start">
 
         <x-widget.modal condition-name="isModalClosePackageActive" class="p-4">
@@ -88,6 +110,73 @@
                 </div>
             </div>
         </x-widget.modal>
+
+        <x-widget.modal condition-name="showConfirmUnlockReinvests">
+            <div class="p-6">
+                <div class="mb-4 text-lg font-semibold">
+                    {{ __('components_account_itc_package_confirm_unlock_reinvests_question') }}
+                </div>
+                <div class="mb-4 text-sm font-semibold max-w-[300px] text-white/70">
+                    {{ __('components_account_itc_package_confirm_unlock_reinvests_note', [
+                        'date' => now()->addMonthNoOverflow()->format('d.m.Y'),
+                    ]) }}
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <x-ui.button variant="secondary" @click="showConfirmUnlockReinvests = false">
+                        {{ __('components_account_itc_package_cancel') }}
+                    </x-ui.button>
+                    <x-ui.button variant="primary"
+                        x-on:click="$wire.unlockMaturedReinvests('{{ $package->uuid }}'); showConfirmUnlockReinvests = false">
+                        {{ __('components_account_itc_package_confirm') }}
+                    </x-ui.button>
+                </div>
+            </div>
+        </x-widget.modal>
+
+        @if ($withButtons && $canUnlockBody)
+            <x-widget.modal condition-name="isModalUnlockBodyActive" max-width="md"
+                class="p-4 md:min-w-[175px] min-w-[125px] md:max-w-[300px]">
+
+                <x-bg.section-slim class="!px-1 !py-2">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-dela text-[18px]">
+                            {{ __('components_account_itc_package_unlock_body_title') }}
+                        </h3>
+                        <figure class="cursor-pointer" x-on:click="isModalUnlockBodyActive = false">
+                            <img class="icon-white w-4" src="{{ vite()->icon('/actions/cancel.svg') }}" alt="">
+                        </figure>
+                    </div>
+                </x-bg.section-slim>
+
+                <x-bg.section-slim class="!px-1 !py-2">
+                    <p class="mb-4 text-sm text-white/70">
+                        {{ __('components_account_itc_package_unlock_body_available', [
+                            'amount' => scale($availableBodyToUnlock)->stripTrailingZeros()->__toString(),
+                        ]) }}
+                    </p>
+
+                    <form wire:submit="unlockPackageBodyAmount('{{ $package->uuid }}')"
+                        x-on:balance-edited.window="isModalUnlockBodyActive = false">
+
+                        <x-ui.input name="unlockBodyAmount"
+                            placeholder="{{ __('components_account_itc_package_unlock_body_amount_label') }}"
+                            validate="number" input-class="py-[5px] px-[12px]">
+                            {{ __('components_account_itc_package_unlock_body_amount_label') }}
+                        </x-ui.input>
+
+                        <p class="mt-4 text-sm text-white/70 max-w-[260px]">
+                            {{ __('components_account_itc_package_unlock_body_note', [
+                                'date' => now()->addMonthNoOverflow()->format('d.m.Y'),
+                            ]) }}
+                        </p>
+
+                        <x-ui.submit-button action="unlockPackageBodyAmount" class="w-full mt-8">
+                            {{ __('components_account_itc_package_confirm') }}
+                        </x-ui.submit-button>
+                    </form>
+                </x-bg.section-slim>
+            </x-widget.modal>
+        @endif
 
         @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT)
             <x-widget.modal condition-name="showConfirmContinue">
@@ -197,14 +286,12 @@
                                 alt="ITC">
                             <div>
                                 <span class="text-[30px] md:text-[36px] font-dela leading-none">
+                                    {{-- Ожидающие выплаты разблокировки показываются отдельной строкой
+                                         под карточкой, поэтому из депозита их нужно вычесть,
+                                         иначе одни и те же деньги видны дважды. --}}
                                     {{ $package->type === PackageTypeEnum::PRESENT && $package->zeroing
                                         ? 0
-                                        : scale(
-                                            $package->transaction->amount +
-                                                ($package->partner_transfers_sum_amount ?? 0) +
-                                                ($package->reinvest_to_body_sum_amount ?? 0) -
-                                                ($package->balance_withdraws_sum_amount ?? 0),
-                                        )->stripTrailingZeros() }}
+                                        : scale($packageBody - $pendingBodyUnlocks)->stripTrailingZeros() }}
                                 </span>
                                 <p class="text-[12px] text-white/50 leading-none tracking-wide font-bold">
                                     {{ __('components_account_itc_package_deposit') }}
@@ -342,10 +429,65 @@
                     </x-ui.button>
                 @endif
 
+                @if (($package->unlockable_reinvest_profits_count ?? 0) > 0)
+                    <x-ui.button variant="secondary" x-on:click="showConfirmUnlockReinvests = true"
+                        class="!text-[14px] !md:text-[16px]">
+                        <span class="text-[14px] md:text-[16px]">
+                            {{ __('components_account_itc_package_unlock_reinvests_action', [
+                                'amount' => scale(
+                                    $package->unlockable_reinvest_profits_sum_amount ?? 0,
+                                )->stripTrailingZeros()->__toString(),
+                            ]) }}
+                        </span>
+                    </x-ui.button>
+                @endif
+
+                @if ($canUnlockBody)
+                    <x-ui.button variant="secondary" x-on:click="isModalUnlockBodyActive = true"
+                        class="!text-[14px] !md:text-[16px]">
+                        <span class="text-[14px] md:text-[16px]">
+                            {{ __('components_account_itc_package_unlock_body_action') }}
+                        </span>
+                    </x-ui.button>
+                @endif
+
             </div>
         @endif
 
         <div class="block lg:hidden flex-shrink-0"
             style="width: 100%; height: 1px; background-color: rgba(255, 255, 255, 0.3);"></div>
     </div>
+
+    @if (($package->unlocked_reinvest_profits_sum_amount ?? 0) > 0)
+        <div class="flex flex-wrap items-baseline gap-2 mt-3 md:pl-5">
+            <p class="text-[12px] text-white/50 leading-none tracking-wide font-bold">
+                {{ __('components_account_itc_package_unlocked_reinvests_label') }}
+            </p>
+            <span class="text-white/90 text-[12px] md:text-[14px] tracking-wide">
+                {{ __('components_account_itc_package_unlocked_reinvests_payout_at', [
+                    'amount' => scale($package->unlocked_reinvest_profits_sum_amount)->stripTrailingZeros()->__toString(),
+                    'date' => ($package->unlocked_reinvest_profits_min_payout_at ?? null)
+                        ? \Carbon\Carbon::parse($package->unlocked_reinvest_profits_min_payout_at)->format('d.m.Y')
+                        : '—',
+                ]) }}
+            </span>
+        </div>
+    @endif
+
+    {{-- Пока ничего не разблокировано, строка не рендерится вовсе. --}}
+    @if ($pendingBodyUnlocks > 0)
+        <div class="flex flex-wrap items-baseline gap-2 mt-3 md:pl-5">
+            <p class="text-[12px] text-white/50 leading-none tracking-wide font-bold">
+                {{ __('components_account_itc_package_unlocked_body_label') }}
+            </p>
+            <span class="text-white/90 text-[12px] md:text-[14px] tracking-wide">
+                {{ __('components_account_itc_package_unlocked_body_payout_at', [
+                    'amount' => scale($pendingBodyUnlocks)->stripTrailingZeros()->__toString(),
+                    'date' => ($package->pending_body_unlocks_min_payout_at ?? null)
+                        ? \Carbon\Carbon::parse($package->pending_body_unlocks_min_payout_at)->format('d.m.Y')
+                        : '—',
+                ]) }}
+            </span>
+        </div>
+    @endif
 </x-bg.main>

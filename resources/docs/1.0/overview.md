@@ -26,3 +26,4 @@
 
 - [Ручной ранг пользователя](/{{route}}/{{version}}/manual-rank)
 - [Управление настройками пакетов](/{{route}}/{{version}}/package-definitions)
+- [Вкладки «Ввод» и «Вывод» в карточке клиента](/{{route}}/{{version}}/user-card-finance-tabs)

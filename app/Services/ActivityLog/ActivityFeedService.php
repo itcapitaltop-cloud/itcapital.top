@@ -576,6 +576,8 @@ final class ActivityFeedService
             ActivityEventTypeEnum::ReferralAddedToLine->value,
             ActivityEventTypeEnum::BecameReferralOfUser->value,
             ActivityEventTypeEnum::PackageReinvested->value,
+            ActivityEventTypeEnum::PackageReinvestUnlocked->value,
+            ActivityEventTypeEnum::PackageBodyUnlocked->value,
             'admin_package_purchased',
             'admin_package_changed_amount',
             'admin_package_changed_percentage',

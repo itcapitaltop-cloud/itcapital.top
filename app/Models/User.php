@@ -302,6 +302,18 @@ final class User extends Authenticatable implements MustVerifyEmail
         );
     }
 
+    public function withdraws(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Withdraw::class,
+            Transaction::class,
+            'user_id',    // foreign key on transactions
+            'uuid',       // foreign key on withdraws
+            'id',         // local key on users
+            'uuid'        // local key on transactions
+        );
+    }
+
     // первый депозит
     public function firstDeposit(): HasOneThrough
     {

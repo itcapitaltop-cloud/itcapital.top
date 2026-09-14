@@ -83,13 +83,29 @@ class AdminController extends Controller
             ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['pendingBodyUnlocks' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->chunkById(50, function (Collection $packages) use ($request) {
                 $packages->each(function (ItcPackage $package) use ($request) {
+                    // Разлоченные реинвесты покидают базу начисления сразу, ещё до выплаты:
+                    // activeReinvestProfits исключает и выплаченные, и разлоченные.
+                    //
+                    // Разблокированная часть тела работает так же: пока выплата в ожидании,
+                    // её вычитает pendingBodyUnlocks, а в момент выплаты она превращается в
+                    // строку package_balance_withdraws. Две суммы никогда не пересекаются,
+                    // поэтому база не проседает дважды и не возвращается на один прогон.
                     $base = BigDecimal::of($package->transaction->amount)
                         ->plus($package->reinvest_profits_sum_amount)
                         ->plus($package->partner_transfers_sum_amount ?? 0)
                         ->plus($package->reinvest_to_body_sum_amount ?? 0)
-                        ->minus($package->balance_withdraws_sum_amount ?? 0);
+                        ->minus($package->balance_withdraws_sum_amount ?? 0)
+                        ->minus($package->pending_body_unlocks_sum_amount ?? 0);
+
+                    Log::debug('[AdminController.createItcPackagesProfits] base', [
+                        'package_uuid' => $package->uuid,
+                        'base' => (string) $base,
+                        'active_reinvests' => (string) ($package->active_reinvest_profits_sum_amount ?? 0),
+                        'pending_body_unlocks' => (string) ($package->pending_body_unlocks_sum_amount ?? 0),
+                    ]);
 
                     $profit = PackageProfit::query()->create([
                         'uuid' => 'PP-' . Str::random(10),
@@ -1316,6 +1332,46 @@ class AdminController extends Controller
         );
 
         return MoonShineJsonResponse::make()->toast('Заявка на вывод создана', ToastType::SUCCESS)->redirect(url()->previous());
+    }
+
+    /**
+     * Одобрение заявки из карточки клиента.
+     *
+     * Общие разделы «Ввод»/«Вывод» дёргают accept() как метод MoonShine-ресурса, но
+     * внутри карточки текущий ресурс — UserResource, у которого этого метода нет.
+     * Поэтому те же действия выставлены отдельными роутами: uuid приходит в строке
+     * запроса, откуда его и читает getItemID().
+     */
+    public function financeAccept(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->accept();
+    }
+
+    public function financeReject(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->reject();
+    }
+
+    public function financeModerate(Request $request): MoonShineJsonResponse
+    {
+        $this->validateFinanceRequestUuid($request);
+
+        return $this->toModerate();
+    }
+
+    /**
+     * Методы трейта ищут транзакцию через firstWhere() и не проверяют результат на null,
+     * поэтому несуществующий uuid без этой проверки уронил бы запрос фаталом.
+     */
+    private function validateFinanceRequestUuid(Request $request): void
+    {
+        $request->validate([
+            'uuid' => ['required', 'string', 'exists:transactions,uuid'],
+        ]);
     }
 
     public function recalculate(MoonShineRequest $request): RedirectResponse

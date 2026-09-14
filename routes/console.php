@@ -54,3 +54,15 @@ Schedule::command('summary:warm-dashboard')
     ->everyTenMinutes()
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('packages:payout-unlocked-reinvests')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sendOutputTo(storage_path('logs/scheduler.log'));
+
+Schedule::command('packages:payout-unlocked-body-amounts')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sendOutputTo(storage_path('logs/scheduler.log'));
