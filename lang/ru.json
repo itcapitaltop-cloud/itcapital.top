@@ -273,8 +273,6 @@
     "components_account_itc_package_total_dividends": "всего дивидендов",
     "components_account_itc_package_balance_zeroed": "Баланс обнулён",
     "components_account_itc_package_reinvest_dividends": "Реинвестировать дивиденды",
-<<<<<<< Updated upstream
-=======
     "components_account_itc_package_unlock_reinvests_action": "Снять все реинвесты (:amount ITC)",
     "components_account_itc_package_confirm_unlock_reinvests_question": "Снять все реинвесты с пакета?",
     "components_account_itc_package_confirm_unlock_reinvests_note": "Реинвесты сразу перестанут приносить дивиденды, а деньги поступят на основной баланс :date. Отменить действие нельзя.",
@@ -287,7 +285,6 @@
     "components_account_itc_package_unlock_body_note": "Сумма сразу перестанет приносить дивиденды, а деньги поступят на основной баланс :date. Отменить действие нельзя.",
     "components_account_itc_package_unlocked_body_label": "Разблокировано с пакета",
     "components_account_itc_package_unlocked_body_payout_at": ":amount ITC на баланс :date",
->>>>>>> Stashed changes
     "components_account_itc_package_withdraw_dividends_to_balance": "Вывести :amount ITC на баланс",
     "components_account_itc_package_withdraw_dividends_top_up_need": "Пополнить пакет",
     "components_account_itc_package_edit_balance": "Отредактировать баланс",
@@ -804,15 +801,12 @@
     "livewire_itc_packages_withdraw_success": "Указанная сумма выведена на основной баланс",
     "livewire_itc_packages_package_extended": "Срок работы пакета продлён на полгода",
     "livewire_itc_packages_package_extended_with_reinvest": "Срок работы пакета продлён, активные реинвесты и свободные дивиденды перенесены в тело пакета",
-<<<<<<< Updated upstream
-=======
     "livewire_itc_packages_no_matured_reinvests": "Нет реинвестов, доступных для снятия",
     "livewire_itc_packages_reinvests_unlocked": "Реинвесты на :amount ITC сняты, деньги поступят на баланс :date",
     "livewire_itc_packages_body_unlock_success": ":amount ITC разблокировано, деньги поступят на баланс :date",
     "livewire_itc_packages_body_unlock_not_available": "Нет суммы, доступной для разблокировки",
     "livewire_itc_packages_body_unlock_too_large": "Сумма больше доступного тела пакета",
     "livewire_itc_packages_body_unlock_wrong_type": "С пакета этого типа нельзя разблокировать сумму",
->>>>>>> Stashed changes
     "livewire_itc_packages_insufficient_dividends_reinvest": "Недостаточно дивидендов для реинвестирования",
     "livewire_itc_packages_insufficient_dividends_withdraw": "Недостаточно дивидендов для снятия",
     "livewire_itc_packages_profit_already_reinvested": "Этот дивиденд уже реинвестирован",

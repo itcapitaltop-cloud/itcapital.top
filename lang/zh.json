@@ -273,8 +273,6 @@
     "components_account_itc_package_total_dividends": "总股息",
     "components_account_itc_package_balance_zeroed": "余额已清零",
     "components_account_itc_package_reinvest_dividends": "股息再投资",
-<<<<<<< Updated upstream
-=======
     "components_account_itc_package_unlock_reinvests_action": "提取全部复投（:amount ITC）",
     "components_account_itc_package_confirm_unlock_reinvests_question": "要提取该套餐的全部复投吗？",
     "components_account_itc_package_confirm_unlock_reinvests_note": "复投将立即停止产生股息，资金将于 :date 到达主余额。此操作无法撤销。",
@@ -287,7 +285,6 @@
     "components_account_itc_package_unlock_body_note": "该金额将立即停止产生股息，资金将于 :date 到达主余额。此操作无法撤销。",
     "components_account_itc_package_unlocked_body_label": "已从套餐解锁",
     "components_account_itc_package_unlocked_body_payout_at": ":amount ITC 将于 :date 到账",
->>>>>>> Stashed changes
     "components_account_itc_package_withdraw_dividends_to_balance": "将 :amount ITC 提现到余额",
     "components_account_itc_package_edit_balance": "编辑余额",
     "components_account_itc_package_withdraw_dividends_top_up_need": "为您的套餐充值",
@@ -804,15 +801,12 @@
     "livewire_itc_packages_withdraw_success": "指定金额已转入主账户余额",
     "livewire_itc_packages_package_extended": "套餐期限已延长6个月",
     "livewire_itc_packages_package_extended_with_reinvest": "套餐期限已延长，活跃再投资及可用股息已转入套餐本金",
-<<<<<<< Updated upstream
-=======
     "livewire_itc_packages_no_matured_reinvests": "没有可提取的复投",
     "livewire_itc_packages_reinvests_unlocked": ":amount ITC 的复投已提取，资金将于 :date 到达余额",
     "livewire_itc_packages_body_unlock_success": ":amount ITC 已解锁，资金将于 :date 到达余额",
     "livewire_itc_packages_body_unlock_not_available": "没有可解锁的金额",
     "livewire_itc_packages_body_unlock_too_large": "金额超过套餐可用本金",
     "livewire_itc_packages_body_unlock_wrong_type": "该类型的套餐无法解锁",
->>>>>>> Stashed changes
     "livewire_itc_packages_insufficient_dividends_reinvest": "股息不足，无法再投资",
     "livewire_itc_packages_insufficient_dividends_withdraw": "股息不足，无法提现",
     "livewire_itc_packages_profit_already_reinvested": "该股息已再投资",

@@ -50,8 +50,6 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $profits_count
  * @property-read Collection<int, PackageProfitReinvest> $reinvestProfits
  * @property-read int|null $reinvest_profits_count
-<<<<<<< Updated upstream
-=======
  * @property-read Collection<int, PackageProfitReinvest> $activeReinvestProfits
  * @property-read int|null $active_reinvest_profits_count
  * @property-read string|null $active_reinvest_profits_sum_amount
@@ -68,7 +66,6 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $pending_body_unlocks_count
  * @property-read string|null $pending_body_unlocks_sum_amount
  * @property-read string|null $pending_body_unlocks_min_payout_at
->>>>>>> Stashed changes
  * @property-read Collection<int, Transaction> $withdrawProfitsTransactions
  * @property-read int|null $withdraw_profits_transactions_count
  *
@@ -135,8 +132,6 @@ class ItcPackage extends Model
             ->whereDoesntHave('withdraw');
     }
 
-<<<<<<< Updated upstream
-=======
     /**
      * Reinvests that still take part in dividend generation:
      * not paid out and not unlocked by the user.
@@ -193,7 +188,6 @@ class ItcPackage extends Model
             ->pending();
     }
 
->>>>>>> Stashed changes
     public function reinvestProfitWithdraws(): HasManyThrough
     {
         return $this->hasManyThrough(

@@ -8,6 +8,8 @@ use App\Enums\Activity\ActivityEventTypeEnum;
 use App\Enums\LogActionTypeEnum;
 use App\Models\Deposit;
 use App\Models\Withdraw;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Spatie\Activitylog\Contracts\Activity;
 
 final class ActivityManager
@@ -76,6 +78,7 @@ final class ActivityManager
         $newRank = (string) ($activity->getExtraProperty('new_rank') ?? '');
         $percent = $this->formatPercent($activity->getExtraProperty('percent'));
         $oldPercent = $this->formatPercent($activity->getExtraProperty('old_percent'));
+        $payoutAt = $this->formatDate($activity->getExtraProperty('payout_at'));
 
         return match ($type) {
             ActivityEventTypeEnum::DepositRequested => __('activity/feed.business.deposit_requested', ['details' => $financeDetails, 'amount' => $amount]),
@@ -99,11 +102,8 @@ final class ActivityManager
             ActivityEventTypeEnum::PackageProfitWithdrawn => __('activity/feed.business.package_profit_withdrawn', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageReinvested => __('activity/feed.business.package_reinvested', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PackageAmountWithdrawnToBalance => __('activity/feed.business.package_amount_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
-<<<<<<< Updated upstream
-=======
             ActivityEventTypeEnum::PackageReinvestUnlocked => __('activity/feed.business.package_reinvest_unlocked', ['uuid' => $packageUuid, 'amount' => $amount, 'date' => $payoutAt]),
             ActivityEventTypeEnum::PackageBodyUnlocked => __('activity/feed.business.package_body_unlocked', ['uuid' => $packageUuid, 'amount' => $amount, 'date' => $payoutAt]),
->>>>>>> Stashed changes
             ActivityEventTypeEnum::PackageReinvestWithdrawnToBalance => __('activity/feed.business.package_reinvest_withdrawn_to_balance', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::PresentPackageZeroed => __('activity/feed.business.present_package_zeroed', ['uuid' => $packageUuid, 'amount' => $amount]),
             ActivityEventTypeEnum::ReferralAddedToLine => __('activity/feed.business.referral_added_to_line', ['line' => $line, 'username' => $username]),
@@ -134,6 +134,19 @@ final class ActivityManager
     private function formatAmount(mixed $amount): string
     {
         return number_format((float) $amount, 2, '.', '');
+    }
+
+    private function formatDate(mixed $date): string
+    {
+        if ($date instanceof CarbonInterface) {
+            return $date->format('d.m.Y');
+        }
+
+        if (! is_string($date) || $date === '') {
+            return '';
+        }
+
+        return Carbon::parse($date)->format('d.m.Y');
     }
 
     /**

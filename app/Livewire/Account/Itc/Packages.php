@@ -2,11 +2,8 @@
 
 namespace App\Livewire\Account\Itc;
 
-<<<<<<< Updated upstream
-=======
 use App\Actions\Packages\UnlockMaturedReinvestsAction;
 use App\Actions\Packages\UnlockPackageBodyAmountAction;
->>>>>>> Stashed changes
 use App\Contracts\Accruals\StartBonusAccrualContract;
 use App\Contracts\Packages\ItcPackageRepositoryContract;
 use App\Contracts\Transactions\TransactionRepositoryContract;
@@ -148,8 +145,6 @@ class Packages extends Component
         $this->mainBalance = $transactionRepositoryContract->getBalanceAmountByUserIdAndType(auth()->user()->id, BalanceTypeEnum::MAIN);
     }
 
-<<<<<<< Updated upstream
-=======
     /**
      * Тело пакета, доступное к выводу или разблокировке, для валидаторов из boot().
      *
@@ -210,7 +205,6 @@ class Packages extends Component
         return $spendable;
     }
 
->>>>>>> Stashed changes
     protected function rules(): array
     {
         return [
@@ -1028,8 +1022,6 @@ class Packages extends Component
         $this->markReinvestNotificationsAsRead($uuid);
     }
 
-<<<<<<< Updated upstream
-=======
     /**
      * Снимает все созревшие реинвесты пакета: они сразу выходят из базы начисления
      * дивидендов, а деньги поступят на основной баланс ровно через календарный месяц.
@@ -1122,7 +1114,6 @@ class Packages extends Component
         );
     }
 
->>>>>>> Stashed changes
     private function markReinvestNotificationsAsRead(string $packageUuid): void
     {
         // Определяем идентификатор пользователя-владельца пакета.

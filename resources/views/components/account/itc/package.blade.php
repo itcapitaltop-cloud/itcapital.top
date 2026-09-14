@@ -50,13 +50,9 @@
         showConfirmReinvest: false,
         showConfirmWithdraw: false,
         showConfirmContinue: false,
-<<<<<<< Updated upstream
-        showConfirmEditBalance: false
-=======
         showConfirmEditBalance: false,
         showConfirmUnlockReinvests: false,
         isModalUnlockBodyActive: false
->>>>>>> Stashed changes
     }" class="flex flex-col md:flex-row gap-[40px] md:items-center items-start">
 
         <x-widget.modal condition-name="isModalClosePackageActive" class="p-4">
@@ -115,8 +111,6 @@
             </div>
         </x-widget.modal>
 
-<<<<<<< Updated upstream
-=======
         <x-widget.modal condition-name="showConfirmUnlockReinvests">
             <div class="p-6">
                 <div class="mb-4 text-lg font-semibold">
@@ -184,7 +178,6 @@
             </x-widget.modal>
         @endif
 
->>>>>>> Stashed changes
         @if ($package->work_to->isPast() && $package->type !== PackageTypeEnum::PRESENT)
             <x-widget.modal condition-name="showConfirmContinue">
                 <div class="p-6">
@@ -436,8 +429,6 @@
                     </x-ui.button>
                 @endif
 
-<<<<<<< Updated upstream
-=======
                 @if (($package->unlockable_reinvest_profits_count ?? 0) > 0)
                     <x-ui.button variant="secondary" x-on:click="showConfirmUnlockReinvests = true"
                         class="!text-[14px] !md:text-[16px]">
@@ -460,15 +451,12 @@
                     </x-ui.button>
                 @endif
 
->>>>>>> Stashed changes
             </div>
         @endif
 
         <div class="block lg:hidden flex-shrink-0"
             style="width: 100%; height: 1px; background-color: rgba(255, 255, 255, 0.3);"></div>
     </div>
-<<<<<<< Updated upstream
-=======
 
     @if (($package->unlocked_reinvest_profits_sum_amount ?? 0) > 0)
         <div class="flex flex-wrap items-baseline gap-2 mt-3 md:pl-5">
@@ -502,5 +490,4 @@
             </span>
         </div>
     @endif
->>>>>>> Stashed changes
 </x-bg.main>

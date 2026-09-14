@@ -54,8 +54,6 @@ Schedule::command('summary:warm-dashboard')
     ->everyTenMinutes()
     ->withoutOverlapping()
     ->onOneServer();
-<<<<<<< Updated upstream
-=======
 
 Schedule::command('packages:payout-unlocked-reinvests')
     ->hourly()
@@ -68,4 +66,3 @@ Schedule::command('packages:payout-unlocked-body-amounts')
     ->withoutOverlapping()
     ->onOneServer()
     ->sendOutputTo(storage_path('logs/scheduler.log'));
->>>>>>> Stashed changes
