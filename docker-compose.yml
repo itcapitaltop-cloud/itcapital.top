@@ -5,6 +5,7 @@ services:
       context: ./docker/8.4
       args:
         WWWGROUP: 1000
+        UBUNTU_MIRROR: ${UBUNTU_MIRROR:-http://archive.ubuntu.com/ubuntu}
     container_name: "${COMPOSE_PROJECT_NAME}-app"
     env_file:
       - .env

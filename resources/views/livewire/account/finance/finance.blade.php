@@ -41,7 +41,9 @@
                 {{-- Сумма --}}
                 <x-ui.input name="depositForm.depositAmount" type="text" step="0.01"
                     placeholder="{{ __('livewire_finance_deposit_amount_placeholder') }}"
-                    input-class="py-[5px] px-[12px]" validate="number">
+                    class="pb-[18px]"
+                    input-class="py-[5px] px-[12px]" validate="number"
+                    notice="{{ __('livewire_finance_itc_rate_notice') }}">
                     {{ __('livewire_finance_deposit_amount_label') }}
                 </x-ui.input>
 
@@ -230,7 +232,9 @@
                 <div>
                     <x-ui.input name="withdrawForm.withdrawAmount" type="text" step="0.01"
                         placeholder="{{ __('livewire_finance_withdraw_amount_placeholder') }}"
-                        input-class="py-[5px] px-[12px]" validate="number">
+                        class="pb-[18px]"
+                        input-class="py-[5px] px-[12px]" validate="number"
+                        notice="{{ __('livewire_finance_itc_rate_notice') }}">
                         {{ __('livewire_finance_withdraw_amount_label') }}
                     </x-ui.input>
                     <p x-show="parseFloat($wire.withdrawForm.withdrawAmount) >= 10" class="text-white px-4 pt-1.5">

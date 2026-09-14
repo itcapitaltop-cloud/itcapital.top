@@ -27,12 +27,14 @@ use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserSummary;
+use App\MoonShine\Forms\ItcPackageTariffField;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\ActivityLog\PartnerReferralActivityService;
 use App\Services\Admin\FinanceRequestService;
-use App\Services\Admin\ReferralTreeService;
-use App\Services\Package\Staking\StakingPerformanceService;
+use App\Services\Admin\UserCardExportService;
+use App\Services\Admin\UserCardSpreadsheetBuilder;
+use App\Services\Package\PackageDefinitionResolver;
 use App\Traits\Moonshine\CanStatusModifyTrait;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -244,121 +246,47 @@ class AdminController extends Controller
 
         $user = User::withoutGlobalScope('notBanned')->with('referrer')->findOrFail($userId);
 
-        $lineNumber = (int) PartnerClosure::query()
-            ->where('descendant_id', $user->id)
-            ->max('depth');
+        $cardData = app(UserCardExportService::class)->collect($user);
+        $spreadsheet = app(UserCardSpreadsheetBuilder::class)->build($cardData, $selectedFields);
 
-        /*
-         * «Пакеты Сумма» повторяет «Сумму пакетов» дашборда /account
-         * (App\Livewire\Account\Dashboard\Index): тело пакета
-         * (amount + partnerTransfers + reinvestToBody − balanceWithdraws,
-         * 0 для обнулённых PRESENT) плюс активные реинвесты.
-         */
-        $packagesTotal = ItcPackage::query()
-            ->select('itc_packages.*')
-            ->join('transactions', 'itc_packages.uuid', '=', 'transactions.uuid')
-            ->where('transactions.user_id', $user->id)
-            ->notActive()
-            ->with(['transaction', 'zeroing'])
-            ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withSum(['reinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->get()
-            ->sum(function (ItcPackage $package): float {
-                $body = $package->type === PackageTypeEnum::PRESENT && $package->zeroing
-                    ? 0.0
-                    : (float) $package->transaction->amount
-                        + (float) $package->partner_transfers_sum_amount
-                        + (float) $package->reinvest_to_body_sum_amount
-                        - (float) $package->balance_withdraws_sum_amount;
+        $filename = $this->userCardFilename($user);
 
-                return $body + (float) $package->reinvest_profits_sum_amount;
-            });
-
-        $stakingPackages = ItcPackage::query()
-            ->active(PackageTypeEnum::STAKING)
-            ->whereHas('transaction', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['transaction', 'stakingTransactionAccruals', 'stakingPurchases', 'packageDefinition'])
-            ->get();
-
-        $tokens = $stakingPackages->isEmpty()
-            ? 0.0
-            : app(StakingPerformanceService::class)->forPackages($stakingPackages)['total_tokens'];
-
-        $telegram = trim((string) $user->telegram);
-
-        $referrals = app(ReferralTreeService::class)->flatten($user->id);
-
-        $values = [
-            UserCardExportField::FULL_NAME->value => trim("{$user->first_name} {$user->last_name}"),
-            UserCardExportField::USERNAME->value => $user->username,
-            UserCardExportField::LINE_NUMBER->value => $lineNumber,
-            UserCardExportField::REFERRER->value => $user->referrer?->username ?? '',
-            UserCardExportField::CITY->value => '',
-            UserCardExportField::PHONE->value => '',
-            UserCardExportField::SOCIAL_NETWORKS->value => $telegram,
-            UserCardExportField::PACKAGES_TOTAL->value => round($packagesTotal, 2),
-            UserCardExportField::TOKENS->value => $tokens,
-            UserCardExportField::EDUCATION->value => '',
-            UserCardExportField::RANK->value => $user->rank,
-            UserCardExportField::REFERRALS->value => $referrals === [] ? 'Нет рефералов' : 'Всего: ' . count($referrals),
-        ];
-
-        $rows = [];
-        $referralsRow = false;
-
-        foreach ($selectedFields as $field) {
-            if ($field === UserCardExportField::REFERRALS && $rows !== []) {
-                $rows[] = ['', ''];
-            }
-
-            $row = count($rows);
-            $rows[] = [$field->label(), $values[$field->value]];
-
-            if ($field === UserCardExportField::REFERRALS) {
-                $referralsRow = $row;
-            }
-        }
-
-        /*
-         * Дерево рефералов: отступ в столбце A показывает линию, каждая строка —
-         * ссылка на карточку реферала в админке.
-         */
-        $treeFirstRow = $referralsRow === false ? null : $referralsRow + 2;
-
-        if ($treeFirstRow !== null) {
-            foreach ($referrals as $referral) {
-                $rows[] = [
-                    str_repeat('    ', $referral['line'] - 1) . $referral['name'],
-                    'Линия ' . $referral['line'],
-                ];
-            }
-        }
-
-        $filename = sprintf('user-%d-card-%s.xlsx', $user->id, now()->format('Ymd-His'));
+        Log::info('[AdminController.exportUserCard] export requested', [
+            'user_id' => $user->id,
+            'fields' => array_column($selectedFields, 'value'),
+            'filename' => $filename,
+        ]);
 
         return response()->streamDownload(
-            function () use ($rows, $treeFirstRow): void {
-                $spreadsheet = new Spreadsheet();
-                $sheet = $spreadsheet->getActiveSheet();
-                $sheet->setTitle('Карточка');
-
-                $sheet->fromArray($rows, null, 'A1');
-
-                if ($treeFirstRow !== null) {
-                    $sheet->getStyle('A' . ($treeFirstRow - 1))->getFont()->setBold(true);
-                }
-
-                foreach (['A', 'B'] as $column) {
-                    $sheet->getColumnDimension($column)->setAutoSize(true);
-                }
-
+            function () use ($spreadsheet): void {
                 (new Xlsx($spreadsheet))->save('php://output');
             },
             $filename,
             ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
         );
+    }
+
+    /**
+     * Имя файла карточки — ФИО пользователя, как в эталоне «Светлана Волкова.xlsx».
+     * Кириллицу кодирует сам Symfony (`filename*=UTF-8''…`), здесь достаточно
+     * убрать символы, недопустимые в именах файлов.
+     */
+    private function userCardFilename(User $user): string
+    {
+        $candidates = [
+            trim("{$user->first_name} {$user->last_name}"),
+            (string) $user->username,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $name = trim(preg_replace('/\s+/u', ' ', preg_replace('#[/\\\\:*?"<>|]+#u', '', $candidate) ?? '') ?? '');
+
+            if ($name !== '') {
+                return $name . '.xlsx';
+            }
+        }
+
+        return sprintf('user-%d.xlsx', $user->id);
     }
 
     public function generatePromoCode(MoonShineRequest $request): MoonShineJsonResponse
@@ -587,12 +515,28 @@ class AdminController extends Controller
         $oldPercent = $package->month_profit_percent;
         $targetUserId = $package->transaction->user_id;
         $oldCreatedAt = $package->created_at->toDateString();
+        $oldDefinitionId = $package->package_definition_id;
+        $oldDefinitionName = $package->packageDefinition?->name;
 
         $package->transaction->amount = $request->input('amount');
         $newCreatedAt = Carbon::parse($request->input('created_at'))->toDateString();
 
         $package->created_at = $newCreatedAt;
-        $package->type = $request->input('type');
+
+        try {
+            $this->applyPackageTariffChange($package, $request);
+        } catch (RuntimeException $exception) {
+            Log::warning('[FIX:package-tariff-change] Tariff could not be applied', [
+                'package_uuid' => $package->uuid,
+                'submitted_package_definition_id' => $request->input('package_definition_id'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return MoonShineJsonResponse::make()
+                ->toast('Не удалось изменить тариф: ' . $exception->getMessage(), ToastType::ERROR);
+        }
+
         $package->month_profit_percent = $request->input('profit_percent');
 
         // A manual per-package edit pins the rate so a later package-definition
@@ -660,6 +604,21 @@ class AdminController extends Controller
             );
         }
 
+        if ($oldDefinitionId !== $package->package_definition_id) {
+            // Only the tariff name goes into old_values/new_values: the admin journal
+            // renders those columns as bare values and money-formats every numeric
+            // one, so a raw definition id would show up as "1.00" and would even
+            // produce a meaningless amount diff between the two ids.
+            $logRepo->updated(
+                $package,
+                'update_itc_package_definition',
+                ['package_definition' => $oldDefinitionName ?? '—'],
+                ['package_definition' => $package->packageDefinition?->name ?? '—'],
+                $targetUserId,
+                ['package_uuid' => $package->uuid],
+            );
+        }
+
         if ((float) $oldPercent !== (float) $package->month_profit_percent) {
             $logRepo->updated(
                 $package,
@@ -689,6 +648,81 @@ class AdminController extends Controller
         return MoonShineJsonResponse::make()
             ->toast(__('admin_controller_package_updated'), ToastType::SUCCESS)
             ->redirect($referer);
+    }
+
+    /**
+     * Apply the tariff submitted by the admin package edit form.
+     *
+     * Legacy packages hold their tariff in `type`; definition-based packages hold
+     * it in `package_definition_id` while `type` is only the system category.
+     * Writing `type` for a definition-based package leaves the label and card
+     * image pointing at the previous tariff, so each package model gets its own
+     * branch — mirroring the field rendered by {@see ItcPackageTariffField}.
+     *
+     * @throws RuntimeException when the submitted definition does not exist
+     */
+    private function applyPackageTariffChange(ItcPackage $package, MoonShineRequest $request): void
+    {
+        $submittedDefinitionId = $request->input('package_definition_id');
+        $submittedType = $request->input('type');
+
+        if ($package->type === PackageTypeEnum::STAKING) {
+            return;
+        }
+
+        if ($package->package_definition_id !== null) {
+            if (blank($submittedDefinitionId)) {
+                return;
+            }
+
+            if ($submittedDefinitionId === ItcPackageTariffField::ARCHIVE_VALUE) {
+                $package->type = PackageTypeEnum::ARCHIVE;
+
+                Log::info('[FIX:package-tariff-change] Archived the package without returning its body', [
+                    'package_uuid' => $package->uuid,
+                    'package_definition_id' => $package->package_definition_id,
+                ]);
+
+                return;
+            }
+
+            $definition = app(PackageDefinitionResolver::class)->resolveById((int) $submittedDefinitionId);
+
+            $package->package_definition_id = $definition->id;
+            $package->type = $definition->type;
+            $package->setRelation('packageDefinition', $definition);
+
+            return;
+        }
+
+        if (blank($submittedType)) {
+            Log::warning('[FIX:package-tariff-change] Legacy package submitted without a type', [
+                'package_uuid' => $package->uuid,
+                'submitted_package_definition_id' => $submittedDefinitionId,
+            ]);
+
+            return;
+        }
+
+        $newType = $submittedType instanceof PackageTypeEnum
+            ? $submittedType
+            : PackageTypeEnum::tryFrom((string) $submittedType);
+
+        if ($newType === null) {
+            Log::warning('[FIX:package-tariff-change] Unknown package type submitted', [
+                'package_uuid' => $package->uuid,
+                'submitted_type' => $submittedType,
+            ]);
+
+            return;
+        }
+
+        $package->type = $newType;
+
+        Log::info('[FIX:package-tariff-change] Applied legacy type', [
+            'package_uuid' => $package->uuid,
+            'new_type' => $newType->value,
+        ]);
     }
 
     public function reinvest(string $uuid)

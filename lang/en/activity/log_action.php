@@ -3,6 +3,7 @@
 return [
     'update_itc_package_amount' => 'Package amount change',
     'update_itc_package_type' => 'Package type change',
+    'update_itc_package_definition' => 'Package tariff change',
     'update_itc_package_profit_percent' => 'Package yield change',
     'update_itc_package_created_at' => 'Package opening date change',
     'update_referrer' => 'Referrer change',

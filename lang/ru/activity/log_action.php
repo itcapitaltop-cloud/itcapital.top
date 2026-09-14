@@ -3,6 +3,7 @@
 return [
     'update_itc_package_amount' => 'Изменение суммы пакета',
     'update_itc_package_type' => 'Изменение типа пакета',
+    'update_itc_package_definition' => 'Изменение тарифа пакета',
     'update_itc_package_profit_percent' => 'Изменение доходности пакета',
     'update_itc_package_created_at' => 'Изменение даты открытия пакета',
     'update_referrer' => 'Изменение реферера',

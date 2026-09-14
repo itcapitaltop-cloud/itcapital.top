@@ -50,6 +50,10 @@ Use when the user mentions Dandy commit rules inside another task. Keep changes 
 ## Commit message
 ```
 
+## Branch rule
+
+Never create a branch with a name you picked yourself. When the changes need a new branch (for example the current branch is `main`/`dev`, or the user asked for one), always ask the user for the branch name first — offer a suggestion, but the user's answer decides. Create it only after that answer, and only with `git checkout -b <confirmed-name>`.
+
 ## Hard rules
 
-Do not commit without explicit approval. Do not mix unrelated refactors into the commit. Do not change public behavior just to improve style.
+Do not create a branch without an explicitly confirmed name. Do not commit without explicit approval. Do not mix unrelated refactors into the commit. Do not change public behavior just to improve style.

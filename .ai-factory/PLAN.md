@@ -1,7 +1,7 @@
-# Implementation Plan: Promo Codes for Package Purchase Thresholds
+# Implementation Plan: Quick-Publish Button for Admin Reviews
 
-Branch: none
-Created: 2026-05-14
+Branch: dev (fast mode — no branch created)
+Created: 2026-09-06
 
 ## Settings
 - Testing: yes
@@ -9,209 +9,174 @@ Created: 2026-05-14
 - Docs: no
 
 ## Scope
-- Add single-use promo codes that lower the minimum threshold required to buy a package.
-- Manage promo codes from the admin package area only.
-- Add a `Промокоды` tab to the admin `Пакеты` section with generation modal and table.
-- Add a promo code field to the user package purchase modal in the personal account.
-- Show validation errors for invalid, already-used, or mismatched promo codes.
+Add a one-click "publish" button to each row of the MoonShine admin reviews list
+(`Отзывы`), so a moderator can approve a review without opening its edit form.
+
+- Icon-only button with a checkmark (`heroicons.check`), green (`success()`).
+- Placed before the standard detail/edit/delete row buttons.
+- Visible only for reviews that are not already `approved`.
+- Sets `status` to `ReviewStatusEnum::Approved`, shows a toast, and refreshes the
+  index table asynchronously (no full page reload) so several reviews can be
+  approved in a row.
+- Out of scope (confirmed with the user): no admin-journal / `BusinessActivity`
+  entry — editing a review status through the normal form does not log today
+  either, so the quick button stays consistent with existing behavior.
 
 ## Research Context
-- User package purchase entry point: `app/Livewire/Account/Itc/Packages.php` with UI in `resources/views/livewire/account/itc/packages.blade.php`.
-- Current regular package minimum is hardcoded as `min:100` in the Livewire component and referenced in translation placeholders.
-- Package admin area uses MoonShine via `app/MoonShine/Resources/ItcPackageResource.php` and pages under `app/MoonShine/Pages/ItcPackage/`.
-- Existing admin modal/action patterns use `ActionButton`, `Modal`, `FormBuilder`, `TableBuilder`, and controller-backed admin routes in `routes/web.php` plus `app/Http/Controllers/AdminController.php`.
-- No existing promo-code/coupon implementation was found.
 
-## Commit Plan
-- **Commit 1** (after tasks 1-3): `feat: add promo code domain model`
-- **Commit 2** (after tasks 4-6): `feat: integrate promo codes into admin and purchase flows`
-- **Commit 3** (after tasks 7-8): `test: cover package promo code flows`
+Verified against the installed `moonshine/moonshine 2.24.0` source:
+
+- `ResourceWithButtons::getIndexItemButtons()` returns
+  `[...getIndexButtons(), detail, edit, delete, massDelete]`, and
+  `getIndexButtons()` falls back to `buttons()` only when `indexButtons()` is
+  empty. `ReviewResource` currently defines neither, so adding `indexButtons()`
+  prepends our button **without** removing the standard row buttons.
+- `ReviewIndexPage` only calls `parent::mainLayer()`, so the resource-level
+  `indexButtons()` hook is the correct place — no page changes are needed.
+- `MoonShineRouter::asyncMethodClosure()` automatically injects
+  `resourceItem => $item->getKey()` into the async URL for row buttons, so no
+  manual `params` closure is required.
+- `AsyncController::method()` dispatches `$resource->{$method}($request)`.
+- `IterableComponent::getButtons()` calls `->fillItem($this->castData($data))`
+  then `->onlyVisible()`, and `ModelCast` hydrates to the model — so
+  `canSee(fn (Review $item) => ...)` receives a real `Review` instance.
+- `ActionButton` has no `tooltip()` method in v2.24; use
+  `customAttributes(['title' => ...])` for the hover hint.
+- **Testability caveat:** `MoonShineRequest::getItemID()` reads the *global*
+  `request('resourceItem')`, not the injected request instance. Take
+  `MoonShineRequest $request` as a parameter and read
+  `$request->get('resourceItem')` (the `VerifyingUserResource::confirmEmail`
+  pattern) so the method can be called directly from a Pest test, as
+  `tests/Feature/AdminBeneficiaryTest.php` does.
+
+Reference implementations already in the repo:
+- `app/MoonShine/Resources/VerifyingUserResource.php` — `ActionButton->method()`
+  + `MoonShineJsonResponse::make()->toast(...)` status-change actions.
+- `app/MoonShine/Resources/PackageDefinitionResource.php:95` — logging style and
+  `MoonShineJsonResponse` return shape.
 
 ## Tasks
 
-### Phase 1: Domain And Persistence
-- [x] Task 1: Create the promo code persistence model and schema.
+### Phase 1: Admin Action
 
-  Deliverable and behavior:
-  - Create a migration for a `promo_codes` table with fields for code, package type, reduced minimum amount, used state, created metadata, used metadata, and timestamps.
-  - Suggested columns: `id`, `code` unique, `package_type`, `reduced_minimum_amount`, `used_at`, `used_by_user_id`, `created_by_admin_id`, `created_at`, `updated_at`.
-  - Add indexes for `code`, `package_type`, `used_at`, and `used_by_user_id` because the admin table and validation path will filter by these fields.
-  - Create `app/Models/PromoCode.php` with casts, fillable/guarded convention matching sibling models, relations to `App\Models\User` for used user and admin creator, and helper methods for active/used checks.
-  - Create `database/factories/PromoCodeFactory.php` with states for unused, used, and package type variants.
+- [x] Task 1: Add the `approve()` action method to `ReviewResource`.
 
-  Files:
-  - `database/migrations/*_create_promo_codes_table.php`
-  - `app/Models/PromoCode.php`
-  - `database/factories/PromoCodeFactory.php`
+  Deliverable: `public function approve(MoonShineRequest $request): MoonShineJsonResponse`
+  on `App\MoonShine\Resources\ReviewResource`.
 
-  Logging requirements:
-  - No runtime logging is needed in the migration/model/factory task.
-  - Ensure later service tasks log code generation and redemption state changes, not raw sensitive payloads.
+  Expected behavior:
+  - Resolve the review via `Review::query()->find($request->get('resourceItem'))`.
+  - If not found → return `MoonShineJsonResponse::make()->toast('Отзыв не найден', ToastType::ERROR)`.
+  - If already `ReviewStatusEnum::Approved` → return a neutral toast
+    (`'Отзыв уже опубликован'`, `ToastType::INFO`) and do **not** write to the DB.
+    This makes the action idempotent even if two moderators click at once.
+  - Otherwise set `status = ReviewStatusEnum::Approved`, save, and return
+    `MoonShineJsonResponse::make()->toast('Отзыв опубликован', ToastType::SUCCESS)`.
+  - Do **not** redirect — the button refreshes the table via a JS event (Task 2).
 
-  Dependency notes:
-  - This task must be completed before admin generation, validation, and tests can persist promo codes.
-
-### Phase 2: Promo Code Business Logic
-- [x] Task 2: Add a focused promo code generation service/action.
-
-  Deliverable and behavior:
-  - Create an application service or action such as `app/Actions/PromoCodes/GeneratePromoCodeAction.php`.
-  - Accept package type and reduced minimum amount from the admin form.
-  - Generate a unique human-enterable code, retry on collisions, and persist the promo code with the authenticated admin user as creator when available.
-  - Validate that `reduced_minimum_amount` is non-negative and below the default package minimum for the selected type.
-  - Keep the code single-use by design; do not add multi-use behavior.
+  LOGGING REQUIREMENTS (verbose):
+  - `Log::info('[ReviewResource.approve] quick publish requested', [...])` on entry
+    with `admin_id` (`auth()->id()`), `review_id`, `previous_status`.
+  - `Log::warning('[ReviewResource.approve] review not found', ['admin_id' => ..., 'review_id' => ...])`
+    for the missing-review branch.
+  - `Log::info('[ReviewResource.approve] review published', ['admin_id' => ..., 'review_id' => ...])`
+    after a successful save.
+  - Follow the existing `[Class.method] message` prefix convention used across
+    `app/MoonShine/` and `app/Services/`.
 
   Files:
-  - `app/Actions/PromoCodes/GeneratePromoCodeAction.php`
-  - optionally `app/Dto/PromoCodes/GeneratePromoCodeData.php`
-  - optionally `app/Enums` only if existing package type enum cannot be used directly
+  - `app/MoonShine/Resources/ReviewResource.php`
 
-  Logging requirements:
-  - Log DEBUG on generation start with admin id, package type, and reduced threshold.
-  - Log INFO when a code is generated with promo code id and package type; do not log unnecessary user/account data.
-  - Log WARNING on invalid generation input or repeated collision retries.
-  - Log ERROR with context if persistence fails.
+  New imports: `MoonShine\Http\Responses\MoonShineJsonResponse`,
+  `MoonShine\MoonShineRequest`, `MoonShine\Enums\ToastType`,
+  `Illuminate\Support\Facades\Log`.
 
-  Dependency notes:
-  - Depends on Task 1 model/schema.
+- [x] Task 2: Add the checkmark row button via `ReviewResource::indexButtons()`.
+  (depends on 1)
 
-- [x] Task 3: Add a focused promo code validation and redemption service for package purchases.
+  Deliverable: `public function indexButtons(): array` on `ReviewResource`
+  returning a single `ActionButton`.
 
-  Deliverable and behavior:
-  - Create a service/action such as `app/Actions/PromoCodes/ApplyPackagePromoCodeAction.php` or `app/Services/PromoCodes/PackagePromoCodeService.php`.
-  - Given user, package type, requested amount, and optional promo code, return the effective minimum threshold and validation result.
-  - Reject unknown codes, already-used codes, codes for a different package type, and amounts lower than the promo-reduced threshold.
-  - Mark the promo code as used only inside the successful package purchase transaction, with `used_at` and `used_by_user_id` populated.
-  - Use row-level locking or a transactional update path to prevent double redemption of a single-use code.
+  Expected behavior / exact shape:
+  ```php
+  ActionButton::make('')
+      ->method(
+          'approve',
+          events: [AlpineJs::event(JsEvent::TABLE_UPDATED, 'index-table')],
+      )
+      ->icon('heroicons.check')
+      ->success()
+      ->customAttributes(['title' => 'Опубликовать отзыв'])
+      ->canSee(fn (Review $item): bool => $item->status !== ReviewStatusEnum::Approved),
+  ```
+  - Empty label + icon = icon-only button (same pattern as
+    `PromoCodeIndexPage::deleteButton()`).
+  - `'index-table'` is the component name returned by
+    `IndexPage::listComponentName()`; the event makes the table re-fetch so the
+    status column and the button visibility update in place.
+  - The standard detail/edit/delete buttons must still render after it — verify
+    visually in the admin list.
 
-  Files:
-  - `app/Actions/PromoCodes/ApplyPackagePromoCodeAction.php` or `app/Services/PromoCodes/PackagePromoCodeService.php`
-  - `app/Livewire/Account/Itc/Packages.php` integration point in later task
-  - optionally a small value object/DTO under `app/Dto/PromoCodes/`
-
-  Logging requirements:
-  - Log DEBUG when validation starts with user id, package type, amount, and whether a code was supplied.
-  - Log WARNING for invalid, already-used, mismatched, or below-threshold promo attempts with promo code id when available.
-  - Log INFO when a promo code is redeemed with promo code id, user id, package type, original threshold, and effective threshold.
-  - Log ERROR if transactional redemption fails or a race condition is detected.
-
-  Dependency notes:
-  - Depends on Task 1.
-  - Must be integrated into the existing package purchase transaction so a failed package purchase never consumes a promo code.
-
-### Phase 3: Admin UI
-- [x] Task 4: Add the admin promo codes tab/table under the package area.
-
-  Deliverable and behavior:
-  - Add a `Промокоды` tab or page in the MoonShine package section following existing `ItcPackageResource` and `ItcPackageIndexPage` conventions.
-  - Show a table with code, package type, reduced threshold, used status, creation date, usage date, and username of the user who used the promo code.
-  - Eager load the used user/admin creator relation to avoid N+1 queries.
-  - Add filters or search for code, package type, and used status if consistent with existing MoonShine resource patterns.
+  LOGGING REQUIREMENTS: none (declarative UI wiring only; all logging lives in
+  `approve()` from Task 1).
 
   Files:
-  - `app/MoonShine/Resources/PromoCodeResource.php` or modifications to `app/MoonShine/Resources/ItcPackageResource.php`
-  - `app/MoonShine/Pages/PromoCode/PromoCodeIndexPage.php`
-  - optionally `app/MoonShine/Pages/PromoCode/PromoCodeDetailPage.php`
-  - `app/Providers/MoonShineServiceProvider.php`
+  - `app/MoonShine/Resources/ReviewResource.php`
 
-  Logging requirements:
-  - No log is required for read-only table rendering.
-  - If custom async loading is used, log DEBUG for admin id, filters, and result count only when consistent with existing admin logging practice.
+  New imports: `MoonShine\ActionButtons\ActionButton`,
+  `MoonShine\Support\AlpineJs`, `MoonShine\Enums\JsEvent`.
 
-  Dependency notes:
-  - Depends on Task 1.
-  - The admin section must remain admin-only through MoonShine authorization/resource visibility.
+  Fallback note: if the row click (navigate-to-detail) swallows the button click
+  in the browser, append
+  `->onClick(fn () => 'event.stopPropagation()', 'stop')` — the pattern already
+  used in `app/MoonShine/Pages/PromoCode/PromoCodeIndexPage.php`.
 
-- [x] Task 5: Add the admin promo code generation modal and endpoint/action binding.
+### Phase 2: Tests
 
-  Deliverable and behavior:
-  - Add a `Сгенерировать промокод` button on the promo codes tab.
-  - Open a modal with fields for package type and reduced minimum amount.
-  - Submit to a MoonShine async method or existing admin controller route pattern.
-  - On success, create a promo code through the generation action and refresh/return the created code in the admin UI.
-  - On validation failure, display admin-visible errors for package type and threshold amount.
+- [x] Task 3: Cover the quick-publish action with a Pest feature test.
+  (depends on 1, 2)
 
-  Files:
-  - `app/MoonShine/Resources/PromoCodeResource.php` or package resource/page containing the tab
-  - `app/MoonShine/Pages/PromoCode/PromoCodeIndexPage.php`
-  - `app/Http/Controllers/AdminController.php` if using controller-backed forms
-  - `routes/web.php` if adding admin POST route
-  - `lang/ru.json`, `lang/en.json`, `lang/zh.json` if new translatable labels are required
+  Deliverable: `tests/Feature/AdminReviewQuickPublishTest.php`, created with
+  `php artisan make:test --pest AdminReviewQuickPublishTest`.
 
-  Logging requirements:
-  - Log DEBUG on modal submit with admin id, package type, and requested threshold.
-  - Log INFO on successful generation with promo code id and package type.
-  - Log WARNING on validation failures or unauthorized attempts.
-  - Log ERROR on unexpected generation failures.
+  Test cases (call the resource method directly, mirroring
+  `tests/Feature/AdminBeneficiaryTest.php` — no HTTP layer, no MoonshineUser
+  needed):
+  1. *publishes a pending review* — `Review::factory()->create()` (factory
+     defaults to `Pending`), build
+     `MoonShineRequest::create('/admin/review-approve', 'POST', ['resourceItem' => $review->id])`,
+     call `(new ReviewResource())->approve($request)`, assert
+     `$review->refresh()->status === ReviewStatusEnum::Approved`.
+  2. *leaves an already-approved review untouched* — create a review with
+     `status => ReviewStatusEnum::Approved`, call `approve()`, assert the status
+     is still `Approved` and `updated_at` did not change (proves the no-write
+     branch).
+  3. *handles a missing review id* — call `approve()` with a non-existent
+     `resourceItem` and assert it returns a `MoonShineJsonResponse` instead of
+     throwing.
+  4. *button visibility* — assert
+     `(new ReviewResource())->indexButtons()` returns exactly one button, that
+     `isSee($pendingReview)` is `true`, and `isSee($approvedReview)` is `false`.
 
-  Dependency notes:
-  - Depends on Tasks 1 and 2.
-
-### Phase 4: User Purchase Flow
-- [x] Task 6: Integrate optional promo code input into the personal account package purchase flow.
-
-  Deliverable and behavior:
-  - Add a `promoCode` Livewire property and validation path to `app/Livewire/Account/Itc/Packages.php`.
-  - Add a `Промокод` input field to the package purchase modal in `resources/views/livewire/account/itc/packages.blade.php`.
-  - If no promo code is supplied, preserve the existing minimum threshold behavior.
-  - If a promo code is supplied, validate it and apply the reduced threshold only for the matching package type.
-  - Return Livewire validation errors for invalid, used, mismatched, or below-threshold codes without creating transactions/packages.
-  - Mark the code used only after the package transaction and package record are successfully created.
+  LOGGING REQUIREMENTS: none in the test itself; the assertions above implicitly
+  cover the branches that emit each log line.
 
   Files:
-  - `app/Livewire/Account/Itc/Packages.php`
-  - `resources/views/livewire/account/itc/packages.blade.php`
-  - `lang/ru.json`
-  - `lang/en.json`
-  - `lang/zh.json`
+  - `tests/Feature/AdminReviewQuickPublishTest.php`
 
-  Logging requirements:
-  - Log DEBUG when purchase begins with user id, amount, package type, and whether promo code was supplied.
-  - Log WARNING for invalid promo validation outcomes and balance/threshold failures.
-  - Log INFO on successful purchase with transaction uuid/package id and promo code id if used.
-  - Log ERROR if package creation succeeds but promo redemption cannot be committed; use transaction rollback to keep state consistent.
+  Verification commands (run both, both must pass):
+  ```
+  vendor/bin/pint --dirty --format agent
+  php artisan test --compact --filter=AdminReviewQuickPublish
+  ```
+  Also re-run `php artisan test --compact --filter=Reviews` to confirm the
+  existing `tests/Feature/ReviewsTest.php` suite still passes (the public
+  reviews page only shows `approved` reviews, so this action feeds it directly).
 
-  Dependency notes:
-  - Depends on Task 3.
-  - Keep financial values out of floats where new calculations are introduced; follow existing amount conventions or `Brick\Math` where needed.
+## Manual Check
 
-### Phase 5: Tests And Verification
-- [x] Task 7: Add Pest coverage for promo code generation and single-use redemption rules.
-
-  Deliverable and behavior:
-  - Add tests proving admin generation creates a valid unused promo code with package type and reduced threshold.
-  - Add service-level or feature tests proving a valid code can be redeemed once.
-  - Add tests proving second redemption by the same or another user fails because the code is globally single-use.
-  - Add tests proving invalid, already-used, and mismatched package-type codes do not create transactions, packages, or usage state.
-
-  Files:
-  - `tests/Feature/PromoCodeTest.php` or a similarly named feature test
-  - `database/factories/PromoCodeFactory.php`
-  - related factory/model files from Task 1 as needed
-
-  Logging requirements:
-  - No production logging changes are required in tests.
-  - Assert persisted state and validation outcomes rather than log contents unless existing activity-log conventions require it.
-
-  Dependency notes:
-  - Depends on Tasks 1-6.
-  - Use existing `RefreshDatabase` setup and factories from the test suite.
-
-- [x] Task 8: Run formatting and targeted verification for the promo code feature.
-
-  Deliverable and behavior:
-  - Run `vendor/bin/pint --dirty --format agent` after PHP changes.
-  - Run targeted Pest tests for the new promo code coverage.
-  - Run a focused broader test filter if package purchase behavior is touched, such as existing package or activity-log related tests.
-  - Review generated migrations and schema indexes for PostgreSQL compatibility.
-
-  Files:
-  - no new application files expected; this task verifies changed files from prior tasks
-
-  Logging requirements:
-  - No runtime logging changes are required.
-  - If tests reveal missing observability in the implementation, add logs to the service/action tasks before final verification.
-
-  Dependency notes:
-  - Depends on Tasks 1-7.
-  - Follow low-token batch mode for long commands: redirect full output to log files, check exit codes, and only inspect summaries or final log tails on failure.
+After implementation, open the admin `Отзывы` list and confirm:
+- Pending/rejected rows show a green checkmark button; approved rows do not.
+- Clicking it shows the «Отзыв опубликован» toast, the row's status flips to
+  «Опубликован», and the checkmark disappears — all without a page reload.
+- Detail / edit / delete buttons are still present on every row.

@@ -601,6 +601,7 @@
     "livewire_finance_deposit_source_crypto": "加密货币",
     "livewire_finance_deposit_source_fiat": "法币",
     "livewire_finance_deposit_amount_label": "充值金额 ITC",
+    "livewire_finance_itc_rate_notice": "1 ITC = 1 USDT BEP20",
     "livewire_finance_deposit_amount_placeholder": "请输入充值金额",
     "livewire_finance_deposit_wallet_address_label": "钱包地址",
     "livewire_finance_deposit_network_label": "网络：",

@@ -30,6 +30,7 @@ use App\Models\User;
 use App\Services\ActivityLog\BusinessActivityLogger;
 use App\Services\Package\PackageDefinitionResolver;
 use App\Services\PromoCodes\PackagePromoCodeService;
+use App\Services\User\SpendableBalanceResolver;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
@@ -139,6 +140,32 @@ class Packages extends Component
         $this->mainBalance = $transactionRepositoryContract->getBalanceAmountByUserIdAndType(auth()->user()->id, BalanceTypeEnum::MAIN);
     }
 
+    /**
+     * The amount that may actually be debited from the main balance.
+     *
+     * The balance is rendered at 2 decimals while it is stored at 8, so the figure
+     * on screen can exceed the real balance by up to 0.005. Validation accepts the
+     * displayed figure; this caps the debit at what the user truly has.
+     */
+    private function spendableAmount(string $requestedAmount, string $context): string
+    {
+        $resolver = app(SpendableBalanceResolver::class);
+        $spendable = $resolver->clampToBalance($this->mainBalance, $requestedAmount);
+
+        if ($resolver->wasClamped($this->mainBalance, $requestedAmount)) {
+            Log::info('[FIX] amount clamped to real balance', [
+                'context' => $context,
+                'user_id' => Auth::id(),
+                'requested_amount' => $requestedAmount,
+                'displayed_balance' => $resolver->toDisplayScale($this->mainBalance),
+                'real_balance' => $this->mainBalance,
+                'debited_amount' => $spendable,
+            ]);
+        }
+
+        return $spendable;
+    }
+
     protected function rules(): array
     {
         return [
@@ -216,13 +243,15 @@ class Packages extends Component
                 'required',
                 'numeric',
                 'min:1',
-                function ($attribute, $value, $fail) {
-                    if ($value > $this->mainBalance) {
+                function ($attribute, $value, $fail): void {
+                    if (! app(SpendableBalanceResolver::class)->coversRequestedAmount($this->mainBalance, (string) $value)) {
                         $fail('Недостаточно средств на балансе.');
                     }
                 },
             ],
         ]);
+
+        $topUpAmount = $this->spendableAmount($this->withdrawPackageAmount, 'package top-up');
 
         $package = Transaction::query()
             ->select(['id', 'uuid', 'amount', 'user_id'])
@@ -239,7 +268,7 @@ class Packages extends Component
             })
             ->first();
 
-        $package->increment('amount', $this->withdrawPackageAmount);
+        $package->increment('amount', $topUpAmount);
 
         app(BusinessActivityLogger::class)->write(new WriteBusinessActivityData(
             type: ActivityEventTypeEnum::PackageToppedUp,
@@ -247,7 +276,7 @@ class Packages extends Component
             subject: $package->itcPackage,
             feeds: [ActivityFeedTypeEnum::Packages, ActivityFeedTypeEnum::UserDetailUser],
             properties: [
-                'amount' => $this->withdrawPackageAmount,
+                'amount' => $topUpAmount,
                 'package_uuid' => $uuid,
                 'source_balance' => 'main',
             ],
@@ -256,7 +285,7 @@ class Packages extends Component
             context: 'account',
         ));
 
-        app(StartBonusAccrualContract::class)->accrue(auth()->id(), (float) $this->withdrawPackageAmount);
+        app(StartBonusAccrualContract::class)->accrue(auth()->id(), (float) $topUpAmount);
 
         $this->reset('withdrawPackageAmount');
         $this->dispatch('balance-edited');
@@ -639,12 +668,19 @@ class Packages extends Component
 
         $redeemedPromoCodeId = null;
 
+        /**
+         * Clamp AFTER the promo/minimum checks: those thresholds are expressed at the
+         * same 2 decimals the user sees, so they must be judged on the requested figure.
+         * The clamp only shaves the invisible sub-cent remainder off the actual debit.
+         */
+        $purchaseAmount = $this->spendableAmount($this->amount, 'package purchase');
+
         try {
             $transactionRepo->checkBalanceAndStore(new CreateTransactionDto(
                 userId: $user->id,
                 trxType: TrxTypeEnum::BUY_PACKAGE,
                 balanceType: BalanceTypeEnum::MAIN,
-                amount: $this->amount,
+                amount: $purchaseAmount,
                 acceptedAt: Carbon::now(),
                 prefix: 'ITC-',
             ), function (Transaction $trx) use ($promoCodeService, $promoCodeValidation, $user, $packageDefinition, &$redeemedPromoCodeId) {
@@ -717,7 +753,9 @@ class Packages extends Component
         } catch (InvalidAmountException $exception) {
             Log::warning('[Packages.buyPackage] insufficient balance', [
                 'user_id' => $user->id,
-                'amount' => $this->amount,
+                'requested_amount' => $this->amount,
+                'debited_amount' => $purchaseAmount,
+                'real_balance' => $this->mainBalance,
                 'promo_code_id' => $promoCodeValidation->promoCode?->id,
             ]);
 
@@ -725,7 +763,7 @@ class Packages extends Component
         } catch (\Throwable $throwable) {
             Log::error('[Packages.buyPackage] package purchase failed', [
                 'user_id' => $user->id,
-                'amount' => $this->amount,
+                'amount' => $purchaseAmount,
                 'promo_code_id' => $promoCodeValidation->promoCode?->id,
                 'exception' => $throwable::class,
                 'message' => $throwable->getMessage(),
@@ -734,11 +772,11 @@ class Packages extends Component
             throw $throwable;
         }
 
-        Notify::packageBought($user, $packageDefinition->name, $this->amount);
+        Notify::packageBought($user, $packageDefinition->name, app(SpendableBalanceResolver::class)->toDisplayScale($purchaseAmount));
 
         Log::info('[Packages.buyPackage] purchased', [
             'user_id' => $user->id,
-            'amount' => $this->amount,
+            'amount' => $purchaseAmount,
             'package_type' => $packageDefinition->type->value,
             'package_definition_id' => $packageDefinition->id,
             'promo_code_id' => $redeemedPromoCodeId,

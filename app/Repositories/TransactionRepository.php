@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ActivityLog\ActivityFeedService;
 use App\Services\User\UserBalanceCalculator;
+use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
@@ -106,7 +107,12 @@ class TransactionRepository implements TransactionRepositoryContract
                 ->balanceFor($dto->userId, $dto->balanceType, forceFresh: true);
             //            Log::channel('source')->debug($amount);
 
-            if ($amount - $dto->amount < 0) {
+            /**
+             * Compared as decimals, not floats: balances carry 8 decimal places and
+             * float subtraction can turn an exact "spend everything" into a negative
+             * epsilon, rejecting a transaction the user is entitled to make.
+             */
+            if (BigDecimal::of($amount)->isLessThan(BigDecimal::of($dto->amount))) {
                 throw new InvalidAmountException();
             }
 

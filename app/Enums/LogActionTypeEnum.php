@@ -6,6 +6,7 @@ enum LogActionTypeEnum: string
 {
     case UPDATE_ITC_PACKAGE_AMOUNT = 'update_itc_package_amount';
     case UPDATE_ITC_PACKAGE_TYPE = 'update_itc_package_type';
+    case UPDATE_ITC_PACKAGE_DEFINITION = 'update_itc_package_definition';
     case UPDATE_ITC_PACKAGE_PROFIT_PERCENT = 'update_itc_package_profit_percent';
     case UPDATE_ITC_PACKAGE_CREATED_AT = 'update_itc_package_created_at';
     case UPDATE_REFERRER = 'update_referrer';
@@ -34,6 +35,7 @@ enum LogActionTypeEnum: string
         return match ($this) {
             self::UPDATE_ITC_PACKAGE_AMOUNT => __('activity/log_action.update_itc_package_amount'),
             self::UPDATE_ITC_PACKAGE_TYPE => __('activity/log_action.update_itc_package_type'),
+            self::UPDATE_ITC_PACKAGE_DEFINITION => __('activity/log_action.update_itc_package_definition'),
             self::UPDATE_ITC_PACKAGE_PROFIT_PERCENT => __('activity/log_action.update_itc_package_profit_percent'),
             self::UPDATE_ITC_PACKAGE_CREATED_AT => __('activity/log_action.update_itc_package_created_at'),
             self::UPDATE_REFERRER => __('activity/log_action.update_referrer'),
