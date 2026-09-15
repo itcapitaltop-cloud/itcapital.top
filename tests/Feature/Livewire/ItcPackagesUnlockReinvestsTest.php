@@ -245,3 +245,52 @@ it('не рендерит ни кнопку, ни строку, когда сн�
         ->assertDontSee(__('components_account_itc_package_unlock_reinvests_action', ['amount' => '150']))
         ->assertDontSee(__('components_account_itc_package_unlocked_reinvests_label'));
 });
+
+/**
+ * Регрессия: карточка показывала «реинвестировано» по reinvest_profits_sum_amount, куда
+ * разлоченный реинвест продолжал попадать. В итоге одна и та же сумма выводилась дважды —
+ * и как работающий реинвест, и как ожидающая выплата, хотя в базе начисления её уже нет.
+ */
+it('убирает разлоченный реинвест из суммы «реинвестировано» в карточке', function () {
+    [$user, $package] = createReinvestUnlockPackage();
+    $this->actingAs($user);
+
+    PackageProfitReinvest::factory()->matured()->create([
+        'package_uuid' => $package->uuid,
+        'amount' => '150',
+    ]);
+
+    // Пока реинвест работает — он показан как «реинвестировано».
+    Livewire::test(Packages::class)
+        ->assertSee(__('components_account_itc_package_reinvested'));
+
+    Livewire::test(Packages::class)->call('unlockMaturedReinvests', $package->uuid);
+
+    // После снятия строка «реинвестировано» исчезает, остаётся только ожидающая выплата.
+    Livewire::test(Packages::class)
+        ->assertDontSee(__('components_account_itc_package_reinvested'))
+        ->assertSee(__('components_account_itc_package_unlocked_reinvests_label'));
+});
+
+it('оставляет в «реинвестировано» только неснятые реинвесты', function () {
+    [$user, $package] = createReinvestUnlockPackage();
+    $this->actingAs($user);
+
+    // Созревший — будет снят.
+    PackageProfitReinvest::factory()->matured()->create([
+        'package_uuid' => $package->uuid,
+        'amount' => '150',
+    ]);
+    // Замороженный — продолжает работать и остаётся в «реинвестировано».
+    PackageProfitReinvest::factory()->notMatured()->create([
+        'package_uuid' => $package->uuid,
+        'amount' => '40',
+    ]);
+
+    Livewire::test(Packages::class)->call('unlockMaturedReinvests', $package->uuid);
+
+    Livewire::test(Packages::class)
+        ->assertSee(__('components_account_itc_package_reinvested'))
+        ->assertSee('+40')
+        ->assertSee(__('components_account_itc_package_unlocked_reinvests_label'));
+});

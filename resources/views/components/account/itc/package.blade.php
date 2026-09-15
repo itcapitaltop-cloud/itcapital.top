@@ -300,10 +300,12 @@
                         </div>
 
                         <div class="flex items-baseline self-baseline mb-4 md:pl-3">
-                            @if ($package->reinvest_profits_sum_amount > 0)
+                            {{-- Только работающие реинвесты: разлоченные показаны отдельной
+                                строкой ожидающей выплаты ниже. --}}
+                            @if (($package->active_reinvest_profits_sum_amount ?? 0) > 0)
                                 <div class="flex flex-col items-baseline gap-1">
                                     <span class="text-[16px] md:text-[20px] font-dela leading-none">
-                                        +{{ scale($package->reinvest_profits_sum_amount)->stripTrailingZeros() }}
+                                        +{{ scale($package->active_reinvest_profits_sum_amount)->stripTrailingZeros() }}
                                     </span>
                                     <p
                                         class="text-[12px] text-white/50 tracking-wide leading-none font-bold md:pl-2 block">

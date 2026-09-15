@@ -349,7 +349,12 @@ class ItcPackage extends Model
             ->withCount(['unlockableReinvestProfits'])
             ->withSum(['unlockableReinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['unlockedReinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withMin('unlockedReinvestProfits', 'payout_at');
+            ->withMin('unlockedReinvestProfits', 'payout_at')
+            // Карточка показывает «реинвестировано» именно по этой сумме: разлоченный
+            // реинвест уже вышел из базы начисления и отображается отдельной строкой
+            // ожидающей выплаты, поэтому в «реинвестировано» он попадать не должен —
+            // иначе одна и та же сумма видна в карточке дважды.
+            ->withSum(['activeReinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount');
     }
 
     #[Scope]
