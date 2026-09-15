@@ -79,7 +79,7 @@ class AdminController extends Controller
                     ->where('work_to', '<=', now())
                     ->whereDoesntHave('reinvestProfits', fn ($qq) => $qq->where('amount', '>', 0));
             })
-            ->withSum(['reinvestProfits' => fn ($query) => $query->select(DB::raw('COALESCE(SUM(amount), 0)'))], 'amount')
+            ->withSum(['activeReinvestProfits' => fn ($query) => $query->select(DB::raw('COALESCE(SUM(amount), 0)'))], 'amount')
             ->withSum(['partnerTransfers' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
@@ -94,7 +94,7 @@ class AdminController extends Controller
                     // строку package_balance_withdraws. Две суммы никогда не пересекаются,
                     // поэтому база не проседает дважды и не возвращается на один прогон.
                     $base = BigDecimal::of($package->transaction->amount)
-                        ->plus($package->reinvest_profits_sum_amount)
+                        ->plus($package->active_reinvest_profits_sum_amount ?? 0)
                         ->plus($package->partner_transfers_sum_amount ?? 0)
                         ->plus($package->reinvest_to_body_sum_amount ?? 0)
                         ->minus($package->balance_withdraws_sum_amount ?? 0)

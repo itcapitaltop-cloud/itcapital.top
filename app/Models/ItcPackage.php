@@ -341,7 +341,15 @@ class ItcPackage extends Model
             ->withSum(['balanceWithdraws' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['reinvestToBody' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
             ->withSum(['pendingBodyUnlocks' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
-            ->withMin('pendingBodyUnlocks', 'payout_at');
+            ->withMin('pendingBodyUnlocks', 'payout_at')
+            // Имена этих четырёх агрегатов зафиксированы вьюхой
+            // resources/views/components/account/itc/package.blade.php: каждое чтение там
+            // прикрыто `?? 0` / `?? null`, поэтому переименование не сломает страницу,
+            // а молча спрячет кнопку снятия и строку ожидающей выплаты.
+            ->withCount(['unlockableReinvestProfits'])
+            ->withSum(['unlockableReinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withSum(['unlockedReinvestProfits' => fn ($q) => $q->select(DB::raw('COALESCE(SUM(amount),0)'))], 'amount')
+            ->withMin('unlockedReinvestProfits', 'payout_at');
     }
 
     #[Scope]

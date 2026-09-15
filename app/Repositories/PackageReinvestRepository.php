@@ -34,7 +34,14 @@ class PackageReinvestRepository implements PackageReinvestRepositoryContract
     public function withdraw(string $reinvestUuid, TransactionRepositoryContract $transactionRepo, bool $writeAdminAudit = true): void
     {
         DB::transaction(function () use ($reinvestUuid, $transactionRepo, $writeAdminAudit) {
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            // PostgreSQL принимает SET TRANSACTION ISOLATION LEVEL только первым запросом
+            // транзакции. Вложенный DB::transaction() открывает лишь SAVEPOINT, поэтому на
+            // уровне > 1 этот statement не просто бессмысленен, а запрещён (SQLSTATE 25001).
+            // Пропустить его там — правильное поведение, а не уступка тестам: внешняя
+            // транзакция (closePackage(), RefreshDatabase) уже задала свой уровень изоляции.
+            if (DB::transactionLevel() === 1) {
+                DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            }
 
             $reinvest = PackageProfitReinvest::query()
                 ->where('uuid', $reinvestUuid)

@@ -134,7 +134,12 @@ class ItcPackageRepository implements ItcPackageRepositoryContract
         PackageReinvestRepositoryContract $reinvestRepo
     ): void {
         DB::transaction(function () use ($uuid, $transactionRepo, $reinvestRepo) {
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            // См. PackageReinvestRepository::withdraw(): на вложенном уровне (SAVEPOINT)
+            // PostgreSQL отвергает смену уровня изоляции, поэтому выставляем её только
+            // в самой внешней транзакции.
+            if (DB::transactionLevel() === 1) {
+                DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            }
 
             $package = ItcPackage::query()
                 ->where('uuid', $uuid)

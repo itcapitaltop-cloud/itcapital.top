@@ -362,14 +362,23 @@ class Packages extends Component
         }
 
         DB::transaction(function () use ($package) {
-            // 1) Все активные реинвесты (без withdraw) — их будем удалять и переносить сумму в тело пакета
+            // 1) Все активные реинвесты (без withdraw) — их будем удалять и переносить сумму в тело пакета.
+            //
+            // whereNull('unlocked_at') обязателен: разлоченный реинвест уже вышел из базы
+            // начисления и закреплён за отложенной выплатой, которую пользователю обещали.
+            // Без этого условия его сумма вернулась бы в тело, а сам он был бы удалён —
+            // деньги достались бы пакету, а выплата, которую ждёт пользователь, исчезла.
             $activeReinvests = PackageProfitReinvest::query()
                 ->where('package_uuid', $package->uuid)
                 ->whereDoesntHave('withdraw')
+                ->whereNull('unlocked_at')
                 ->with('profitLink')
                 ->orderBy('created_at')
                 ->orderBy('uuid')
-                ->get(['id', 'uuid', 'amount', 'created_at']);
+                // package_uuid обязателен в выборке: при удалении реинвеста ниже
+                // PackageProfitReinvestSummaryObserver пересчитывает user_summary именно
+                // по нему, а на незагруженной колонке падает с TypeError.
+                ->get(['id', 'uuid', 'package_uuid', 'amount', 'created_at']);
 
             if ($activeReinvests->isEmpty()) {
 
